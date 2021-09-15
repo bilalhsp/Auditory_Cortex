@@ -12,13 +12,11 @@ class Neural_Data:
   'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
   """
   def __init__(self, dir, json_file="Neural_data_files.json"):
-    """Ok Class
-    """
     self.dir = dir
     self.json_file = json_file
     self.spikes, self.trials = self.load_data(self.dir, self.json_file)
     self.num_channels = len(self.spikes.keys())
-    print(self.num_channels)
+    print(f"Data from {self.num_channels:.0f} channels loaded...!")
 
   def load_data(self,dir, j_file):
     """ Loads data from __MSspk.mat files and returns a tuple of dictionaries. 
