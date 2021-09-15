@@ -4,7 +4,7 @@ import json
 import os
 
 
-class Neural_dataset:
+class Neural_Data:
   """Neural_dataset class loads neural data, from the directory specified at creation & 
   provides functions to retrieve 'relative/absolute' spike times, or spike counts in the durations
   whose width is specified by 'win'
