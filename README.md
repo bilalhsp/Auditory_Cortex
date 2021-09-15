@@ -9,7 +9,7 @@ import Auditory_Cortex.Dataset as dataset
 data = dataset.Neural_Data("path_of_working_directory")                                                                                                         
 #"path_of_working_directory" is the address of the folder containing channel files and json file.
 
-#Functions:
+#Functions:                                                                                                                                                                         
 data.retrieve_spike_times(sent = sentence_code)                                                                                                                       
 #Returns times of spikes, relative to stimulus onset or absolute time
 #provide 'sentence_code' or 'trial_number' as argument
