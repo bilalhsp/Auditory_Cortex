@@ -16,7 +16,7 @@ class Neural_Data:
     self.json_file = json_file
     self.spikes, self.trials = self.load_data(self.dir, self.json_file)
     self.num_channels = len(self.spikes.keys())
-    print(f"Data from {self.num_channels:.0f} channels loaded...!")
+    print(f"Data from {self.num_channels} channels loaded...!")
 
   def load_data(self,dir, j_file):
     """ Loads data from __MSspk.mat files and returns a tuple of dictionaries. 
