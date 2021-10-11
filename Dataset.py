@@ -86,25 +86,28 @@ class Neural_Data:
     win = win/1000
     bins = {}             #miliseconds
     for i in range(self.num_channels):
-      tmp = np.zeros(int(np.ceil(s_times[i][-1]/win)))
-      j = 0
-      en = win                  #End time for ongoing search window
-    
-      for val in s_times[i]:
+      if s_times[i][-1] > 0:
+        tmp = np.zeros(int(np.ceil(s_times[i][-1]/win)))
+        j = 0
+        en = win                  #End time for ongoing search window
 
-        if (val< en):
-          if early_spikes:
-            tmp[j] += 1
-          else:      
-            if val >= 0:
+        for val in s_times[i]:
+
+          if (val< en):
+            if early_spikes:
               tmp[j] += 1
-        else:    
-          while(val > en):
-            j += 1
-            # tmp[j] += 1
-            en += win
-          tmp[j] += 1
-      bins[i] = tmp
+            else:      
+              if val >= 0:
+                tmp[j] += 1
+          else:    
+            while(val > en):
+              j += 1
+              # tmp[j] += 1
+              en += win
+            tmp[j] += 1
+        bins[i] = tmp
+      else:
+         bins[i] = np.zeros(1)
     return bins
 
   def retrieve_spikes_count(self, sent=212, trial = 0, win = 50, early_spikes = True):
