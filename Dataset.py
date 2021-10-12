@@ -111,7 +111,7 @@ class Neural_Data:
     win = win/1000
     bins = {}             #miliseconds
     for i in range(self.num_channels):
-      tmp = np.zeros(int(self.sentdet[sent].duration/win))
+      tmp = np.zeros(round(self.sentdet[sent].duration/win))
       if s_times[i][-1] > 0:
         j = 0
         en = win                  #End time for ongoing search window
