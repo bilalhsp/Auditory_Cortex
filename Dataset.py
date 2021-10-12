@@ -117,19 +117,19 @@ class Neural_Data:
         en = win                  #End time for ongoing search window
 
         for val in s_times[i]:
-
-          if (val< en):
-            if early_spikes:
-              tmp[j] += 1
-            else:      
-              if val >= 0:
+          if val < self.sentdet[sent].duration:
+            if (val< en):
+              if early_spikes:
                 tmp[j] += 1
-          else:    
-            while(val > en):
-              j += 1
-              # tmp[j] += 1
-              en += win
-            tmp[j] += 1
+              else:      
+                if val >= 0:
+                  tmp[j] += 1
+            else:    
+              while(val > en):
+                j += 1
+                # tmp[j] += 1
+                en += win
+              tmp[j] += 1
       bins[i] = tmp
     
     return bins
