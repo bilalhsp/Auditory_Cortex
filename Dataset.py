@@ -111,7 +111,7 @@ class Neural_Data:
     win = win/1000
     bins = {}             #miliseconds
     for i in range(self.num_channels):
-      tmp = np.zeros(round(self.sentdet[sent].duration/win))
+      tmp = np.zeros(int(np.floor(self.sentdet[sent].duration/win + 0.4)))  # Trying to exactly match number of frames given by transformer (rounding precision)
       if s_times[i][-1] > 0:
         j = 0
         en = win                  #End time for ongoing search window
