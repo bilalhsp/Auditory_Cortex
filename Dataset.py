@@ -13,7 +13,7 @@ class Neural_Data:
   """
   def __init__(self, dir, json_file="Neural_data_files.json", mat_file = 'out_sentence_details_timit_all_loudness.mat'):
     self.dir = dir
-    self.sentences = io.loadmat(os.path.join(data_dir + mat_file), struct_as_record = False, squeeze_me = True, )
+    self.sentences = io.loadmat(os.path.join(self.dir + mat_file), struct_as_record = False, squeeze_me = True, )
     self.features = self.sentences['features']
     self.phn_names = self.sentences['phnnames']
     self.sentdet = self.sentences['sentdet']
@@ -101,19 +101,18 @@ class Neural_Data:
     
     return s_times
 
-  def create_bins(self, s_times, win=50, early_spikes = True):
+  def create_bins(self, s_times, sent=212, win=50, early_spikes = True):
     """Returns bins containing number of spikes in the 'win' durations
       following the stimulus onset.
       'win' (int) miliseconds specifing the width of time slots for binds
       'early_spikes' (bool: default = True) to include or discard early spikes 
       that start a little before stimulus onset time.
-
     """
     win = win/1000
     bins = {}             #miliseconds
     for i in range(self.num_channels):
+      tmp = np.zeros(int(np.ceil(self.sentdet[sent].duration/win)))
       if s_times[i][-1] > 0:
-        tmp = np.zeros(int(np.ceil(s_times[i][-1]/win)))
         j = 0
         en = win                  #End time for ongoing search window
 
@@ -131,9 +130,8 @@ class Neural_Data:
               # tmp[j] += 1
               en += win
             tmp[j] += 1
-        bins[i] = tmp
-      else:
-         bins[i] = np.zeros(1)
+      bins[i] = tmp
+    
     return bins
 
   def retrieve_spikes_count(self, sent=212, trial = 0, win = 50, early_spikes = True):
@@ -150,6 +148,6 @@ class Neural_Data:
     #get 'relative' spike times for the given sentence and trial
     s_times = self.retrieve_spike_times(sent=sent, trial=trial, early_spikes = early_spikes)
     #return spikes count in each bin
-    output = self.create_bins(s_times, win = win, early_spikes = early_spikes)
+    output = self.create_bins(s_times, sent = sent, win = win, early_spikes = early_spikes)
     
     return output
