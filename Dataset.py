@@ -11,8 +11,13 @@ class Neural_Data:
   'dir': (String) Path to the directory containing data files and the json_file.
   'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
   """
-  def __init__(self, dir, json_file="Neural_data_files.json"):
+  def __init__(self, dir, json_file="Neural_data_files.json", mat_file = 'out_sentence_details_timit_all_loudness.mat'):
     self.dir = dir
+    self.sentences = io.loadmat(os.path.join(data_dir + mat_file), struct_as_record = False, squeeze_me = True, )
+    self.features = self.sentences['features']
+    self.phn_names = self.sentences['phnnames']
+    self.sentdet = self.sentences['sentdet']
+    self.fs = self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
     self.json_file = json_file
     self.spikes, self.trials = self.load_data(self.dir, self.json_file)
     self.num_channels = len(self.spikes.keys())
@@ -43,6 +48,27 @@ class Neural_Data:
     
     return spikes, trials
 
+  def phoneme(self, sent=0):
+    #indices where phoneme exists
+    phoneme_present = np.amax(self.sentdet[sent].phnmat, axis=0)
+    # one-hot-encoding to indices (these may carry 0 where no phoneme is present)
+    indices = np.argmax(self.sentdet[sent].phnmat, axis = 0)
+    #eliminate 0's for no phonemes
+    indices = indices[np.where(phoneme_present>0)]
+    return self.phn_names[indices]
+  
+  def audio(self, sent=0):
+    sound = self.sentdet[sent].sound
+    return sound
+
+  def audio_phoneme_data(self):
+    audio = {}
+    phnm = {}
+    for i in range(499):
+      phnm[i] = self.phoneme(i)
+      audio[i] = self.audio(i)
+    return audio, phnm
+  
   def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative', early_spikes = True):
     """Returns times of spikes, relative to stimulus onset or absolute time
     'sent' (int) index of stimulus sentencce 
