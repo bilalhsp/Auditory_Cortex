@@ -11,19 +11,18 @@ class Neural_Data:
   'dir': (String) Path to the directory containing data files and the json_file.
   'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
   """
-  def __init__(self, dir, json_file="Neural_data_files.json", mat_file = 'out_sentence_details_timit_all_loudness.mat'):
+  def __init__(self, dir,  mat_file = 'out_sentence_details_timit_all_loudness.mat'):
     self.dir = dir
     self.sentences = io.loadmat(os.path.join(self.dir + mat_file), struct_as_record = False, squeeze_me = True, )
     self.features = self.sentences['features']
     self.phn_names = self.sentences['phnnames']
     self.sentdet = self.sentences['sentdet']
     self.fs = self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
-    self.json_file = json_file
-    self.spikes, self.trials = self.load_data(self.dir, self.json_file)
+    self.spikes, self.trials = self.load_data()
     self.num_channels = len(self.spikes.keys())
     print(f"Data from {self.num_channels} channels loaded...!")
 
-  def load_data(self,dir, j_file):
+  def load_data(self):
     """ Loads data from __MSspk.mat files and returns a tuple of dictionaries. 
     Takes in the path of directory having the __MUspk.mat files and json file 
     with filenames to load. 
@@ -33,16 +32,13 @@ class Neural_Data:
     (spikes, trials): 1st carries dictionary of spike structs read from __MUspk files
     and second one carries dictionary of trial structs.
     """
-    data = {}
+    path = os.path.join(self.dir,"data_files")
+    names = os.listdir(path)
     spikes = {}
     trials = {}
-
-    with open(os.path.join(dir,j_file), 'r') as file:
-      f_names = json.load(file)
-    
-    # Load all data files, as specified by the json file.
-    for i in range(len(f_names.keys())):
-      data[i] = io.loadmat(os.path.join(dir,f_names[str(i)]), squeeze_me = True, struct_as_record = False)
+    data = {}
+    for i, name in enumerate(names):
+      data[i] = io.loadmat(os.path.join(path,name), squeeze_me = True, struct_as_record = False)
       spikes[i] = data[i]['spike']
       trials[i] = data[i]['trial']
     
