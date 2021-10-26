@@ -108,7 +108,7 @@ class Neural_Data:
     bins = {}             #miliseconds
     for i in range(self.num_channels):
       #tmp = np.zeros(int(np.floor(self.sentdet[sent].duration/win + 0.39)))  # Trying to exactly match number of frames given by transformer (rounding precision)
-      tmp = np.zeros(int(np.ceil(self.sentdet[sent].duration/win)))    #to match the number of frames with Akshita's GRU based model
+      tmp = np.zeros(int(np.ceil(self.sentdet[sent].duration/win + 0.1)))    #to match the number of frames with Akshita's GRU based model
       #if s_times[i][-1] > 0:
       j = 0
       en = win                  #End time for ongoing search window
