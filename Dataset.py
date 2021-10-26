@@ -81,7 +81,7 @@ class Neural_Data:
     if trial ==0:
       # if no trial # is provided, use the first trial for the given sentence
       # tr carries the trial # to index through spike data
-      tr = self.spikes[0].trial[self.spikes[0].timitStimcode==sent][trial] 
+      tr = self.spikes[1].trial[self.spikes[1].timitStimcode==sent][trial] 
     else:
       print('Please provide Trial # corresponding to the provided sentence using of spike.trial')
       tr = trial
