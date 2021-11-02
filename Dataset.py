@@ -65,6 +65,30 @@ class Neural_Data:
       audio[i] = self.audio(i)
     return audio, phnm
   
+  def get_trials(self, sent):
+    #get all trials for sentence 'sent'
+    #Trials are repeated for these sentences only
+    #sents = [12,13,31,43,56,163,212,218,287,308]
+
+    #trials = np.unique(obj.dataset.spikes[1].trial[obj.dataset.spikes[1].timitStimcode==sent])
+    # Using channel 1 trials dict to get list of trials for 'sent', but trials for all the channels are the same 
+    #only the outcome 'spikes' can vary, so that is the reason of not using spikes
+    
+    trials = (np.where(self.trials[1].timitStimcode == sent)[0]) + 1          # adding 1 to match the indexes
+    return trials
+
+  def retrieve_spikes_count_for_all_trials(self, sent, w=50):
+    trials = self.get_trials(sent)
+    spikes = {}
+    for i in range(self.num_channels):
+      spk = self.retrieve_spikes_count(trial=trials[0], win = w, early_spikes = False)[i]
+      spikes_ch = np.zeros((len(trials), spk.shape[0]))
+      spikes_ch[0] = spk
+      for x, tr in enumerate(trials[1:]):
+        spikes_ch[x+1] = obj.dataset.retrieve_spikes_count(trial=tr, win = 40, early_spikes = True)[1]
+      spikes[i] = spikes_ch
+    return spikes
+
   def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative', early_spikes = True):
     """Returns times of spikes, relative to stimulus onset or absolute time
     'sent' (int) index of stimulus sentencce 
@@ -81,9 +105,10 @@ class Neural_Data:
     if trial ==0:
       # if no trial # is provided, use the first trial for the given sentence
       # tr carries the trial # to index through spike data
-      tr = self.spikes[1].trial[self.spikes[1].timitStimcode==sent][trial] 
+      #tr = self.spikes[1].trial[self.spikes[1].timitStimcode==sent][trial] 
+      tr = (np.where(self.trials[1].timitStimcode == sent)[0][0]) + 1      # adding 1 to match the indexes
     else:
-      print('Please provide Trial # corresponding to the provided sentence using of spike.trial')
+      #print('Please provide Trial # corresponding to the provided sentence using of spike.trial')
       tr = trial
       
     for i in range(self.num_channels):
@@ -97,7 +122,7 @@ class Neural_Data:
     
     return s_times
 
-  def create_bins(self, s_times, sent=212, win=50, early_spikes = True):
+  def create_bins(self, s_times, sent=212, win=50, early_spikes = True, model = 'transformer'):
     """Returns bins containing number of spikes in the 'win' durations
       following the stimulus onset.
       'win' (int) miliseconds specifing the width of time slots for binds
@@ -106,9 +131,15 @@ class Neural_Data:
     """
     win = win/1000
     bins = {}             #miliseconds
+    if model == 'transformer':
+       # Trying to exactly match number of frames given by transformer (rounding precision)
+      n = int(np.floor(self.sentdet[sent].duration/win + 0.39))
+    else:
+        #to match the number of frames with Akshita's GRU based model
+      n = int(np.ceil(self.sentdet[sent].duration/win + 0.001))
     for i in range(self.num_channels):
-      #tmp = np.zeros(int(np.floor(self.sentdet[sent].duration/win + 0.39)))  # Trying to exactly match number of frames given by transformer (rounding precision)
-      tmp = np.zeros(int(np.ceil(self.sentdet[sent].duration/win + 0.001)))    #to match the number of frames with Akshita's GRU based model
+      tmp = np.zeros(n) 
+      #tmp = np.zeros()  
       #if s_times[i][-1] > 0:
       j = 0
       en = win                  #End time for ongoing search window
