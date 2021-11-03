@@ -85,7 +85,7 @@ class Neural_Data:
       spikes_ch = np.zeros((len(trials), spk.shape[0]))
       spikes_ch[0] = spk
       for x, tr in enumerate(trials[1:]):
-        spikes_ch[x+1] = obj.dataset.retrieve_spikes_count(trial=tr, win = 40, early_spikes = True)[1]
+        spikes_ch[x+1] = self.retrieve_spikes_count(trial=tr, win = w, early_spikes = True)[1]
       spikes[i] = spikes_ch
     return spikes
 
