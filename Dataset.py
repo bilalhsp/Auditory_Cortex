@@ -11,18 +11,18 @@ class Neural_Data:
   'dir': (String) Path to the directory containing data files and the json_file.
   'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
   """
-  def __init__(self, dir,  mat_file = 'out_sentence_details_timit_all_loudness.mat'):
+  def __init__(self, dir,  mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
     self.dir = dir
     self.sentences = io.loadmat(os.path.join(self.dir, mat_file), struct_as_record = False, squeeze_me = True, )
     self.features = self.sentences['features']
     self.phn_names = self.sentences['phnnames']
     self.sentdet = self.sentences['sentdet']
     self.fs = self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
-    self.spikes, self.trials = self.load_data()
+    self.spikes, self.trials = self.load_data(verbose=verbose)
     self.num_channels = len(self.spikes.keys())
     print(f"Data from {self.num_channels} channels loaded...!")
 
-  def load_data(self):
+  def load_data(self, verbose):
     """ Loads data from __MSspk.mat files and returns a tuple of dictionaries. 
     Takes in the path of directory having the __MUspk.mat files and json file 
     with filenames to load. 
@@ -38,6 +38,8 @@ class Neural_Data:
     trials = {}
     data = {}
     for i, name in enumerate(names):
+      if verbose:
+        print(name)
       data[i] = io.loadmat(os.path.join(path,name), squeeze_me = True, struct_as_record = False)
       spikes[i] = data[i]['spike']
       trials[i] = data[i]['trial']
@@ -122,7 +124,7 @@ class Neural_Data:
     
     return s_times
 
-  def create_bins(self, s_times, sent=212, win=50, early_spikes = True, model = 'transformer'):
+  def create_bins(self, s_times, sent=212, win=50, delay = 0, early_spikes = True, model = 'transformer'):
     """Returns bins containing number of spikes in the 'win' durations
       following the stimulus onset.
       'win' (int) miliseconds specifing the width of time slots for binds
@@ -142,27 +144,29 @@ class Neural_Data:
       #tmp = np.zeros()  
       #if s_times[i][-1] > 0:
       j = 0
-      en = win                  #End time for ongoing search window
+      st = delay
+      en = st+win                  #End time for ongoing search window
 
       for val in s_times[i]:
-        if val < (tmp.size * win):
-          if (val< en):
-            if early_spikes:
-              tmp[j] += 1
-            else:      
-              if val >= 0:
-                tmp[j] += 1
-          else:    
+        if val < (tmp.size * win + st):
+          if (val<= en and val>st):
+            tmp[j] += 1
+#             if early_spikes:
+#               tmp[j] += 1
+#             else:      
+#               if val >= 0:
+#                 tmp[j] += 1
+          elif val>en:    
             while(val > en):
               j += 1
-              # tmp[j] += 1
+              st += win
               en += win
             tmp[j] += 1
       bins[i] = tmp
     
     return bins
 
-  def retrieve_spikes_count(self, sent=212, trial = 0, win = 50, early_spikes = True):
+  def retrieve_spikes_count(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True):
     """Returns number of spikes in every 'win' miliseconds duration following the 
     stimulus onset time.
     'sent' (int) index of stimulus sentencce 
@@ -176,6 +180,6 @@ class Neural_Data:
     #get 'relative' spike times for the given sentence and trial
     s_times = self.retrieve_spike_times(sent=sent, trial=trial, early_spikes = early_spikes)
     #return spikes count in each bin
-    output = self.create_bins(s_times, sent = sent, win = win, early_spikes = early_spikes)
+    output = self.create_bins(s_times, sent = sent, win = win,delay=delay, early_spikes = early_spikes)
     
     return output
