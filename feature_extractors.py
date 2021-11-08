@@ -1,5 +1,5 @@
 from torch import nn, Tensor
-class feature_extractor_S2T(nn.Module):
+class Feature_Extractor_S2T(nn.Module):
   def __init__(self, model: nn.Module, layers):
     super(feature_extractor, self).__init__()
     self.model = model
