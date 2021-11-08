@@ -148,7 +148,7 @@ class Neural_Data:
       en = st+win                  #End time for ongoing search window
 
       for val in s_times[i]:
-        if val < (tmp.size * win + st):
+        if val < (tmp.size * win + delay):
           if (val<= en and val>st):
             tmp[j] += 1
 #             if early_spikes:
