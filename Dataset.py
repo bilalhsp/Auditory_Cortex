@@ -2,7 +2,7 @@ from scipy import io
 import numpy as np
 import json
 import os
-
+import matplotlib.pyplot as plt
 
 class Neural_Data:
   """Neural_dataset class loads neural data, from the directory specified at creation & 
@@ -208,40 +208,40 @@ class Neural_Data:
     
     # Neural Data Plotting Functions....
     
-    def rastor_plot(self ,sent=12, ch=9):
-        # Rastor plot for all the trials of given 'sent' and channel 'ch'
-        
-        #Repeated trials for following timitStimcodes only
-        #sents = [12,13,32,43,56,163,212,218,287,308]
-        spikes = {}
-        max_time = 0
-        fig = plt.figure(figsize=(12,6))
-        trials = self.get_trials(sent=sent)
-        for i, tr in enumerate(trials):
-            spikes[i] = self.retrieve_spike_times(sent=sent, trial=tr)[ch]
-            mx = np.amax(spikes[i], axis=0)
-            if mx > max_time:
-                max_time = mx 
-            #print(spikes[i].shape)
-            plt.eventplot(spikes[i], lineoffsets=i+1, linelengths=0.3, linestyles='-', linewidths=8)
-        plt.xlim(0,max_time)
-        plt.xlabel('Time (s)', fontsize=14)
-        plt.ylabel('Trials', fontsize=14)
-        plt.title(f"Rastor Plot for session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}'", fontsize=14, fontweight='bold')
-    def psth(obj, sent=12, ch=9, win = 40):
-        trials = self.get_trials(sent=sent)
-        spikes = {}
-        fig = plt.figure(figsize=(12,6))
-        for i, tr in enumerate(trials):
-            spikes[i] = self.retrieve_spikes_count(sent=12, trial=tr, win=win)[ch]
-            if i==0:
-                psth = np.zeros(spikes[i].shape[0])
-            psth += spikes[i]
-            #print(spikes[i].shape)
-        #print(psth.shape)
-        edges = np.float64(np.arange(0, psth.shape[0]))*win/1000
-        plt.bar(edges,psth, width=(0.8*win/1000))
-        # plt.xlim(0,2)
-        plt.xlabel('Time (s)', fontsize=14)
-        plt.ylabel('Spike Counts', fontsize=14)
-        plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
+  def rastor_plot(self ,sent=12, ch=9):
+    # Rastor plot for all the trials of given 'sent' and channel 'ch'
+
+    #Repeated trials for following timitStimcodes only
+    #sents = [12,13,32,43,56,163,212,218,287,308]
+    spikes = {}
+    max_time = 0
+    fig = plt.figure(figsize=(12,6))
+    trials = self.get_trials(sent=sent)
+    for i, tr in enumerate(trials):
+        spikes[i] = self.retrieve_spike_times(sent=sent, trial=tr)[ch]
+        mx = np.amax(spikes[i], axis=0)
+        if mx > max_time:
+            max_time = mx 
+        #print(spikes[i].shape)
+        plt.eventplot(spikes[i], lineoffsets=i+1, linelengths=0.3, linestyles='-', linewidths=8)
+    plt.xlim(0,max_time)
+    plt.xlabel('Time (s)', fontsize=14)
+    plt.ylabel('Trials', fontsize=14)
+    plt.title(f"Rastor Plot for session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}'", fontsize=14, fontweight='bold')
+  def psth(self, sent=12, ch=9, win = 40):
+    trials = self.get_trials(sent=sent)
+    spikes = {}
+    fig = plt.figure(figsize=(12,6))
+    for i, tr in enumerate(trials):
+        spikes[i] = self.retrieve_spikes_count(sent=12, trial=tr, win=win)[ch]
+        if i==0:
+            psth = np.zeros(spikes[i].shape[0])
+        psth += spikes[i]
+        #print(spikes[i].shape)
+    #print(psth.shape)
+    edges = np.float64(np.arange(0, psth.shape[0]))*win/1000
+    plt.bar(edges,psth, width=(0.8*win/1000))
+    # plt.xlim(0,2)
+    plt.xlabel('Time (s)', fontsize=14)
+    plt.ylabel('Spike Counts', fontsize=14)
+    plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
