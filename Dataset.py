@@ -224,10 +224,11 @@ class Neural_Data:
             max_time = mx 
         #print(spikes[i].shape)
         plt.eventplot(spikes[i], lineoffsets=i+1, linelengths=0.3, linestyles='-', linewidths=8)
-    plt.xlim(0,max_time)
+    plt.xlim(0,max_time+0.1)
     plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Trials', fontsize=14)
     plt.title(f"Rastor Plot for session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}'", fontsize=14, fontweight='bold')
+    plt.show()
   def psth(self, sent=12, ch=9, win = 40):
     trials = self.get_trials(sent=sent)
     spikes = {}
@@ -245,3 +246,27 @@ class Neural_Data:
     plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Spike Counts', fontsize=14)
     plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
+    plt.show()
+
+  def spectrogram(self, sent=12, ch=0):
+    sent = sent - 1
+
+    bef = self.sentdet[sent].befaft[0]
+    aft = self.sentdet[sent].befaft[0]
+    pw = self.sentdet[sent].sound
+    fs =  self.sentdet[sent].soundf
+
+    # print()
+
+    pwDur = self.sentdet[sent].duration
+
+    spectroDur = self.sentdet[sent].aud.shape[1]
+    spectrogramPrecision = pwDur/spectroDur
+    befSpectro = round(bef/spectrogramPrecision)
+    aftSpectro = round(aft/spectrogramPrecision)
+
+    spectroTimeVec = np.linspace(0,pwDur-(bef+aft),5)
+
+    plt.imshow(self.sentdet[sent].aud[:, befSpectro : -aftSpectro], origin='lower')
+    plt.xticks(ticks=np.linspace(0, spectroDur-(befSpectro+aftSpectro), 5) ,labels=spectroTimeVec.round(decimals=2))
+    plt.show()
