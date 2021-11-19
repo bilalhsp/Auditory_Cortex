@@ -63,8 +63,21 @@ class Neural_Data:
   def audio(self, sent=1):
     # subtracting 1 because timitStimcodes range [1,500) and sent indices range [0,499)
     sent -= 1
+    fs = self.sentdet[sent].soundf
+    bef = self.sentdet[sent].befaft[0]
+    aft = self.sentdet[sent].befaft[1]
     sound = self.sentdet[sent].sound
+    sound = sound[int(bef*fs):-int(aft*fs)]
+    
     return sound
+
+  def duration(self, sent=1):
+    sent -= 1
+    
+    bef = self.sentdet[sent].befaft[0]
+    aft = self.sentdet[sent].befaft[1]
+    duration = self.sentdet[sent].duration - (bef + aft)
+    return duration
 
   def audio_phoneme_data(self):
     audio = {}
@@ -143,10 +156,10 @@ class Neural_Data:
     if model == 'transformer':
        # Trying to exactly match number of frames given by transformer (rounding precision)
         #Indices of 'sentdet' start from 0, whereas timitStimcodes start from 1
-      n = int(np.floor(self.sentdet[sent-1].duration/win + 0.39))
+      n = int(np.floor(self.duration(sent)/win + 0.39))
     else:
         #to match the number of frames with Akshita's GRU based model
-      n = int(np.ceil(self.sentdet[sent-1].duration/win + 0.001))
+      n = int(np.ceil(self.duration(sent)/win + 0.001))
     for i in range(self.num_channels):
       tmp = np.zeros(n, dtype=np.int32) 
       #tmp = np.zeros()  
@@ -176,7 +189,7 @@ class Neural_Data:
     
     return bins
 
-  def retrieve_spikes_count(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True):
+  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True):
     """Returns number of spikes in every 'win' miliseconds duration following the 
     stimulus onset time.
     'sent' (int) index of stimulus sentencce 
@@ -200,7 +213,8 @@ class Neural_Data:
     s_times = self.retrieve_spike_times(sent=sent, trial=trial)
     win = win/1000
     counts = {}
-    duration = round(self.sentdet[sent-1].duration,3)  #round off to 3 decimals...
+   
+    duration = round(self.duration(sent),3)  #round off to 3 decimals...
     bins = np.arange(delay, delay + duration, win)
     for i in range(self.num_channels):
         counts[i], _ = np.histogram(s_times[i], bins)
@@ -215,7 +229,7 @@ class Neural_Data:
     #sents = [12,13,32,43,56,163,212,218,287,308]
     spikes = {}
     max_time = 0
-    fig = plt.figure(figsize=(12,6))
+    #fig = plt.figure(figsize=(12,6))
     trials = self.get_trials(sent=sent)
     for i, tr in enumerate(trials):
         spikes[i] = self.retrieve_spike_times(sent=sent, trial=tr)[ch]
@@ -224,49 +238,26 @@ class Neural_Data:
             max_time = mx 
         #print(spikes[i].shape)
         plt.eventplot(spikes[i], lineoffsets=i+1, linelengths=0.3, linestyles='-', linewidths=8)
-    plt.xlim(0,max_time+0.1)
+    plt.xlim(0,self.duration(sent))
     plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Trials', fontsize=14)
-    plt.title(f"Rastor Plot for session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}'", fontsize=14, fontweight='bold')
-    plt.show()
+    #plt.title(f"Rastor Plot for session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}'", fontsize=14, fontweight='bold')
   def psth(self, sent=12, ch=9, win = 40):
     trials = self.get_trials(sent=sent)
     spikes = {}
-    fig = plt.figure(figsize=(12,6))
+    #fig = plt.figure(figsize=(12,6))
     for i, tr in enumerate(trials):
-        spikes[i] = self.retrieve_spikes_count(sent=12, trial=tr, win=win)[ch]
+        spikes[i] = self.retrieve_spike_counts(sent=12, trial=tr, win=win)[ch]
         if i==0:
             psth = np.zeros(spikes[i].shape[0])
         psth += spikes[i]
         #print(spikes[i].shape)
     #print(psth.shape)
+ 
+    psth /= trials.size
     edges = np.float64(np.arange(0, psth.shape[0]))*win/1000
     plt.bar(edges,psth, width=(0.8*win/1000))
-    # plt.xlim(0,2)
-    plt.xlabel('Time (s)', fontsize=14)
+    plt.xlim(0,self.duration(sent))
+    #plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Spike Counts', fontsize=14)
-    plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
-    plt.show()
-
-  def spectrogram(self, sent=12, ch=0):
-    sent = sent - 1
-
-    bef = self.sentdet[sent].befaft[0]
-    aft = self.sentdet[sent].befaft[0]
-    pw = self.sentdet[sent].sound
-    fs =  self.sentdet[sent].soundf
-
-    # print()
-
-    pwDur = self.sentdet[sent].duration
-
-    spectroDur = self.sentdet[sent].aud.shape[1]
-    spectrogramPrecision = pwDur/spectroDur
-    befSpectro = round(bef/spectrogramPrecision)
-    aftSpectro = round(aft/spectrogramPrecision)
-
-    spectroTimeVec = np.linspace(0,pwDur-(bef+aft),5)
-
-    plt.imshow(self.sentdet[sent].aud[:, befSpectro : -aftSpectro], origin='lower')
-    plt.xticks(ticks=np.linspace(0, spectroDur-(befSpectro+aftSpectro), 5) ,labels=spectroTimeVec.round(decimals=2))
-    plt.show()
+    #plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
