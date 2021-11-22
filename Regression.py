@@ -3,13 +3,13 @@ import torch
 import os
 from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
-from Dataset import Neural_Data
-from Feature_Extractors import Feature_Extractor_S2T
+from Auditory_Cortex.Dataset import Neural_Data
+from Auditory_Cortex.Feature_Extractors import Feature_Extractor_S2T
 
 class transformer_regression():
   def __init__(self, dir, subject):
     self.dir = os.path.join(dir, subject)
-    self.dataset = Neural_Data(self.dir)
+    self.dataset = Neural_Data(dir, subject)
     self.layers = ["model.encoder.layers.0.fc2", "model.encoder.layers.1.fc2", "model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
                    "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
                    "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
