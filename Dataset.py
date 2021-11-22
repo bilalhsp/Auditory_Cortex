@@ -153,6 +153,7 @@ class Neural_Data:
       that start a little before stimulus onset time.
     """
     win = win/1000
+    delay = delay/1000
     bins = {}             #miliseconds
     if model == 'transformer':
        # Trying to exactly match number of frames given by transformer (rounding precision)
