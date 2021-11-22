@@ -64,8 +64,9 @@ class Neural_Data:
     # subtracting 1 because timitStimcodes range [1,500) and sent indices range [0,499)
     sent -= 1
     fs = self.sentdet[sent].soundf
-    bef = self.sentdet[sent].befaft[0]
-    aft = self.sentdet[sent].befaft[1]
+    bef, aft = 0.5, 0.5
+    #bef = self.sentdet[sent].befaft[0]
+    #aft = self.sentdet[sent].befaft[1]
     sound = self.sentdet[sent].sound
     sound = sound[int(bef*fs):-int(aft*fs)]
     
@@ -73,9 +74,9 @@ class Neural_Data:
 
   def duration(self, sent=1):
     sent -= 1
-    
-    bef = self.sentdet[sent].befaft[0]
-    aft = self.sentdet[sent].befaft[1]
+    bef, aft = 0.5, 0.5
+    #bef = self.sentdet[sent].befaft[0]
+    #aft = self.sentdet[sent].befaft[1]
     duration = self.sentdet[sent].duration - (bef + aft)
     return duration
 
@@ -99,15 +100,15 @@ class Neural_Data:
     trials = (np.where(self.trials[1].timitStimcode == sent)[0]) + 1          # adding 1 to match the indexes
     return trials
 
-  def retrieve_spikes_count_for_all_trials(self, sent, w=50):
+  def retrieve_spike_counts_for_all_trials(self, sent, w=50):
     trials = self.get_trials(sent)
     spikes = {}
     for i in range(self.num_channels):
-      spk = self.retrieve_spikes_count(trial=trials[0], win = w, early_spikes = False)[i]
+      spk = self.retrieve_spike_counts(trial=trials[0], win = w, early_spikes = False)[i]
       spikes_ch = np.zeros((len(trials), spk.shape[0]))
       spikes_ch[0] = spk
       for x, tr in enumerate(trials[1:]):
-        spikes_ch[x+1] = self.retrieve_spikes_count(trial=tr, win = w, early_spikes = True)[1]
+        spikes_ch[x+1] = self.retrieve_spike_counts(trial=tr, win = w, early_spikes = True)[1]
       spikes[i] = spikes_ch
     return spikes
 
