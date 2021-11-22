@@ -19,10 +19,10 @@ class transformer_regression():
     print("Objects created, now loading Transformer layer features...!")
     self.features, self.demean_features = self.get_transformer_features()
 
-  def simply_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40):
+  def simply_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40, delay=0):
     spikes ={}
     for x,i in enumerate(range(sent_s,sent_e)):
-      spikes[x] = torch.tensor(self.dataset.retrieve_spikes_count(sent=i, win=w ,early_spikes=False)[ch])
+      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i, win=w, delay=delay ,early_spikes=False)[ch])
     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
     return spikes
 
@@ -30,7 +30,7 @@ class transformer_regression():
     spikes ={}
     spk_mean = {}
     for x,i in enumerate(range(sent_s,sent_e)):
-      spikes[x] = torch.tensor(self.dataset.retrieve_spikes_count(sent=i, win=40 ,early_spikes=False)[ch])
+      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i, win=40 ,early_spikes=False)[ch])
       spk_mean[x] = torch.mean(spikes[x], dim = 0)
       spikes[x] = spikes[x] - spk_mean[x]
     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
@@ -43,7 +43,7 @@ class transformer_regression():
     #sents = [12,13,32,43,56,163,212,218,287,308]
     r2_scores = np.zeros(self.dataset.num_channels)
     #trials = obj.dataset.get_trials(13)
-    spkk = self.dataset.retrieve_spikes_count_for_all_trials(sent=sent, w=w)
+    spkk = self.dataset.retrieve_spike_counts_for_all_trials(sent=sent, w=w)
   
     for i in range(self.dataset.num_channels):
       h1 = np.mean(spkk[i][0:6], axis=0)
@@ -152,13 +152,15 @@ class transformer_regression():
 
 
 
-  def compute_r2_channel(self, layer, win, channel):
+  def compute_r2_channel(self, layer, win, channel, delay):
     k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
     print(f"k = {k}")
     r2t = np.zeros(1)
     r2v = np.zeros(1)
+    r2tt = np.zeros(1)
     pct = np.zeros(1)
     pcv = np.zeros(1)
+    pctt = np.zeros(1)
 
     #downsamples if k>1 
     if k >1:
@@ -166,27 +168,33 @@ class transformer_regression():
     else:
       feats = self.features[layer]
 
-    m = int(feats.shape[0] *0.75)
-    x_train = feats[0:m, :]
-    x_test = feats[m:, :]
+    n1 = int(feats.shape[0] *0.75)
+    n2 = int(feats.shape[0] *0.90)
+    x_train = feats[0:n1, :]
+    x_val = feats[n1:n2, :]
+    x_test = feats[n2:, :]
     
     # for i in range(self.dataset.num_channels):
-    y = self.simply_spikes(ch=channel)
+    y = self.simply_spikes(ch=channel, delay=delay)
     if k>1:
       y = self.down_sample_spikes(y,k)
-    y_train = y[0:m]
-    y_test = y[m:]
+    y_train = y[0:n1]
+    y_val = y[n1:n2]    
+    y_test = y[n2:]
     B = self.regression_param(x_train, y_train)
 
     r2t = self.regression_score(x_train, y_train, B)
-    r2v = self.regression_score(x_test, y_test, B)
+    r2v = self.regression_score(x_val, y_val, B)
+    r2tt = self.regression_score(x_test, y_test, B)
     pct = np.corrcoef(self.predict(x_train, B), y_train)
-    pcv = np.corrcoef(self.predict(x_test, B), y_test)
+    pcv = np.corrcoef(self.predict(x_val, B), y_val)
+    pctt = np.corrcoef(self.predict(x_test, B), y_test)
     pct = np.square(pct[0,1])
     pcv = np.square(pcv[0,1])
+    pctt = np.square(pctt[0,1])
     
-    return r2t, r2v, pct, pcv
-
+    return r2t, r2v,r2tt, pct, pcv,pctt
+  
   def FE_r2_channel(self, layer, win, channel):
     k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
     print(f"k = {k}")
