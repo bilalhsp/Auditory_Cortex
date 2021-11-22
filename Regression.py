@@ -74,9 +74,8 @@ class transformer_regression():
   #     feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=0).numpy()
   #   return feats
 
-  def get_transformer_features(self):
-    sent_s = 1
-    sent_e = 499
+  def get_transformer_features(self, sent_s = 1, sent_e = 499):
+    
     features = [{} for _ in range(len(self.layers))]
     demean_features = [{} for _ in range(len(self.layers))]
     f_mean = {}    
