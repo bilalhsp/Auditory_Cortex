@@ -5,6 +5,9 @@ from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from Auditory_Cortex.Dataset import Neural_Data
 from Auditory_Cortex.Feature_Extractors import Feature_Extractor_S2T
+from sklearn.decomposition import PCA
+
+import matplotlib.pyplot as plt
 
 class transformer_regression():
   def __init__(self, dir, subject):
@@ -242,3 +245,42 @@ class transformer_regression():
     return B
   def predict(self, X, B):
     return X@B
+
+  def get_pcs(self, layer, sents):
+      #layer = 0
+      #sents = [495, 496, 497]
+      feats = [{} for _ in sents]
+      feats_pcs = {}
+      for i, s in enumerate(sents):
+        feats[i], _ = self.get_transformer_features(s, s+1)
+      layer_features = self.features[layer]
+      m = layer_features.shape[0]
+      pc = PCA(n_components=2)
+      pc.fit(layer_features[:int(0.75*m),:])
+      for i, s in enumerate(sents):
+        feats_pcs[i] = pc.transform(feats[i][layer]) 
+      return feats_pcs
+
+  def plot_pcs(self, l=0, sents=[495,496,497]):
+      c_maps = ['Greys', 'Purples', 'Blues', 'Oranges',
+                'Greens', 'Reds',
+                #'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+                #'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn'
+                ] 
+      leg_colors = ['tab:gray','tab:purple','tab:blue','tab:orange',
+                    'tab:green','tab:red']
+
+      pcs = self.get_pcs(layer=l, sents=sents)
+
+      for i in range(len(pcs.keys())):
+        shades = np.arange(0,pcs[i].shape[0])
+
+        plt.scatter(pcs[i][:,0], pcs[i][:,1], label=f"sent: {sents[i]}", cmap=c_maps[(i+2)%len(c_maps)], c=shades, vmin=-40, vmax=80)
+
+      leg = plt.legend(loc='best')
+      for i in range(len(pcs.keys())):
+        leg.legendHandles[i].set_color(leg_colors[(i+2)%len(leg_colors)])
+
+      plt.xlabel(f"PC1")
+      plt.ylabel(f"PC2")
+      plt.title(f"{self.layers[l]}")
