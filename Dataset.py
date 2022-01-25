@@ -25,7 +25,7 @@ class Neural_Data:
     print(f"Data from {self.num_channels} channels loaded...!")
 
   def load_data(self, verbose):
-    """ Loads data from __MSspk.mat files and returns a tuple of dictionaries. 
+    """ Loads data from __MUspk.mat files and returns a tuple of dictionaries. 
     Takes in the path of directory having the __MUspk.mat files and json file 
     with filenames to load. 
     'dir: (string) address of location with __MUspk.mat files
@@ -101,15 +101,27 @@ class Neural_Data:
     return trials
 
   def retrieve_spike_counts_for_all_trials(self, sent, w=50):
+    
     trials = self.get_trials(sent)
-    spikes = {}
+    spk = self.retrieve_spike_counts(trial=trials[0], win = w, early_spikes = False)
+    spikes = {i:np.zeros((len(trials), spk[0].shape[0])) for i in range(self.num_channels)}
     for i in range(self.num_channels):
-      spk = self.retrieve_spike_counts(trial=trials[0], win = w, early_spikes = False)[i]
-      spikes_ch = np.zeros((len(trials), spk.shape[0]))
-      spikes_ch[0] = spk
-      for x, tr in enumerate(trials[1:]):
-        spikes_ch[x+1] = self.retrieve_spike_counts(trial=tr, win = w, early_spikes = True)[1]
-      spikes[i] = spikes_ch
+        spikes[i][0] = spk[i]
+    for x, tr in enumerate(trials[1:]):
+        spikes_tr = self.retrieve_spike_counts(trial=tr, win = w, early_spikes = True)
+        for i in range(self.num_channels):
+            spikes[i][x+1] = spikes_tr[i]
+
+    
+#     trials = self.get_trials(sent)
+#     spikes = {}
+#     for i in range(self.num_channels):
+#       spk = self.retrieve_spike_counts(trial=trials[0], win = w, early_spikes = False)[i]
+#       spikes_ch = np.zeros((len(trials), spk.shape[0]))
+#       spikes_ch[0] = spk
+#       for x, tr in enumerate(trials[1:]):
+#         spikes_ch[x+1] = self.retrieve_spike_counts(trial=tr, win = w, early_spikes = True)[i]
+#       spikes[i] = spikes_ch
     return spikes
 
   def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative', early_spikes = True):
@@ -145,13 +157,16 @@ class Neural_Data:
     
     return s_times
 
-  def create_bins(self, s_times, sent=212, win=50, delay = 0, early_spikes = True, model = 'transformer'):
+  def create_bins(self, s_times, sent=212, trial=0, win=50, delay = 0, early_spikes = True, model = 'transformer'):
     """Returns bins containing number of spikes in the 'win' durations
       following the stimulus onset.
       'win' (int) miliseconds specifing the width of time slots for binds
       'early_spikes' (bool: default = True) to include or discard early spikes 
       that start a little before stimulus onset time.
     """
+    if trial != 0:
+        trial -= 1
+        sent = self.trials[1].timitStimcode[trial]
     win = win/1000
     delay = delay/1000
     bins = {}             #miliseconds
@@ -191,7 +206,7 @@ class Neural_Data:
     
     return bins
 
-  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True):
+  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True, model = 'transformer'):
     """Returns number of spikes in every 'win' miliseconds duration following the 
     stimulus onset time.
     'sent' (int) index of stimulus sentencce 
@@ -205,7 +220,7 @@ class Neural_Data:
     #get 'relative' spike times for the given sentence and trial
     s_times = self.retrieve_spike_times(sent=sent, trial=trial, early_spikes = early_spikes)
     #return spikes count in each bin
-    output = self.create_bins(s_times, sent = sent, win = win,delay=delay, early_spikes = early_spikes)
+    output = self.create_bins(s_times, sent=sent, trial=trial, win = win,delay=delay, early_spikes = early_spikes, model=model)
     
     return output
 
@@ -263,3 +278,19 @@ class Neural_Data:
     #plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Spike Counts', fontsize=14)
     #plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
+
+    
+  def signal_power(self, win, ch, sents = [12,13,32,43,56,163,212,218,287,308]):
+    
+    sp = 0
+    for s in sents:
+        r = self.retrieve_spike_counts_for_all_trials(sent=s, w=win)[ch]
+        N = r.shape[0]
+        s = np.sum(r, axis=0)
+        n1 = np.var(s, axis=0)
+        n2 = 0
+        for i in range(r.shape[0]):
+            n2 += np.var(r[i])
+        sp += (n1 - n2)/(N*(N-1))
+    sp /= len(sents)
+    return sp

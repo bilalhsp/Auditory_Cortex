@@ -5,27 +5,41 @@ from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from Auditory_Cortex.Dataset import Neural_Data
 from Auditory_Cortex.Feature_Extractors import Feature_Extractor_S2T
+from Auditory_Cortex.Feature_Extractors import Feature_Extractor_GRU
 from sklearn.decomposition import PCA
-
+import rnn_model.speech_recognition as speech_recognition
 import matplotlib.pyplot as plt
+import torchaudio
 
 class transformer_regression():
-  def __init__(self, dir, subject):
+  def __init__(self, dir, subject, model='transformer'):
     self.dir = os.path.join(dir, subject)
     self.dataset = Neural_Data(dir, subject)
-    self.layers = ["model.encoder.layers.0.fc2", "model.encoder.layers.1.fc2", "model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
-                   "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
-                   "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
-    self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
-    self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
-    self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
-    print("Objects created, now loading Transformer layer features...!")
-    self.features, self.demean_features = self.get_transformer_features()
+    self.model_name = model
+    if self.model_name == 'transformer':        
+        self.layers = ["model.encoder.layers.0.fc2", "model.encoder.layers.1.fc2","model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
+                       "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
+                       "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
+        self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
+        self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
+        self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
+        print("Objects created, now loading Transformer layer features...!")
+        self.features, self.demean_features = self.get_transformer_features()
+    else:
+        self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
+        self.model = speech_recognition.SpeechRecognitionModel(3,5,512,29,128,2,0.1)
+        path = os.path.join(dir, 'rnn_model')
+        weights_file = "epoch_250.pt"
+        checkpoint = torch.load(os.path.join(path,weights_file),map_location=torch.device('cpu'))
+        self.model.load_state_dict(checkpoint['state_dict'])
+        self.model_extractor = Feature_Extractor_GRU(self.model, self.layers)
+        self.spect = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=128)
+        self.features, self.demean_features = self.get_transformer_features()
 
   def simply_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40, delay=0):
     spikes ={}
     for x,i in enumerate(range(sent_s,sent_e)):
-      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i, win=w, delay=delay ,early_spikes=False)[ch])
+      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name)[ch])
     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
     return spikes
 
@@ -54,9 +68,21 @@ class transformer_regression():
       r2_scores[i] = self.r2(h1,h2)
     return r2_scores
 
+  def prepare_GRU_input(self, aud):
+      aud = aud.astype(np.float32) 
+      input = torch.tensor(aud)
+      aud_spect = self.spect(input)
+      aud_spect = aud_spect.unsqueeze(dim=0)
+      aud_spect = aud_spect.unsqueeze(dim=0).type(torch.float32)
+      return aud_spect
+    
   def translate(self, aud, fs = 16000):
-    inputs_features = self.processor(aud,padding=True, sampling_rate=fs, return_tensors="pt").input_features
-    generated_ids = self.model_extractor(inputs_features)
+    if self.model_name == 'transformer':
+        inputs_features = self.processor(aud,padding=True, sampling_rate=fs, return_tensors="pt").input_features
+        generated_ids = self.model_extractor(inputs_features)
+    else:
+        inputs_features = self.prepare_GRU_input(aud)
+        generated_ids = self.model_extractor(inputs_features)
 
   # def simply_stack(self, features):
   #   features = torch.cat([features[i] for i in range(498)], dim=0)
@@ -91,8 +117,8 @@ class transformer_regression():
         f_mean[x] = torch.mean(features[j][x], dim = 0)    
         demean_features[j][x]= features[j][x] - f_mean[x]
     for j, l in enumerate(self.layers):
-      feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=0).numpy()
-      demean_feats[j] = torch.cat([demean_features[j][i] for i in range(sent_e-sent_s)], dim=0).numpy()
+      feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=0).detach().numpy()
+      demean_feats[j] = torch.cat([demean_features[j][i] for i in range(sent_e-sent_s)], dim=0).detach().numpy()
     return feats, demean_feats
 
   # for i in range(498):
@@ -157,9 +183,7 @@ class transformer_regression():
   def compute_r2_channel(self, layer, win, channel, delay):
     k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
     print(f"k = {k}")
-    r2t = np.zeros(1)
-    r2v = np.zeros(1)
-    r2tt = np.zeros(1)
+    
     pct = np.zeros(1)
     pcv = np.zeros(1)
     pctt = np.zeros(1)
@@ -170,33 +194,103 @@ class transformer_regression():
     else:
       feats = self.features[layer]
 
-    n1 = int(feats.shape[0] *0.75)
-    n2 = int(feats.shape[0] *0.90)
-    x_train = feats[0:n1, :]
-    x_val = feats[n1:n2, :]
-    x_test = feats[n2:, :]
-    
-    # for i in range(self.dataset.num_channels):
     y = self.simply_spikes(ch=channel, delay=delay)
     if k>1:
       y = self.down_sample_spikes(y,k)
-    y_train = y[0:n1]
-    y_val = y[n1:n2]    
-    y_test = y[n2:]
-    B = self.regression_param(x_train, y_train)
-
-    r2t = self.regression_score(x_train, y_train, B)
-    r2v = self.regression_score(x_val, y_val, B)
-    r2tt = self.regression_score(x_test, y_test, B)
-    pct = np.corrcoef(self.predict(x_train, B), y_train)
-    pcv = np.corrcoef(self.predict(x_val, B), y_val)
-    pctt = np.corrcoef(self.predict(x_test, B), y_test)
-    pct = np.square(pct[0,1])
-    pcv = np.square(pcv[0,1])
-    pctt = np.square(pctt[0,1])
+    m = int(feats.shape[0])
+    n2 = int(m*0.9)
+    x_test = feats[n2:, :]
+    y_test = y[n2:]    
     
-    return r2t, r2v,r2tt, pct, pcv,pctt
-  
+    for i in range(5):
+        a = int(i*0.2*n2)
+        b = int((i+1)*0.2*n2)
+        
+        x_val = feats[a:b, :] 
+        y_val = y[a:b] 
+        
+        x_train = np.concatenate((feats[:a,:], feats[b:n2,:]), axis=0)
+        y_train = np.concatenate((y[:a], y[b:n2]))
+        # Linear Regression...!
+        B = self.regression_param(x_train, y_train)
+        y_hat_train = self.predict(x_train, B)
+        y_hat_val = self.predict(x_val, B)
+        y_hat_test = self.predict(x_test, B)
+        
+        pct += np.corrcoef(y_hat_train, y_train)[0,1]
+        pcv += np.corrcoef(y_hat_val, y_val)[0,1]
+        pctt += np.corrcoef(y_hat_test, y_test)[0,1]
+        
+    pct /= 5
+    pcv /= 5
+    pctt /= 5
+    
+    return pct, pcv,pctt
+
+  def compute_cc_norm(self, layer, win, channel, delay):
+    if self.model_name=='transformer':
+        def_w = 40
+    else:
+        def_w = 25
+    
+    k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
+    print(f"k = {k}")
+    r2t = np.zeros(1)
+    r2v = np.zeros(1)
+    r2tt = np.zeros(1)
+
+    #downsamples if k>1 
+    if k >1:
+      feats = self.down_sample_features(self.features[layer], k)
+    else:
+      feats = self.features[layer]
+
+    y = self.simply_spikes(ch=channel, delay=delay, w = def_w)
+    if k>1:
+      y = self.down_sample_spikes(y,k)
+    
+    m = int(feats.shape[0])
+    n2 = int(m*0.9)
+    x_test = feats[n2:, :]
+    y_test = y[n2:]    
+    
+    # signal power, will be used for normalization
+    sp = self.dataset.signal_power(win, channel)
+    for i in range(5):
+        a = int(i*0.2*n2)
+        b = int((i+1)*0.2*n2)
+        
+        x_val = feats[a:b, :] 
+        y_val = y[a:b] 
+        
+        x_train = np.concatenate((feats[:a,:], feats[b:n2,:]), axis=0)
+        y_train = np.concatenate((y[:a], y[b:n2]))
+        
+        # Linear Regression...!
+        B = self.regression_param(x_train, y_train)
+        y_hat_train = self.predict(x_train, B)
+        y_hat_val = self.predict(x_val, B)
+        y_hat_test = self.predict(x_test, B)
+        
+        #Normalized correlation coefficient
+        r2t += self.cc_norm(y_hat_train, y_train, sp)
+        r2v += self.cc_norm(y_hat_val, y_val, sp)
+        r2tt += self.cc_norm(y_hat_test, y_test, sp)
+        
+    r2t /= 5
+    r2v /= 5
+    r2tt /= 5
+   
+    return r2t, r2v,r2tt
+
+  def cc_normalized(self, x, y):
+    B = self.regression_param(x,y)
+    y_hat = self.predict(x, B)
+    
+            
+  return cc
+
+
   def FE_r2_channel(self, layer, win, channel):
     k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
     print(f"k = {k}")
@@ -228,6 +322,23 @@ class transformer_regression():
     pcv = (np.corrcoef(self.predict(x_test, B), y_test)[0,1])**2
     return r2t, r2v, pct, pcv
 
+#   def signal_power(self, win, ch):
+#     sents = [12,13,32,43,56,163,212,218,287,308]
+#     sp = 0
+#     for s in sents:
+#         r = self.dataset.retrieve_spike_counts_for_all_trials(sent=s, w=win)[ch]
+#         N = r.shape[0]
+#         s = np.sum(r, axis=0)
+#         n1 = np.var(s, axis=0)
+#         n2 = 0
+#         for i in range(r.shape[0]):
+#             n2 += np.var(r[i])
+#         sp += (n1 - n2)/(N*(N-1))
+#     sp /= len(sents)
+#     return sp 
+
+  def cc_norm(self, y_hat, y, sp):
+    return np.cov(y_hat, y)[0,1]/(np.sqrt(np.var(y_hat)*sp))
 
   def r2(self, labels, predictions):
     score = 0.0
