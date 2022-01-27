@@ -6,7 +6,7 @@ from transformers import Speech2TextForConditionalGeneration, Speech2TextProcess
 from Auditory_Cortex.Dataset import Neural_Data
 from Auditory_Cortex.Feature_Extractors import Feature_Extractor_S2T
 from Auditory_Cortex.Feature_Extractors import Feature_Extractor_GRU
-from sklearn.decomposition import PCA
+#from sklearn.decomposition import PCA
 import rnn_model.speech_recognition as speech_recognition
 import matplotlib.pyplot as plt
 import torchaudio
@@ -17,9 +17,10 @@ class transformer_regression():
     self.dataset = Neural_Data(dir, subject)
     self.model_name = model
     if self.model_name == 'transformer':        
-        self.layers = ["model.encoder.layers.0.fc2", "model.encoder.layers.1.fc2","model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
-                       "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
-                       "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
+        self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1","model.encoder.layers.0.fc2",
+                       "model.encoder.layers.1.fc2","model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
+                       "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2",
+                       "model.encoder.layers.7.fc2","model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
         self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
         self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
         self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
@@ -36,18 +37,29 @@ class transformer_regression():
         self.spect = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=128)
         self.features, self.demean_features = self.get_transformer_features()
 
-  def simply_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40, delay=0):
+  def simply_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40, delay=0,  offset=0.39):
     spikes ={}
     for x,i in enumerate(range(sent_s,sent_e)):
-      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name)[ch])
+      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name,
+                                                                  offset=offset)[ch])
     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
     return spikes
+
+  def all_channel_spikes(self, sent_s=1, sent_e=499, w = 40, delay=0,  offset=0.39):
+    spikes = []
+    result = {}
+    for i in range(sent_s,sent_e):
+        spikes.append(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name,offset=offset))
+    for ch in range(self.dataset.num_channels):
+        result[ch] = np.concatenate([spikes[i][ch] for i in range(len(spikes))], axis=0)
+
+    return result
 
   def demean_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40):
     spikes ={}
     spk_mean = {}
     for x,i in enumerate(range(sent_s,sent_e)):
-      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i, win=40 ,early_spikes=False)[ch])
+      spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i, win=w ,early_spikes=False)[ch])
       spk_mean[x] = torch.mean(spikes[x], dim = 0)
       spikes[x] = spikes[x] - spk_mean[x]
     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
@@ -117,8 +129,12 @@ class transformer_regression():
         f_mean[x] = torch.mean(features[j][x], dim = 0)    
         demean_features[j][x]= features[j][x] - f_mean[x]
     for j, l in enumerate(self.layers):
-      feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=0).detach().numpy()
-      demean_feats[j] = torch.cat([demean_features[j][i] for i in range(sent_e-sent_s)], dim=0).detach().numpy()
+      if j<2:
+        d = 1
+      else:
+        d=0
+      feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=d).detach().numpy()
+      demean_feats[j] = torch.cat([demean_features[j][i] for i in range(sent_e-sent_s)], dim=d).detach().numpy()
     return feats, demean_feats
 
   # for i in range(498):
@@ -226,26 +242,85 @@ class transformer_regression():
     pctt /= 5
     
     return pct, pcv,pctt
-
-  def compute_cc_norm(self, layer, win, channel, delay):
+  def get_cc_norm_layer(self, layer, win, delay=0):
+    print(f"Computing correlations for layer:{layer} ...")
+    num_channels = self.dataset.num_channels
+    train_cc_norm = np.zeros(num_channels)
+    val_cc_norm = np.zeros(num_channels)
+    test_cc_norm = np.zeros(num_channels)
+    
+    feats, spikes = self.get_feats_and_spikes(layer, win, delay)
+ 
+    for ch in range(num_channels):
+        sp = self.dataset.signal_power(win, ch)
+        train_cc_norm[ch], val_cc_norm[ch], test_cc_norm[ch] = self.compute_cc_norm(feats, spikes[ch], sp)
+        
+    return train_cc_norm, val_cc_norm, test_cc_norm
+  
+  def get_feats_and_spikes(self, layer, win, delay=0):
     if self.model_name=='transformer':
-        def_w = 40
+        #def_w = 20
+        # offset is used to match different rounding error in 1st conv layer vs the rest of the layers...!
+        if layer <1:
+            feats = self.features[layer].transpose()
+            offset = -0.25
+            def_w = 20 
+        elif layer < 2:
+            feats = self.features[layer].transpose()
+            def_w = 40
+            offset = 0.39
+        else:
+            feats = self.features[layer]
+            def_w = 40
+            offset = 0.39
     else:
         def_w = 25
+        
+    k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
+    #print(f"k = {k}")
+    r2t = np.zeros(1)
+    r2v = np.zeros(1)
+    r2tt = np.zeros(1)
+    #downsamples if k>1 
+    if k >1:
+      feats = self.down_sample_features(feats, k)
     
+    spikes = self.all_channel_spikes(delay=delay, w = def_w, offset=offset)
+    if k>1:
+      for ch in range(self.dataset.num_channels):
+          spikes[ch] = self.down_sample_spikes(spikes[ch],k)
+
+    return feats, spikes
+
+  def get_cc_norm(self, layer, win, channel, delay=0):
+    if self.model_name=='transformer':
+        #def_w = 20
+        # offset is used to match different rounding error in 1st conv layer vs the rest of the layers...!
+        if layer <1:
+            feats = self.features[layer].transpose()
+            offset = -0.25
+            def_w = 20 
+        elif layer < 2:
+            feats = self.features[layer].transpose()
+            def_w = 40
+            offset = 0.39
+        else:
+            feats = self.features[layer]
+            def_w = 40
+            offset = 0.39
+    else:
+        def_w = 25
+        
     k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
     print(f"k = {k}")
     r2t = np.zeros(1)
     r2v = np.zeros(1)
     r2tt = np.zeros(1)
-
     #downsamples if k>1 
     if k >1:
-      feats = self.down_sample_features(self.features[layer], k)
-    else:
-      feats = self.features[layer]
-
-    y = self.simply_spikes(ch=channel, delay=delay, w = def_w)
+      feats = self.down_sample_features(feats, k)
+    
+    y = self.simply_spikes(ch=channel, delay=delay, w = def_w, offset=offset)
     if k>1:
       y = self.down_sample_spikes(y,k)
     
@@ -283,12 +358,63 @@ class transformer_regression():
    
     return r2t, r2v,r2tt
 
-  def cc_normalized(self, x, y):
-    B = self.regression_param(x,y)
-    y_hat = self.predict(x, B)
+  def compute_cc_norm(self, x, y, sp=1):
+    # provide 'sp' for normalized correlation coefficient...!
+    r2t = np.zeros(1)
+    r2v = np.zeros(1)
+    r2tt = np.zeros(1)
     
+    m = int(x.shape[0])
+    n2 = int(m*0.9)
+    x_test = x[n2:, :]
+    y_test = y[n2:]    
+    
+    # signal power, will be used for normalization
+    #sp = self.dataset.signal_power(win, channel)
+    for i in range(5):
+        a = int(i*0.2*n2)
+        b = int((i+1)*0.2*n2)
+        
+        x_val = x[a:b, :] 
+        y_val = y[a:b] 
+        
+        x_train = np.concatenate((x[:a,:], x[b:n2,:]), axis=0)
+        y_train = np.concatenate((y[:a], y[b:n2]))
+        
+        # Linear Regression...!
+        B = self.regression_param(x_train, y_train)
+        y_hat_train = self.predict(x_train, B)
+        y_hat_val = self.predict(x_val, B)
+        y_hat_test = self.predict(x_test, B)
+        
+        #Normalized correlation coefficient
+        r2t += self.cc_norm(y_hat_train, y_train, sp)
+        r2v += self.cc_norm(y_hat_val, y_val, sp)
+        r2tt += self.cc_norm(y_hat_test, y_test, sp)
+        
+    r2t /= 5
+    r2v /= 5
+    r2tt /= 5
+   
+    return r2t, r2v,r2tt    
             
-  return cc
+  
+
+  def cc_norm(self, y_hat, y, sp):
+    # 'sp==1' means, signal power not provided, then return simple correlation coefficient i.e. 'un-normalized'
+    if sp==1:
+        factor = np.var(y)
+    else:
+        factor = sp
+
+    return np.cov(y_hat, y)[0,1]/(np.sqrt(np.var(y_hat)*factor))
+
+  def regression_param(self, X, y):
+    B = linalg.lstsq(X, y)[0]
+    return B
+
+  def predict(self, X, B):
+    return X@B
 
 
   def FE_r2_channel(self, layer, win, channel):
@@ -337,8 +463,6 @@ class transformer_regression():
 #     sp /= len(sents)
 #     return sp 
 
-  def cc_norm(self, y_hat, y, sp):
-    return np.cov(y_hat, y)[0,1]/(np.sqrt(np.var(y_hat)*sp))
 
   def r2(self, labels, predictions):
     score = 0.0
@@ -351,47 +475,42 @@ class transformer_regression():
     y_hat = self.predict(X,B)
     return self.r2(y, y_hat)
 
-  def regression_param(self, X, y):
-    B = linalg.lstsq(X, y)[0]
-    return B
-  def predict(self, X, B):
-    return X@B
 
-  def get_pcs(self, layer, sents):
-      #layer = 0
-      #sents = [495, 496, 497]
-      feats = [{} for _ in sents]
-      feats_pcs = {}
-      for i, s in enumerate(sents):
-        feats[i], _ = self.get_transformer_features(s, s+1)
-      layer_features = self.features[layer]
-      m = layer_features.shape[0]
-      pc = PCA(n_components=2)
-      pc.fit(layer_features[:int(0.75*m),:])
-      for i, s in enumerate(sents):
-        feats_pcs[i] = pc.transform(feats[i][layer]) 
-      return feats_pcs
+#   def get_pcs(self, layer, sents):
+#       #layer = 0
+#       #sents = [495, 496, 497]
+#       feats = [{} for _ in sents]
+#       feats_pcs = {}
+#       for i, s in enumerate(sents):
+#         feats[i], _ = self.get_transformer_features(s, s+1)
+#       layer_features = self.features[layer]
+#       m = layer_features.shape[0]
+#       pc = PCA(n_components=2)
+#       pc.fit(layer_features[:int(0.75*m),:])
+#       for i, s in enumerate(sents):
+#         feats_pcs[i] = pc.transform(feats[i][layer]) 
+#       return feats_pcs
 
-  def plot_pcs(self, l=0, sents=[495,496,497]):
-      c_maps = ['Greys', 'Purples', 'Blues', 'Oranges',
-                'Greens', 'Reds',
-                #'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
-                #'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn'
-                ] 
-      leg_colors = ['tab:gray','tab:purple','tab:blue','tab:orange',
-                    'tab:green','tab:red']
+#   def plot_pcs(self, l=0, sents=[495,496,497]):
+#       c_maps = ['Greys', 'Purples', 'Blues', 'Oranges',
+#                 'Greens', 'Reds',
+#                 #'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+#                 #'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn'
+#                 ] 
+#       leg_colors = ['tab:gray','tab:purple','tab:blue','tab:orange',
+#                     'tab:green','tab:red']
 
-      pcs = self.get_pcs(layer=l, sents=sents)
+#       pcs = self.get_pcs(layer=l, sents=sents)
 
-      for i in range(len(pcs.keys())):
-        shades = np.arange(0,pcs[i].shape[0])
+#       for i in range(len(pcs.keys())):
+#         shades = np.arange(0,pcs[i].shape[0])
 
-        plt.scatter(pcs[i][:,0], pcs[i][:,1], label=f"sent: {sents[i]}", cmap=c_maps[(i+2)%len(c_maps)], c=shades, vmin=-40, vmax=80)
+#         plt.scatter(pcs[i][:,0], pcs[i][:,1], label=f"sent: {sents[i]}", cmap=c_maps[(i+2)%len(c_maps)], c=shades, vmin=-40, vmax=80)
 
-      leg = plt.legend(loc='best')
-      for i in range(len(pcs.keys())):
-        leg.legendHandles[i].set_color(leg_colors[(i+2)%len(leg_colors)])
+#       leg = plt.legend(loc='best')
+#       for i in range(len(pcs.keys())):
+#         leg.legendHandles[i].set_color(leg_colors[(i+2)%len(leg_colors)])
 
-      plt.xlabel(f"PC1")
-      plt.ylabel(f"PC2")
-      plt.title(f"{self.layers[l]}")
+#       plt.xlabel(f"PC1")
+#       plt.ylabel(f"PC2")
+#       plt.title(f"{self.layers[l]}")

@@ -157,12 +157,13 @@ class Neural_Data:
     
     return s_times
 
-  def create_bins(self, s_times, sent=212, trial=0, win=50, delay = 0, early_spikes = True, model = 'transformer'):
+  def create_bins(self, s_times, sent=212, trial=0, win=50, delay = 0, early_spikes = True, model = 'transformer', offset = 0.39):
     """Returns bins containing number of spikes in the 'win' durations
       following the stimulus onset.
       'win' (int) miliseconds specifing the width of time slots for binds
       'early_spikes' (bool: default = True) to include or discard early spikes 
       that start a little before stimulus onset time.
+      use offset = -0.25 for 1st conv layer and 0.39 for the rest layers 
     """
     if trial != 0:
         trial -= 1
@@ -173,7 +174,9 @@ class Neural_Data:
     if model == 'transformer':
        # Trying to exactly match number of frames given by transformer (rounding precision)
         #Indices of 'sentdet' start from 0, whereas timitStimcodes start from 1
-      n = int(np.floor(self.duration(sent)/win + 0.39))
+      #n = int(np.floor(self.duration(sent)/win + 0.39))    #matches at bin size=40
+      #n = int(np.floor(self.duration(sent)/win - 0.25))     #to match bin size=20
+      n = int(np.floor(self.duration(sent)/win + offset))  
     else:
         #to match the number of frames with Akshita's GRU based model
       n = int(np.ceil(self.duration(sent)/win + 0.001))
@@ -206,7 +209,7 @@ class Neural_Data:
     
     return bins
 
-  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True, model = 'transformer'):
+  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True, model = 'transformer', offset=0.39):
     """Returns number of spikes in every 'win' miliseconds duration following the 
     stimulus onset time.
     'sent' (int) index of stimulus sentencce 
@@ -220,7 +223,8 @@ class Neural_Data:
     #get 'relative' spike times for the given sentence and trial
     s_times = self.retrieve_spike_times(sent=sent, trial=trial, early_spikes = early_spikes)
     #return spikes count in each bin
-    output = self.create_bins(s_times, sent=sent, trial=trial, win = win,delay=delay, early_spikes = early_spikes, model=model)
+    output = self.create_bins(s_times, sent=sent, trial=trial, win = win,delay=delay, early_spikes = early_spikes, model=model,
+                              offset=offset)
     
     return output
 
