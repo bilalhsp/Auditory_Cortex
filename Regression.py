@@ -3,18 +3,18 @@ import torch
 import os
 from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
-<<<<<<< HEAD
+
 from Auditory_Cortex.Dataset import Neural_Data
 from Auditory_Cortex.Feature_Extractors import Feature_Extractor_S2T
 from Auditory_Cortex.Feature_Extractors import Feature_Extractor_GRU
 #from sklearn.decomposition import PCA
 import rnn_model.speech_recognition as speech_recognition
-=======
-from Dataset import Neural_Data
-from Feature_Extractors import Feature_Extractor_S2T
-from sklearn.decomposition import PCA
 
->>>>>>> 25aa669058a0ccfaf6a2979c2319212e2965bdfd
+# from Dataset import Neural_Data
+# from Feature_Extractors import Feature_Extractor_S2T
+# from sklearn.decomposition import PCA
+
+
 import matplotlib.pyplot as plt
 import torchaudio
 
@@ -205,15 +205,12 @@ class transformer_regression():
 
   def compute_r2_channel(self, layer, win, channel, delay):
     k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
-<<<<<<< HEAD
     print(f"k = {k}")
     
-=======
     # print(f"k = {k}")
     r2t = np.zeros(1)
     r2v = np.zeros(1)
     r2tt = np.zeros(1)
->>>>>>> 25aa669058a0ccfaf6a2979c2319212e2965bdfd
     pct = np.zeros(1)
     pcv = np.zeros(1)
     pctt = np.zeros(1)
