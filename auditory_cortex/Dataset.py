@@ -13,16 +13,17 @@ class Neural_Data:
   """
   def __init__(self, dir, sub,  mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
     self.sub = sub
-    self.dir = os.path.join(dir, sub)
+    self.dir = dir
     self.sentences = io.loadmat(os.path.join(self.dir, mat_file), struct_as_record = False, squeeze_me = True, )
     self.features = self.sentences['features']
     self.phn_names = self.sentences['phnnames']
     self.sentdet = self.sentences['sentdet']
     self.fs = self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
-    self.names = os.listdir(os.path.join(self.dir,"data_files"))
+    self.names = os.listdir(os.path.join(self.dir, self.sub)) 
+    # print(self.names)
     self.spikes, self.trials = self.load_data(verbose=verbose)
     self.num_channels = len(self.spikes.keys())
-    print(f"Data from {self.num_channels} channels loaded...!")
+    # print(f"Data from {self.num_channels} channels loaded...!")
 
   def load_data(self, verbose):
     """ Loads data from __MUspk.mat files and returns a tuple of dictionaries. 
@@ -34,7 +35,7 @@ class Neural_Data:
     (spikes, trials): 1st carries dictionary of spike structs read from __MUspk files
     and second one carries dictionary of trial structs.
     """
-    path = os.path.join(self.dir,"data_files")
+    path = os.path.join(self.dir, self.sub)
     spikes = {}
     trials = {}
     data = {}
@@ -42,9 +43,10 @@ class Neural_Data:
     for i, name in enumerate(self.names):
       if verbose:
         print(name)
-      data[i] = io.loadmat(os.path.join(path,name), squeeze_me = True, struct_as_record = False)
-      spikes[i] = data[i]['spike']
-      trials[i] = data[i]['trial']
+      if 'TRIALINFO' not in name:
+        data[i] = io.loadmat(os.path.join(path,name), squeeze_me = True, struct_as_record = False)
+        spikes[i] = data[i]['spike']
+        trials[i] = data[i]['trial']
     
     return spikes, trials
 
@@ -290,8 +292,8 @@ class Neural_Data:
     for s in sents:
         r = self.retrieve_spike_counts_for_all_trials(sent=s, w=win)[ch]
         N = r.shape[0]
-        s = np.sum(r, axis=0)
-        n1 = np.var(s, axis=0)
+        trail_sum = np.sum(r, axis=0)
+        n1 = np.var(trail_sum, axis=0)
         n2 = 0
         for i in range(r.shape[0]):
             n2 += np.var(r[i])
