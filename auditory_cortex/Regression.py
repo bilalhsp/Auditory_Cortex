@@ -4,11 +4,12 @@ import os
 from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 
-from Auditory_Cortex.Dataset import Neural_Data
-from Auditory_Cortex.Feature_Extractors import Feature_Extractor_S2T
-from Auditory_Cortex.Feature_Extractors import Feature_Extractor_GRU
+
+from auditory_cortex.Dataset import Neural_Data
+from auditory_cortex.Feature_Extractors import Feature_Extractor_S2T
+from auditory_cortex.Feature_Extractors import Feature_Extractor_GRU
 #from sklearn.decomposition import PCA
-import rnn_model.speech_recognition as speech_recognition
+# import rnn_model.speech_recognition as speech_recognition
 
 # from Dataset import Neural_Data
 # from Feature_Extractors import Feature_Extractor_S2T
@@ -31,7 +32,7 @@ class transformer_regression():
         self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
         self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
         self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
-        print("Objects created, now loading Transformer layer features...!")
+        # print("Objects created, now loading Transformer layer features...!")
         self.features, self.demean_features = self.get_transformer_features()
     else:
         self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
@@ -323,7 +324,7 @@ class transformer_regression():
         def_w = 25
         
     k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
-    print(f"k = {k}")
+    # print(f"k = {k}")
     r2t = np.zeros(1)
     r2v = np.zeros(1)
     r2tt = np.zeros(1)
