@@ -1,4 +1,25 @@
 # Auditory_cortex
+
+
+[Repo Link](https://github.com/bilalhsp/Auditory_Cortex)
+
+```git clone https://github.com/bilalhsp/Auditory_Cortex.git```
+
+go to the directory Auditory_Cortex
+
+```pip install -e .```
+
+```
+git add .
+git commit -m "message"
+git push origin main
+
+username:
+password:
+```
+
+
+
 Modelling the auditory cortex using task optimized Deep Learning models 
 
 ```Dataset.py``` module defines the ```Neural_Data``` class that provides routines for loading the neural data. 
