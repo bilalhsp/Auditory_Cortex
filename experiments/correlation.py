@@ -29,11 +29,11 @@ for ch in range(reg.dataset.num_channels):
         # PCtt.append(pctt)
     corr_values[ch] =  {"train": R2t, "val": R2v, "test": R2tt}
 # fig, ax = plt.subplots(1,2, figsize=(14,6), sharey=True)
-    with open("/scratch/gilbreth/akamsali/Research/Makin/outputs/neuron_corr/"+sub + "_" + str(w) +'.csv' ,'a') as f1:
+    with open("/scratch/gilbreth/akamsali/Research/Makin/outputs/neuron_corr/with_sp/"+ sub + "_" + str(w) +'.csv' ,'a') as f1:
         writer=csv.writer(f1)
         row = R2t + R2v + R2tt
         writer.writerow(row)
         f1.close()
 
-with open("/scratch/gilbreth/akamsali/Research/Makin/outputs/neuron_corr/"+sub + "_" + str(w), 'w') as f:
+with open("/scratch/gilbreth/akamsali/Research/Makin/outputs/neuron_corr/with_sp/" + sub + "_" + str(w), 'w') as f:
     json.dump(corr_values, f)

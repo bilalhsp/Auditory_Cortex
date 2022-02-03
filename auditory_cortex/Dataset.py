@@ -44,6 +44,7 @@ class Neural_Data:
       if verbose:
         print(name)
       if 'TRIALINFO' not in name:
+        # print(name)
         data[i] = io.loadmat(os.path.join(path,name), squeeze_me = True, struct_as_record = False)
         spikes[i] = data[i]['spike']
         trials[i] = data[i]['trial']

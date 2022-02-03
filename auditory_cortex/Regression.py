@@ -360,9 +360,9 @@ class transformer_regression():
         y_hat_test = self.predict(x_test, B)
         
         #Normalized correlation coefficient
-        r2t += self.cc_norm(y_hat_train, y_train, sp)
-        r2v += self.cc_norm(y_hat_val, y_val, sp)
-        r2tt += self.cc_norm(y_hat_test, y_test, sp)
+        r2t += self.cc_norm(y_hat_train, y_train, sp=sp)
+        r2v += self.cc_norm(y_hat_val, y_val, sp=sp)
+        r2tt += self.cc_norm(y_hat_test, y_test, sp=sp)
         
     r2t /= 5
     r2v /= 5
