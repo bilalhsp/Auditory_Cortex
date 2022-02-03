@@ -17,7 +17,9 @@ git push origin main
 username:
 password:
 ```
-
+## **IF memory error**
+go to the subject directory:
+```rm -rf .*```
 
 
 Modelling the auditory cortex using task optimized Deep Learning models 
