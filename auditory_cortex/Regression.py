@@ -3,7 +3,7 @@ import torch
 import os
 from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
-
+from sklearn.linear_model import Ridge
 
 from auditory_cortex.Dataset import Neural_Data
 from auditory_cortex.Feature_Extractors import Feature_Extractor_S2T
@@ -304,7 +304,7 @@ class transformer_regression():
 
     return feats, spikes
 
-  def get_cc_norm(self, layer, win, channel, delay=0):
+  def get_cc_norm(self, layer, win, channel, delay=0, alpha=1.0):
     if self.model_name=='transformer':
         #def_w = 20
         # offset is used to match different rounding error in 1st conv layer vs the rest of the layers...!
@@ -342,7 +342,8 @@ class transformer_regression():
     y_test = y[n2:]    
     
     # signal power, will be used for normalization
-    sp = self.dataset.signal_power(win, channel)
+    # sp = self.dataset.signal_power(win, channel)
+    sp = 1
     for i in range(5):
         a = int(i*0.2*n2)
         b = int((i+1)*0.2*n2)
@@ -354,11 +355,18 @@ class transformer_regression():
         y_train = np.concatenate((y[:a], y[b:n2]))
         
         # Linear Regression...!
-        B = self.regression_param(x_train, y_train)
-        y_hat_train = self.predict(x_train, B)
-        y_hat_val = self.predict(x_val, B)
-        y_hat_test = self.predict(x_test, B)
-        
+        # B = self.regression_param(x_train, y_train)
+        # y_hat_train = self.predict(x_train, B)
+        # y_hat_val = self.predict(x_val, B)
+        # y_hat_test = self.predict(x_test, B)
+        ### Ridge Regression
+        ridge_model = Ridge(alpha=alpha)
+        ridge_model.fit(x_train, y_train)
+        y_hat_train = ridge_model.predict(x_train)
+        y_hat_val = ridge_model.predict(x_val)
+        y_hat_test = ridge_model.predict(x_test)
+
+
         #Normalized correlation coefficient
         r2t += self.cc_norm(y_hat_train, y_train, sp=sp)
         r2v += self.cc_norm(y_hat_val, y_val, sp=sp)
