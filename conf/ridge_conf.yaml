@@ -1,0 +1,3 @@
+data_path: /depot/jgmakin/data/auditory_cortex/josh_data/data
+sub: '200206'
+output_dir: /scratch/gilbreth/akamsali/Research/Makin/outputs/neuron_corr/ridge_regression

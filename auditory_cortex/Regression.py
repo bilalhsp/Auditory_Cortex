@@ -25,32 +25,33 @@ class transformer_regression():
     self.dataset = Neural_Data(dir, subject)
     self.model_name = model
     if self.model_name == 'transformer':        
-        self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1","model.encoder.layers.0.fc2",
-                       "model.encoder.layers.1.fc2","model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
-                       "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2",
-                       "model.encoder.layers.7.fc2","model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
-        self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
-        self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
-        self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
-        # print("Objects created, now loading Transformer layer features...!")
-        self.features, self.demean_features = self.get_transformer_features()
+      self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1","model.encoder.layers.0.fc2",
+                      "model.encoder.layers.1.fc2","model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
+                      "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2","model.encoder.layers.6.fc2",
+                      "model.encoder.layers.7.fc2","model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
+      self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
+      self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
+      self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
+      # print("Objects created, now loading Transformer layer features...!")
+      # self.features, self.demean_features = self.get_transformer_features()
     else:
-        self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
-        self.model = speech_recognition.SpeechRecognitionModel(3,5,512,29,128,2,0.1)
-        path = os.path.join(dir, 'rnn_model')
-        weights_file = "epoch_250.pt"
-        checkpoint = torch.load(os.path.join(path,weights_file),map_location=torch.device('cpu'))
-        self.model.load_state_dict(checkpoint['state_dict'])
-        self.model_extractor = Feature_Extractor_GRU(self.model, self.layers)
-        self.spect = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=128)
-        self.features, self.demean_features = self.get_transformer_features()
+      self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
+      self.model = speech_recognition.SpeechRecognitionModel(3,5,512,29,128,2,0.1)
+      path = os.path.join(dir, 'rnn_model')
+      weights_file = "epoch_250.pt"
+      checkpoint = torch.load(os.path.join(path,weights_file),map_location=torch.device('cpu'))
+      self.model.load_state_dict(checkpoint['state_dict'])
+      self.model_extractor = Feature_Extractor_GRU(self.model, self.layers)
+      self.spect = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=128)
+      self.features, self.demean_features = self.get_transformer_features()
+    
 
-  def simply_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40, delay=0,  offset=0.39):
+  def simply_spikes(self, sent_list=[12], ch=0, w = 40, delay=0,  offset=0.39):
     spikes ={}
-    for x,i in enumerate(range(sent_s,sent_e)):
+    for x,i in enumerate(sent_list):
       spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name,
                                                                   offset=offset)[ch])
-    spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
+    spikes = torch.cat([spikes[i] for i in range(len(sent_list))], dim = 0).numpy()
     return spikes
 
   def all_channel_spikes(self, sent_s=1, sent_e=499, w = 40, delay=0,  offset=0.39):
@@ -123,14 +124,14 @@ class transformer_regression():
   #     feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=0).numpy()
   #   return feats
 
-  def get_transformer_features(self, sent_s = 1, sent_e = 499):
+  def get_transformer_features(self, sent_list):
     
     features = [{} for _ in range(len(self.layers))]
     demean_features = [{} for _ in range(len(self.layers))]
     f_mean = {}    
     feats = {}
     demean_feats = {}
-    for x, i in enumerate(range(sent_s, sent_e)):
+    for x, i in enumerate(sent_list):
       self.translate(self.dataset.audio(i))
       for j, l in enumerate(self.layers):
         features[j][x] = self.model_extractor.features[l]
@@ -141,9 +142,13 @@ class transformer_regression():
         d = 1
       else:
         d=0
-      feats[j] = torch.cat([features[j][i] for i in range(sent_e-sent_s)], dim=d).detach().numpy()
-      demean_feats[j] = torch.cat([demean_features[j][i] for i in range(sent_e-sent_s)], dim=d).detach().numpy()
+      feats[j] = torch.cat([features[j][i] for i in range(len(sent_list))], dim=d).detach().numpy()
+      demean_feats[j] = torch.cat([demean_features[j][i] for i in range(len(sent_list))], dim=d).detach().numpy()
     return feats, demean_feats
+
+
+    # self.features = feats
+    # self.demean_features = demean_feats
 
   # for i in range(498):
   #   f_mean[i] = torch.mean(features[i], dim = 0)
@@ -355,16 +360,16 @@ class transformer_regression():
         y_train = np.concatenate((y[:a], y[b:n2]))
         
         # Linear Regression...!
-        # B = self.regression_param(x_train, y_train)
-        # y_hat_train = self.predict(x_train, B)
-        # y_hat_val = self.predict(x_val, B)
-        # y_hat_test = self.predict(x_test, B)
+        B = self.regression_param(x_train, y_train)
+        y_hat_train = self.predict(x_train, B)
+        y_hat_val = self.predict(x_val, B)
+        y_hat_test = self.predict(x_test, B)
         ### Ridge Regression
-        ridge_model = Ridge(alpha=alpha)
-        ridge_model.fit(x_train, y_train)
-        y_hat_train = ridge_model.predict(x_train)
-        y_hat_val = ridge_model.predict(x_val)
-        y_hat_test = ridge_model.predict(x_test)
+        # ridge_model = Ridge(alpha=alpha)
+        # ridge_model.fit(x_train, y_train)
+        # y_hat_train = ridge_model.predict(x_train)
+        # y_hat_val = ridge_model.predict(x_val)
+        # y_hat_test = ridge_model.predict(x_test)
 
 
         #Normalized correlation coefficient
@@ -495,6 +500,43 @@ class transformer_regression():
     y_hat = self.predict(X,B)
     return self.r2(y, y_hat)
 
+## for L2 regularisation
+  def get_layer_values(self, layer, win, sent_list=[12]):
+    features, _ = self.get_transformer_features(sent_list)
+
+    if self.model_name=='transformer':
+        #def_w = 20
+        # offset is used to match different rounding error in 1st conv layer vs the rest of the layers...!
+        if layer <1:
+            feats = features[layer].transpose()
+            offset = -0.25
+            def_w = 20 
+        elif layer < 2:
+            feats = features[layer].transpose()
+            def_w = 40
+            offset = 0.39
+        else:
+            feats = features[layer]
+            def_w = 40
+            offset = 0.39
+    else:
+        def_w = 25
+        
+    k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
+    # print(f"k = {k}")
+    if k >1:
+      feats = self.down_sample_features(feats, k)
+
+    return k, def_w, offset, feats
+
+  def get_all_channels(self, def_w, offset=0, delay=0, k_val=1, sent_list=[12]):
+    n_all_channel = []
+    for channel in range(self.dataset.num_channels):
+        n = self.simply_spikes(ch=channel, delay=delay, w=def_w, offset=offset, sent_list=sent_list)
+        if k_val>1:
+            n = self.down_sample_spikes(n, k_val)
+        n_all_channel.append(n)
+    return np.array(n_all_channel).T
 
 #   def get_pcs(self, layer, sents):
 #       #layer = 0
@@ -534,3 +576,6 @@ class transformer_regression():
 #       plt.xlabel(f"PC1")
 #       plt.ylabel(f"PC2")
 #       plt.title(f"{self.layers[l]}")
+
+
+
