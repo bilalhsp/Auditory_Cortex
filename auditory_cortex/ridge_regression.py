@@ -8,7 +8,7 @@ class RidgeRegression():
 
   def fit(self, X, y):
     X_with_intercept = np.c_[np.ones((X.shape[0], 1)), X]
-    # print(X.shape, X_with_intercept.shape)
+
     self.X_intercept = X_with_intercept
     # number of columns in matrix of X including intercept
     dimension = X_with_intercept.shape[1]
@@ -20,7 +20,7 @@ class RidgeRegression():
     # We create a bias term corresponding to alpha for each column of X not
     # including the intercept
     A_biased = self.alpha * A
-    print(A_biased.shape)
+    # print(A_biased.shape)
     Beta = np.linalg.inv(X_with_intercept.T.dot(
         X_with_intercept) + A_biased).dot(X_with_intercept.T).dot(y)
     self.Beta = Beta

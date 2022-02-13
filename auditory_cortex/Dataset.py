@@ -152,12 +152,12 @@ class Neural_Data:
     for i in range(self.num_channels):
       #spike_indices to index through spike fields
       # print("here: ",i, tr)
-      spike_indices = np.where(self.spikes[i+1].trial == tr)
+      spike_indices = np.where(self.spikes[i].trial == tr)
       #spike times relative to the stimuls On time (Stimon)
       if timing_type == 'relative':
-        s_times[i] = self.spikes[i+1].stimlock[spike_indices]   
+        s_times[i] = self.spikes[i].stimlock[spike_indices]   
       elif timing_type == 'absolute':
-        s_times[i] = self.spikes[i+1].spktimes[spike_indices]   
+        s_times[i] = self.spikes[i].spktimes[spike_indices]   
     
     return s_times
 
