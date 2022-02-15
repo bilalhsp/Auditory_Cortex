@@ -36,6 +36,8 @@ class transformer_regression:
 			# print("Objects created, now loading Transformer layer features...!")
 			# self.features, self.demean_features = self.get_transformer_features()
 			self.get_transformer_features()
+			self.simply_spikes()															
+
     	# else:
 		# 	self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
 		# 	self.model = speech_recognition.SpeechRecognitionModel(3,5,512,29,128,2,0.1)
@@ -50,14 +52,31 @@ class transformer_regression:
 
 
 
-	def simply_spikes(self, sent_list=[12], ch=0, w = 40, delay=0,  offset=0.39):
-		spikes ={}
-		for x,i in enumerate(sent_list):
-			spikes[i] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name,
-																	offset=offset)[ch])
-		# self.spikes_dict = spikes															
-		spikes = torch.cat([spikes[i] for i in sent_list], dim = 0).numpy()
-		return spikes
+	# def simply_spikes(self, sent_list=[12], ch=0, w = 40, delay=0,  offset=0.39):
+	# 	spikes ={}
+	# 	for x,i in enumerate(sent_list):
+	# 		spikes[i] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=w,delay=delay,early_spikes=False,model=self.model_name,
+	# 																offset=offset)[ch])
+	# 	# self.spikes_dict = spikes															
+	# 	spikes = torch.cat([spikes[i] for i in sent_list], dim = 0).numpy()
+	# 	return spikes
+	
+	def simply_spikes(self, delay=0):
+		spikes = [{}, {}]
+	
+		for i in range(1,499):
+			spikes[0][i] = self.dataset.retrieve_spike_counts(sent=i, win=20, delay=delay, 
+																early_spikes=False,
+																model=self.model_name, 
+																offset=-0.25)
+			spikes[1][i] = self.dataset.retrieve_spike_counts(sent=i, win=40, delay=delay, 
+																early_spikes=False,
+																model=self.model_name,
+																offset=0.39)
+
+		self.spikes_dict = spikes															
+		# spikes = torch.cat([spikes[i] for i in sent_list], dim = 0).numpy()
+		# return spikes
 
 	def all_channel_spikes(self, sent_s=1, sent_e=499, w = 40, delay=0,  offset=0.39):
 		spikes = []
@@ -140,8 +159,8 @@ class transformer_regression:
 			self.translate(self.dataset.audio(i))
 			for j, l in enumerate(self.layers):
 				features[j][i] = self.model_extractor.features[l]
-				f_mean[i] = torch.mean(features[j][i], dim = 0)    
-				demean_features[j][i]= features[j][i] - f_mean[i]
+				# f_mean[i] = torch.mean(features[j][i], dim = 0)    
+				# demean_features[j][i]= features[j][i] - f_mean[i]
 			# for j, l in enumerate(self.layers):
 			# 	if j<2:
 			# 		d = 1
@@ -174,13 +193,14 @@ class transformer_regression:
 		return out
 
 	def down_sample_spikes(self, spks, k):
-		out = np.zeros(int(np.ceil(spks.shape[0]/k)))
+		# out = np.zeros(int(np.ceil(spks.shape[0]/k)))
+		out = np.zeros((int(np.ceil(spks.shape[0]/k)), spks.shape[1]))
 		for i in range(out.shape[0]):
 		#Just add the remaining samples at the end...!
 			if (i == out.shape[0] -1):
-				out[i] = spks[k*i:].sum(axis=0)
+				out[i] = spks[k*i:, :].sum(axis=0)
 			else:  
-				out[i] = spks[k*i:k*(i+1)].sum(axis=0)
+				out[i] = spks[k*i:k*(i+1), :].sum(axis=0)
 		return out
 
 	def compute_r2(self, layer, win):
@@ -510,11 +530,11 @@ class transformer_regression:
 		return self.r2(y, y_hat)
 
 	## for L2 regularisation
-	def get_layer_values(self, layer, win, sent_list=[12]):
+	def get_layer_values_and_spikes(self, layer, win, sent_list=[12]):
 		# features, _ = self.get_transformer_features(sent_list)
 
 		if layer<2:
-			d = 1
+			d=1
 		else:
 			d=0
 
@@ -523,36 +543,45 @@ class transformer_regression:
 		if self.model_name=='transformer':
 			#def_w = 20
 			# offset is used to match different rounding error in 1st conv layer vs the rest of the layers...!
+			n = self.spikes_dict[1]
+
 			if layer <1:
 				feats = features.transpose()
-				offset = -0.25
+				# offset = -0.25
 				def_w = 20 
+				n = self.spikes_dict[0]
 			elif layer < 2:
 				feats = features.transpose()
 				def_w = 40
-				offset = 0.39
+				# offset = 0.39
 			else:
 				feats = features
 				def_w = 40
-				offset = 0.39
+				# offset = 0.39
 		else:
 			def_w = 25
 			
 		k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
 		# print(f"k = {k}")
+		spikes = list(map(lambda i: np.array(list(n[i].values())).T, sent_list))
+
+
 		if k >1:
 			feats = self.down_sample_features(feats, k)
+			spikes = self.down_sample_spikes(np.concatenate(spikes, axis=0), k)
+		
+		# n = self.simply_spikes(ch=channel, delay=delay, w=def_w, offset=offset, sent_list=sent_list)
 
-		return k, def_w, offset, feats
+		return feats, spikes
 
-	def get_all_channels(self, def_w, offset=0, delay=0, k_val=1, sent_list=[12]):
-		n_all_channel = []
-		for channel in range(self.dataset.num_channels):
-			n = self.simply_spikes(ch=channel, delay=delay, w=def_w, offset=offset, sent_list=sent_list)
-			if k_val>1:
-				n = self.down_sample_spikes(n, k_val)
-			n_all_channel.append(n)
-		return np.array(n_all_channel).T
+	# def get_all_channels(self, def_w, offset=0, delay=0, k_val=1, sent_list=[12]):
+	# 	n_all_channel = []
+	# 	for channel in range(1):
+	# 		n = self.simply_spikes(ch=channel, delay=delay, w=def_w, offset=offset, sent_list=sent_list)
+	# 		if k_val>1:
+	# 			n = self.down_sample_spikes(n, k_val)
+	# 		n_all_channel.append(n)
+	# 	return np.array(n_all_channel).T
 
 #   def get_pcs(self, layer, sents):
 #       #layer = 0
