@@ -21,8 +21,10 @@ class RidgeRegression():
     # including the intercept
     A_biased = self.alpha * A
     # print(A_biased.shape)
-    Beta = np.linalg.inv(X_with_intercept.T.dot(
-        X_with_intercept) + A_biased).dot(X_with_intercept.T).dot(y)
+    # Beta = np.linalg.inv(X_with_intercept.T.dot(
+        # X_with_intercept) + A_biased).dot(X_with_intercept.T).dot(y)
+    Beta = np.linalg.solve(X_with_intercept.T.dot(X_with_intercept) + A_biased, (X_with_intercept.T).dot(y))
+    
     self.Beta = Beta
     return self
 
