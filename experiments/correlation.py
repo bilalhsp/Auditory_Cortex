@@ -11,7 +11,7 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import r2_score
 
 # import time
-import csv
+import json
 
 
 conf_path = '/scratch/gilbreth/akamsali/Research/Makin/Auditory_Cortex/conf/ridge_conf.yaml'
@@ -43,16 +43,18 @@ num_layers = len(reg.layers)
 
 kf = KFold(n_splits=5, shuffle=True)
 
+tot_layer = {}
 
 for l in range(num_layers):
+    r2t_tot = []
+    r2v_tot = []
+    r2tt_tot = []
     for train, val in kf.split(train_val_list):
-        
+
         z_vals_test, n_vals_test = reg.get_layer_values_and_spikes(layer=l, win=w, sent_list=test_list)
         
         # test data
-        r2t = 0
-        r2v = 0
-        r2tt = 0
+        
         # start = time.time()
         z_vals_train, n_vals_train = reg.get_layer_values_and_spikes(layer=l, win=80, sent_list=train_val_list[train])
         z_vals_val, n_vals_val = reg.get_layer_values_and_spikes(layer=l, win=80, sent_list=train_val_list[val])
@@ -74,17 +76,40 @@ for l in range(num_layers):
         # y_hat_val = ridge_model.predict(x_val)
         # y_hat_test = ridge_model.predict(x_test)
 
-
+        r2t = []
+        r2v = []
+        r2tt = []
         #Normalized correlation coefficient
-        r2t += reg.cc_norm(y_hat_train, n_vals_train, sp=sp)
-        r2v += reg.cc_norm(y_hat_val, n_vals_val, sp=sp)
-        r2tt += reg.cc_norm(y_hat_test, n_vals_test, sp=sp)
-            
-    with open(output_dir + "/" + subject + '_linear_reg' +".csv" ,'a') as f1:
-            writer=csv.writer(f1)
-            row = [subject, l, r2t/5, r2v/5, r2tt/5 ]
-            writer.writerow(row)
-            f1.close()
+        for i in range(reg.dataset.num_channels):
+            r2t.append(reg.cc_norm(y_hat_train[:,i], n_vals_train[:,i], sp=sp))
+            r2v.append(reg.cc_norm(y_hat_val[:,i], n_vals_val[:,i], sp=sp))
+            r2tt.append(reg.cc_norm(y_hat_test[:,i], n_vals_test[:,i], sp=sp))
+
+        r2t_tot.append(r2t)
+        r2v_tot.append(r2v)
+        r2tt_tot.append(r2tt)
+
+    r2t_tot = np.average(r2t_tot, axis = 0)
+    r2v_tot = np.average(r2v_tot, axis = 0)
+    r2tt_tot = np.average(r2tt_tot, axis = 0)
+
+    tot_layer[l] = {'train': r2t_tot.tolist(), 'val': r2v_tot.tolist(), 'test': r2tt_tot.tolist()}
+    
+
+    with open(output_dir + "/" + subject + '_lin_reg_allchannel', 'w') as f:
+        json.dump(tot_layer, f)
+
+
+        # r2t += reg.cc_norm(y_hat_train, n_vals_train, sp=sp)
+        # r2v += reg.cc_norm(y_hat_val, n_vals_val, sp=sp)
+        # r2tt += reg.cc_norm(y_hat_test, n_vals_test, sp=sp)
+        
+        
+    # with open(output_dir + "/" + subject + '_linear_reg' +".csv" ,'a') as f1:
+    #         writer=csv.writer(f1)
+    #         row = [subject, l, r2t/5, r2v/5, r2tt/5 ]
+    #         writer.writerow(row)
+    #         f1.close()
 
     # with open(output_dir + "/" + subject + '_' + str(int(alpha)) + '_all_layers' +".csv" ,'a') as f2:
     #     writer=csv.writer(f1)

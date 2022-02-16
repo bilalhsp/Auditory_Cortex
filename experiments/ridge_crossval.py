@@ -2,17 +2,18 @@ from auditory_cortex.Regression import transformer_regression
 from auditory_cortex.ridge_regression import RidgeRegression 
 
 
-import sys
+# import sys
+import json
+from matplotlib.font_manager import json_dump
 import yaml
 from yaml import Loader
 import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import KFold
-from sklearn.metrics import r2_score
+# from sklearn.metrics import r2_score
 
-# import time
-import csv
-
+import time
+# import csv
 
 conf_path = '/scratch/gilbreth/akamsali/Research/Makin/Auditory_Cortex/conf/ridge_conf.yaml'
 
@@ -39,56 +40,58 @@ sp = 1
 num_layers = len(reg.layers)
 
 
-alphas = [0, 1, 10, 100, 1000, 10000, 100000]
+# alphas = [0, 1, 10, 100, 1000, 10000, 100000]
+# alphas = [1000000, 100000000, 1000000000, 10000000000, 100000000000, 1000000000000]
+alphas = np.linspace(1e5, 1e6, 10).tolist()
 
 kf = KFold(n_splits=5, shuffle=True)
 
 
-for train, val in kf.split(train_val_list):
+for alpha in alphas:
+    print("alpha: ", alpha)
+    tot_layer = {}
+    start = time.time()
     for l in range(num_layers):
-        
+       
+        r2t_tot = []
+        r2v_tot = []
+        r2tt_tot = []
         z_vals_test, n_vals_test = reg.get_layer_values_and_spikes(layer=l, win=w, sent_list=test_list)
         
-        # test data
-        r2t = 0
-        r2v = 0
-        r2tt = 0
-        # start = time.time()
-        z_vals_train, n_vals_train = reg.get_layer_values_and_spikes(layer=l, win=80, sent_list=train_val_list[train])
-        z_vals_val, n_vals_val = reg.get_layer_values_and_spikes(layer=l, win=80, sent_list=train_val_list[val])
-        
-        # k_val_train , def_w_train, offset_train, z_vals_train = reg.get_layer_values(layer=l, win=w, sent_list=train_val_list[train])
-        # n_vals_train = reg.get_all_channels(def_w=def_w_train, offset=offset_train, k_val=k_val_train, sent_list=train_val_list[train])
-
-        # k_val_val , def_w_val, offset_val, z_vals_val = reg.get_layer_values(layer=l,win=w, sent_list=train_val_list[val])
-        # n_vals_val = reg.get_all_channels(def_w=def_w_val, offset=offset_val, k_val=k_val_val, sent_list=train_val_list[val])
-
-        for alpha in alphas:
+        for train, val in kf.split(train_val_list):
+            z_vals_train, n_vals_train = reg.get_layer_values_and_spikes(layer=l, win=80, sent_list=train_val_list[train])
+            z_vals_val, n_vals_val = reg.get_layer_values_and_spikes(layer=l, win=80, sent_list=train_val_list[val])
 
             ridge_model = Ridge(alpha=alpha)
-            ridge_model.fit(z_vals_train, n_vals_train)
-            y_hat_train = ridge_model.predict(z_vals_train)
-            y_hat_val = ridge_model.predict(z_vals_val)
-            y_hat_test = ridge_model.predict(z_vals_test)
-
-            ridge_model = RidgeRegression(alpha=alpha)
             ridge_model.fit(z_vals_train, n_vals_train)
             n_hat_train = ridge_model.predict(z_vals_train)
             n_hat_val = ridge_model.predict(z_vals_val)
             n_hat_test = ridge_model.predict(z_vals_test)
 
-            r2t = reg.cc_norm(n_hat_train, n_vals_train, sp=sp)
-            r2v = reg.cc_norm(n_hat_val, n_vals_val, sp=sp)
-            r2tt = reg.cc_norm(n_hat_test, n_vals_test, sp=sp)
+            r2t = []
+            r2v = []
+            r2tt = []
             
-            with open(output_dir + "/" + subject + '_over_alphas' +".csv" ,'a') as f1:
-                    writer=csv.writer(f1)
-                    row = [subject, l, alpha, r2t, r2v, r2tt, r2_score(n_vals_train, y_hat_train), r2_score(n_vals_val, y_hat_val) ,r2_score(n_vals_test, y_hat_test) ]
-                    writer.writerow(row)
-                    f1.close()
+            for i in range(reg.dataset.num_channels):
+                r2t.append(reg.cc_norm(n_hat_train[:,i], n_vals_train[:,i], sp=sp))
+                r2v.append(reg.cc_norm(n_hat_val[:,i], n_vals_val[:,i], sp=sp))
+                r2tt.append(reg.cc_norm(n_hat_test[:,i], n_vals_test[:,i], sp=sp))
+            
+            # break
+            
+        r2t_tot.append(r2t)
+        r2v_tot.append(r2v)
+        r2tt_tot.append(r2tt)
+
+        r2t_tot = np.average(r2t_tot, axis = 0)
+        r2v_tot = np.average(r2v_tot, axis = 0)
+        r2tt_tot = np.average(r2tt_tot, axis = 0)
+
+        tot_layer[l] = {'train': r2t_tot.tolist(), 'val': r2v_tot.tolist(), 'test': r2tt_tot.tolist()}
+        # tot_layer[l] = {'train': r2t.tolist(), 'val': r2v.tolist(), 'test': r2tt.tolist()}
+
     
-    # with open(output_dir + "/" + subject + '_' + str(int(alpha)) + '_all_layers' +".csv" ,'a') as f2:
-    #     writer=csv.writer(f1)
-    #     row = [subject, l, alpha, r2t/5, r2v/5, r2tt/5]
-    #     writer.writerow(row)
-    #     f1.close()
+    # print("time: ",time.time()-start)
+    # break
+    with open(output_dir + "/" + subject + '_' + str(alpha), 'w') as f:
+        json.dump(tot_layer, f)

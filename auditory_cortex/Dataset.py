@@ -267,6 +267,7 @@ class Neural_Data:
     plt.xlabel('Time (s)', fontsize=14)
     plt.ylabel('Trials', fontsize=14)
     #plt.title(f"Rastor Plot for session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}'", fontsize=14, fontweight='bold')
+    
   def psth(self, sent=12, ch=9, win = 40):
     trials = self.get_trials(sent=sent)
     spikes = {}
