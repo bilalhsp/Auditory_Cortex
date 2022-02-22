@@ -42,7 +42,7 @@ num_layers = len(reg.layers)
 
 # alphas = [0, 1, 10, 100, 1000, 10000, 100000]
 # alphas = [1000000, 100000000, 1000000000, 10000000000, 100000000000, 1000000000000]
-alphas = np.linspace(1e5, 1e6, 10).tolist()
+alphas = np.linspace(1e6, 1e7, 10).tolist()
 
 kf = KFold(n_splits=5, shuffle=True)
 
