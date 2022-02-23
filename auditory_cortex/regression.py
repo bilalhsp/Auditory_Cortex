@@ -6,9 +6,9 @@ from scipy import linalg
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from sklearn.linear_model import Ridge
 
-from auditory_cortex.Dataset import Neural_Data
-from auditory_cortex.Feature_Extractors import Feature_Extractor_S2T
-from auditory_cortex.Feature_Extractors import Feature_Extractor_GRU
+from auditory_cortex.dataset import Neural_Data
+from auditory_cortex.feature_extractors import Feature_Extractor_S2T
+from auditory_cortex.feature_extractors import Feature_Extractor_GRU
 #from sklearn.decomposition import PCA
 # import rnn_model.speech_recognition as speech_recognition
 

@@ -1,4 +1,4 @@
-from auditory_cortex.Regression import transformer_regression
+from auditory_cortex.regression import transformer_regression
 from auditory_cortex.ridge_regression import RidgeRegression 
 
 
