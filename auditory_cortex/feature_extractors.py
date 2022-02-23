@@ -1,4 +1,5 @@
 from torch import nn, Tensor
+
 class Feature_Extractor_S2T(nn.Module):
   def __init__(self, model: nn.Module, layers):
     super(Feature_Extractor_S2T, self).__init__()
@@ -14,6 +15,7 @@ class Feature_Extractor_S2T(nn.Module):
   def create_hooks(self):
     def fn(layer, _, output):
       self.features[layer.__name__] = output.squeeze()
+      print("here:", output)
     return fn
     
   def forward(self, input):
