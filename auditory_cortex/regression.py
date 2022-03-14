@@ -158,7 +158,8 @@ class transformer_regression:
 		for i in range(1,499):
 			self.translate(self.dataset.audio(i))
 			for j, l in enumerate(self.layers):
-				features[j][i] = self.model_extractor.features[l]
+				features[j][i] = self.model_extractor.features[l].squeeze(dim=0)
+
 				# f_mean[i] = torch.mean(features[j][i], dim = 0)    
 				# demean_features[j][i]= features[j][i] - f_mean[i]
 			# for j, l in enumerate(self.layers):
@@ -184,6 +185,7 @@ class transformer_regression:
 
 	def down_sample_features(self, feats, k):
 		out = np.zeros((int(np.ceil(feats.shape[0]/k)),feats.shape[1]))
+		# print(out.shape)
 		for i in range(out.shape[0]):
 		#Just add the remaining samples at the end...!
 			if (i == out.shape[0] -1):
