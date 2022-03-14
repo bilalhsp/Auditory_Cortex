@@ -49,9 +49,9 @@ for l in range(num_layers):
     r2t_tot = []
     r2v_tot = []
     r2tt_tot = []
+    z_vals_test, n_vals_test = reg.get_layer_values_and_spikes(layer=l, win=w, sent_list=test_list)
     for train, val in kf.split(train_val_list):
 
-        z_vals_test, n_vals_test = reg.get_layer_values_and_spikes(layer=l, win=w, sent_list=test_list)
         
         # test data
         
