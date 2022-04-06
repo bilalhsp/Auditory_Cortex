@@ -64,7 +64,7 @@ class transformer_regression:
 	def simply_spikes(self, delay=0):
 		spikes = [{}, {}]
 	
-		for i in range(1,499):
+		for i in range(1,500):
 			spikes[0][i] = self.dataset.retrieve_spike_counts(sent=i, win=20, delay=delay, 
 																early_spikes=False,
 																model=self.model_name, 
@@ -78,7 +78,7 @@ class transformer_regression:
 		# spikes = torch.cat([spikes[i] for i in sent_list], dim = 0).numpy()
 		# return spikes
 
-	def all_channel_spikes(self, sent_s=1, sent_e=499, w = 40, delay=0,  offset=0.39):
+	def all_channel_spikes(self, sent_s=1, sent_e=500, w = 40, delay=0,  offset=0.39):
 		spikes = []
 		result = {}
 		for i in range(sent_s,sent_e):
@@ -88,7 +88,7 @@ class transformer_regression:
 
 		return result
 
-	def demean_spikes(self, sent_s=1, sent_e=499, ch=0, w = 40):
+	def demean_spikes(self, sent_s=1, sent_e=500, ch=0, w = 40):
 		spikes ={}
 		spk_mean = {}
 		for x,i in enumerate(range(sent_s,sent_e)):
@@ -155,7 +155,7 @@ class transformer_regression:
 		demean_features = [{} for _ in range(len(self.layers))]
 		f_mean = {}
 
-		for i in range(1,499):
+		for i in range(1,500):
 			self.translate(self.dataset.audio(i))
 			for j, l in enumerate(self.layers):
 				features[j][i] = self.model_extractor.features[l].squeeze(dim=0)
