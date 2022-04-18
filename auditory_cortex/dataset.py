@@ -152,7 +152,8 @@ class Neural_Data:
     for i in range(self.num_channels):
       #spike_indices to index through spike fields
       # print("here: ",i, tr)
-      j = i+1
+      # j = i+1
+      j = i
       spike_indices = np.where(self.spikes[j].trial == tr)
       #spike times relative to the stimuls On time (Stimon)
       if timing_type == 'relative':
