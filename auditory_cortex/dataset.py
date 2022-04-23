@@ -284,10 +284,12 @@ class Neural_Data:
  
     psth /= trials.size
     edges = np.float64(np.arange(0, psth.shape[0]))*win/1000
-    plt.bar(edges,psth, width=(0.8*win/1000))
-    plt.xlim(0,self.duration(sent))
-    #plt.xlabel('Time (s)', fontsize=14)
-    plt.ylabel('Spike Counts', fontsize=14)
+
+    return edges, psth
+    # plt.bar(edges,psth, width=(0.8*win/1000))
+    # plt.xlim(0,self.duration(sent))
+    # #plt.xlabel('Time (s)', fontsize=14)
+    # plt.ylabel('Spike Counts', fontsize=14)
     #plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
 
     
