@@ -2,42 +2,47 @@ import torch
 from gradient_extraction.hook import Hook
 
 
-class GetGradient():
-    def __init__(self, model, optimizer):
+class GetGradient:
+    def __init__(self, model, feature_extractor):
         self.model = model 
-        self.optimizer = optimizer
-        self.sig = torch.nn.Sigmoid()
+        self.feature_extractor = feature_extractor
 
-    def back_prop_step(self):     
-        
-        self.optimizer.zero_grad()
-        
-        net_out = self.model(self.spect, decoder_input_ids=self.decoder_input_ids)
-        # print(hook.output_f.shape)
-        # add 
-        # print("hf_shape:", self.hook.output_f.shape)
-        beta = torch.zeros(self.hook.output_f.shape[1], 1)
-        beta[beta.shape[0]//2, :] = 1
-        self.betas = beta
-        beta_z = torch.matmul(self.betas.T, self.hook.output_f)
-        # beta_z = torch.zeros_like(self.hook.output_f)
-        # beta_z[:,:,0] = self.hook.output_f[:, :, 0]
-        # self.beta_z = beta_z
-        loss = -beta_z[0].mean()
-        # print("loss:", loss.item())
+    def back_prop_step(self, unit):     
+        if self.layer_ID < 2:
+            chosen_feature = self.hook.output_f[0, unit, :]
+        else: 
+            chosen_feature = self.hook.output_f[0, :, unit]
+            
+        loss = -chosen_feature.mean()
         loss.backward()
         self.optimizer.step()
         return loss.item()
 
-    def get_opt_input(self, spect, layer, iterations=10):
-        self.spect = spect
-        self.spect.requires_grad = True
-
+    def get_opt_input(self, aud, layer_ID, layer, iterations=10):
+        self.layer_ID = layer_ID
         self.hook = Hook(self.model, layer, backward=True)
-        self.decoder_input_ids = torch.tensor([[1, 1]]) * self.model.config.decoder_start_token_id
+        decoder_input_ids = torch.tensor([[1, 1]]) * self.model.config.decoder_start_token_id
+
+        for param in self.model.parameters():
+            assert param.requires_grad == False, "Model parameters not frozen"
 
         self.loss_list = []
+        self.spect_list = []
+        self.og_spect = []
 
-        for i in range(iterations):
-            l = self.back_prop_step()
-            self.loss_list.append(l)         
+        for unit in range(10):
+            self.spect = self.feature_extractor(aud, sampling_rate=16000, return_tensors="pt").input_features
+            self.og_spect.append(self.spect) 
+            self.spect.requires_grad = True
+            self.optimizer = torch.optim.Adam([self.spect], lr=10)
+            loss_list = []
+
+            self.optimizer.zero_grad()
+            for i in range(iterations):
+                net_out = self.model(self.spect, decoder_input_ids=decoder_input_ids)
+                l = self.back_prop_step(unit)
+                loss_list.append(l)
+
+            self.loss_list.append(loss_list)
+            self.spect_list.append(self.spect)
+

@@ -7,7 +7,7 @@ class Hook():
         layer.__name__ = layer_name
 
         self.hook_fwd = layer.register_forward_hook(self.hook_fn_f)
-        self.hook_bwd = layer.register_backward_hook(self.hook_fn_b)
+        # self.hook_bwd = layer.register_backward_hook(self.hook_fn_b)
 
     def hook_fn_f(self, layer, input, output):
         self.input_f = input
