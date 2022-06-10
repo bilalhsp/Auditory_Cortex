@@ -9,4 +9,3 @@ class TransformerModel:
 						"model.encoder.layers.7.fc2","model.encoder.layers.8.fc2","model.encoder.layers.9.fc2"]
         self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
         self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
-        self.model_extractor = Feature_Extractor_S2T(self.model, self.layers)
