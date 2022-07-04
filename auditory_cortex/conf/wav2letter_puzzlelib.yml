@@ -1,0 +1,4 @@
+
+- layer_name: conv1
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
