@@ -205,7 +205,8 @@ class Neural_Data:
               j += 1
               st += win
               en += win
-            tmp[j] += 1
+            if j<n:
+              tmp[j] += 1
             
       bins[i] = tmp
     

@@ -21,16 +21,18 @@ class transformer_regression():
     if model == 'speech2text':
         print(f"Creating regression obj for: 'speech2text'")
         self.model_name=model
-        self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1",
-                        "model.encoder.layers.0.fc2","model.encoder.layers.1.fc2",
-                        "model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
-                        "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2",
-                        "model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
-                        "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2",
-                        ]
+        # self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1",
+        #                 "model.encoder.layers.0.fc2","model.encoder.layers.1.fc2",
+        #                 "model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
+        #                 "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2",
+        #                 "model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
+        #                 "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2",
+        #                 ]
+        
         self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
         self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
-        self.model_extractor = Feature_Extractor_S2T(self.model, self.processor, self.layers)
+        self.model_extractor = Feature_Extractor_S2T(self.model, self.processor)
+        self.layers = self.model_extractor.layers
 
     elif model == 'wav2vec':
         print(f"Creating regression obj for: 'wav2vec'")
@@ -179,27 +181,87 @@ class transformer_regression():
     self.features = self.unroll_time(self.resample(self.raw_features, bin_width))
     self.spikes = self.all_channel_spikes(bin_width=bin_width, delay=delay, offset=offset, sents=sents)
 
-  def corr_coeffs(self, layers=None, channels=None):
-    if layers == None:
-      layers = np.arange(len(self.layers))
-    if channels == None:
-      channels = np.arange(self.dataset.num_channels)
-    train_cc = np.zeros((len(layers), len(channels)))
-    val_cc = np.zeros((len(layers), len(channels)))
-    test_cc = np.zeros((len(layers), len(channels)))
-    for l,layer in enumerate(layers):
-      print(f"Computing correlations for layer {layer}")
-      for c,ch in enumerate(channels):
-        train_cc[l,c], val_cc[l,c], test_cc[l,c] = \
-                self.compute_cc_norm(self.features[layer], self.spikes[ch])
-    return train_cc, val_cc, test_cc
+  # def corr_coeffs(self, layers=None, channels=None):
+  #   if layers == None:
+  #     layers = np.arange(len(self.layers))
+  #   if channels == None:
+  #     channels = np.arange(self.dataset.num_channels)
+  #   train_cc = np.zeros((len(layers), len(channels)))
+  #   val_cc = np.zeros((len(layers), len(channels)))
+  #   test_cc = np.zeros((len(layers), len(channels)))
+  #   for l,layer in enumerate(layers):
+  #     print(f"Computing correlations for layer {layer}")
+  #     for c,ch in enumerate(channels):
+  #       train_cc[l,c], val_cc[l,c], test_cc[l,c] = \
+  #               self.compute_cc_norm(self.features[layer], self.spikes[ch])
+  #   return train_cc, val_cc, test_cc
 
   def save_corr_coeffs(self, win, delay, file_path):
     print(f"Working on win: {win}ms, delay: {delay}ms")
     self.load_features_and_spikes(bin_width=win, delay=delay)
-    train_cc, val_cc, test_cc = self.corr_coeffs()
-    corr = {'train': train_cc, 'val': val_cc, 'test': test_cc, 'win': win, 'delay': delay}
+    # train_cc, val_cc, test_cc = self.corr_coeffs()
+    train_cc = []
+    val_cc = []
+    test_cc = []
+    for layer in range(len(self.layers)):
+      print(f"Computing correlations for layer {layer}")
+      a,b,c = self.compute_cc_norm_layer(layer=layer)
+      train_cc.append(a.squeeze())
+      val_cc.append(b.squeeze())
+      test_cc.append(c.squeeze())
+    corr = {'train': np.array(train_cc), 'val': np.array(val_cc), 'test': np.array(test_cc),
+           'win': win, 'delay': delay}
     data = utils.write_to_disk(corr, file_path)
+
+  def compute_cc_norm_layer(self, layer, sp=1, normalize=False):
+    """
+    Compute correlation coefficients for the whole layer,
+    optimized linear regression using 'lstsq'
+    
+    Args:
+        layer (int): index of the layer
+    """
+    n_channels = self.dataset.num_channels
+    x = self.features[layer]
+    y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+    # provide 'sp' for normalized correlation coefficient...!
+    r2t = np.zeros((1, n_channels))
+    r2v = np.zeros((1, n_channels))
+    r2tt = np.zeros((1, n_channels))
+    
+    m = int(x.shape[0])
+    n2 = int(m*0.9)
+    x_test = x[n2:,:]
+    y_test = y[n2:,:]    
+    
+    # signal power, will be used for normalization
+    #sp = self.dataset.signal_power(win, channel)
+    for i in range(5):
+        a = int(i*0.2*n2)
+        b = int((i+1)*0.2*n2)
+  
+        x_val = x[a:b,:] 
+        y_val = y[a:b,:] 
+        
+        x_train = np.concatenate((x[:a,:], x[b:n2,:]), axis=0)
+        y_train = np.concatenate((y[:a], y[b:n2]), axis=0)
+        
+        # Linear Regression...!
+        B = self.regression_param(x_train, y_train)
+        y_hat_train = self.predict(x_train, B)
+        y_hat_val = self.predict(x_val, B)
+        y_hat_test = self.predict(x_test, B)
+        
+        #Normalized correlation coefficient
+        r2t += self.cc_norm(y_hat_train, y_train, sp, normalize=normalize)
+        r2v += self.cc_norm(y_hat_val, y_val, sp, normalize=normalize)
+        r2tt += self.cc_norm(y_hat_test, y_test, sp, normalize=normalize)
+        
+    r2t /= 5
+    r2v /= 5
+    r2tt /= 5
+   
+    return r2t, r2v,r2tt  
 
 
 
@@ -333,25 +395,25 @@ class transformer_regression():
    
     return r2t, r2v,r2tt  
 
-  def compute_and_store_corr(self, wins, delays, file_path):
-    """computes correlations for all layers and channels,
-    | for all combinations of 'wins' and 'delays' and stores them 
-    | to the 'file_path'.
-    | wins: list
-    | delays: list
-    | file_path: path of csv file
-    """
-    num_layers = len(self.layers)
-    num_channels = self.dataset.num_channels
-    for win in wins:
-        for delay in delays:
-            train_cc = np.zeros((num_layers, num_channels))
-            val_cc = np.zeros((num_layers, num_channels))
-            test_cc = np.zeros((num_layers, num_channels)) 
-            for layer in range(0, num_layers):
-                train_cc[layer,:], val_cc[layer,:], test_cc[layer,:] = self.get_cc_norm_layer(layer, win, delay, normalize=False)
-            corr = {'train': train_cc, 'val': val_cc, 'test': test_cc, 'win': win, 'delay': delay}
-            data = utils.write_to_disk(corr, file_path)
+  # def compute_and_store_corr(self, wins, delays, file_path):
+  #   """computes correlations for all layers and channels,
+  #   | for all combinations of 'wins' and 'delays' and stores them 
+  #   | to the 'file_path'.
+  #   | wins: list
+  #   | delays: list
+  #   | file_path: path of csv file
+  #   """
+  #   num_layers = len(self.layers)
+  #   num_channels = self.dataset.num_channels
+  #   for win in wins:
+  #       for delay in delays:
+  #           train_cc = np.zeros((num_layers, num_channels))
+  #           val_cc = np.zeros((num_layers, num_channels))
+  #           test_cc = np.zeros((num_layers, num_channels)) 
+  #           for layer in range(0, num_layers):
+  #               train_cc[layer,:], val_cc[layer,:], test_cc[layer,:] = self.get_cc_norm_layer(layer, win, delay, normalize=False)
+  #           corr = {'train': train_cc, 'val': val_cc, 'test': test_cc, 'win': win, 'delay': delay}
+  #           data = utils.write_to_disk(corr, file_path)
 
   def get_Poiss_scores_layer(self, layer, win, delay=0, sents= np.arange(1,499), load_features=False):
     print(f"Computing Poisson scores for layer:{layer} ...")
@@ -408,12 +470,19 @@ class transformer_regression():
  
   def cc_norm(self, y_hat, y, sp, normalize=False):
     # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
-    if normalize:
-        factor = sp
-    else:
-        factor = np.var(y)  
+    try:
+      n_channels = y.shape[1]
+    except:
+      n_channels=1
+      y = np.expand_dims(y,axis=1)
+      y_hat = np.expand_dims(y_hat,axis=1)
+    corr_coeff = np.zeros((1, n_channels))
+    for ch in range(n_channels):
+      if not normalize:
+          sp = np.var(y[:,ch])
+      corr_coeff[:,ch] = np.cov(y_hat[:,ch], y[:,ch])[0,1]/(np.sqrt(np.var(y_hat[:,ch])*sp))
 
-    return np.cov(y_hat, y)[0,1]/(np.sqrt(np.var(y_hat)*factor))
+    return corr_coeff
 
   def regression_param(self, X, y):
     B = linalg.lstsq(X, y)[0]
