@@ -52,7 +52,7 @@ class FeatureExtractor(ABC):
     returns:
         (dim, time) features extracted for layer at 'layer_index' location 
     '''
-    return self.features[self.layers[index]]
+    return self.features[self.layers[layer_index]]
 
   def def_bin_width(self, layer):
     def_w = self.bin_widths[layer]
