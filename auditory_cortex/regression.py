@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import os
+import pandas as pd
 from scipy import linalg, signal
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor,Wav2Vec2Processor, Wav2Vec2ForCTC
 
@@ -122,7 +123,14 @@ class transformer_regression():
     ##############################
     ## New functions...
     ##############################
-  def extract_features(self, sents=np.arange(1,499)):
+  def get_features(self, layer):
+    try:
+      feats = self.features[layer]
+    except AttributeError:
+      raise AttributeError("Run 'load_features_and_spikes()' method before using hidden features...")
+    return feats
+
+  def extract_features(self, sents = None, grad=False):
     """
     Returns all layer features for given 'sents'
     
@@ -133,9 +141,11 @@ class transformer_regression():
         List of dict: List index corresponds to layer number carrying 
                       dict of extracted features for all sentences. 
     """
+    if sents == None:
+      sents=np.arange(1,499)
     features = [{} for _ in range(len(self.layers))]
     for x, i in enumerate(sents):
-      self.model_extractor.translate(self.dataset.audio(i))
+      self.model_extractor.translate(self.dataset.audio(i), grad = grad)
       for j, l in enumerate(self.layers):
         features[j][i] = self.model_extractor.features[l]
         if self.model_name=='wav2vec':
@@ -175,7 +185,9 @@ class transformer_regression():
       feats[j] = np.concatenate([features[j][sent] for sent in features[j].keys()], axis=0)
     return feats
 
-  def load_features_and_spikes(self, bin_width=5, delay=0, offset=0, sents = np.arange(1,499), load_raw=False):
+  def load_features_and_spikes(self, bin_width=40, delay=0, offset=0, sents=None, load_raw=False):
+    if sents == None:
+      sents = np.arange(1,499)
     if load_raw:
       self.raw_features = self.extract_features(sents)
     self.features = self.unroll_time(self.resample(self.raw_features, bin_width))
@@ -196,7 +208,7 @@ class transformer_regression():
   #               self.compute_cc_norm(self.features[layer], self.spikes[ch])
   #   return train_cc, val_cc, test_cc
 
-  def save_corr_coeffs(self, win, delay, file_path):
+  def save_corr_coeffs(self, win, delay, file_path, null_dist=False):
     print(f"Working on win: {win}ms, delay: {delay}ms")
     self.load_features_and_spikes(bin_width=win, delay=delay)
     # train_cc, val_cc, test_cc = self.corr_coeffs()
@@ -205,7 +217,7 @@ class transformer_regression():
     test_cc = []
     for layer in range(len(self.layers)):
       print(f"Computing correlations for layer {layer}")
-      a,b,c = self.compute_cc_norm_layer(layer=layer)
+      a,b,c = self.compute_cc_norm_layer(layer=layer, null_dist=null_dist)
       train_cc.append(a.squeeze())
       val_cc.append(b.squeeze())
       test_cc.append(c.squeeze())
@@ -213,7 +225,7 @@ class transformer_regression():
            'win': win, 'delay': delay}
     data = utils.write_to_disk(corr, file_path)
 
-  def compute_cc_norm_layer(self, layer, sp=1, normalize=False):
+  def compute_cc_norm_layer(self, layer, sp=1, normalize=False, null_dist = False):
     """
     Compute correlation coefficients for the whole layer,
     optimized linear regression using 'lstsq'
@@ -224,6 +236,12 @@ class transformer_regression():
     n_channels = self.dataset.num_channels
     x = self.features[layer]
     y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+    # x.shape  = n_samples x n_dims
+    # y.shape = n_samples x channels
+  
+    if null_dist:
+      np.random.shuffle(y)
+
     # provide 'sp' for normalized correlation coefficient...!
     r2t = np.zeros((1, n_channels))
     r2v = np.zeros((1, n_channels))
@@ -247,15 +265,15 @@ class transformer_regression():
         y_train = np.concatenate((y[:a], y[b:n2]), axis=0)
         
         # Linear Regression...!
-        B = self.regression_param(x_train, y_train)
+        B = utils.regression_param(x_train, y_train)
         y_hat_train = self.predict(x_train, B)
         y_hat_val = self.predict(x_val, B)
         y_hat_test = self.predict(x_test, B)
         
         #Normalized correlation coefficient
-        r2t += self.cc_norm(y_hat_train, y_train, sp, normalize=normalize)
-        r2v += self.cc_norm(y_hat_val, y_val, sp, normalize=normalize)
-        r2tt += self.cc_norm(y_hat_test, y_test, sp, normalize=normalize)
+        r2t += utils.cc_norm(y_hat_train, y_train, sp, normalize=normalize)
+        r2v += utils.cc_norm(y_hat_val, y_val, sp, normalize=normalize)
+        r2tt += utils.cc_norm(y_hat_test, y_test, sp, normalize=normalize)
         
     r2t /= 5
     r2v /= 5
@@ -263,6 +281,98 @@ class transformer_regression():
    
     return r2t, r2v,r2tt  
 
+  def linear_shift_null_dist(self, layer, N=50, bin_width=40, delay=0):
+    """
+    Compute correlations for null dist 'num_repeats' times
+     for the whole layer,
+    
+    Args:
+        layer (int): index of the layer
+        num_repeats (int): number of simulations
+    """
+    null_dist = pd.DataFrame(columns=['layer','channel','bin_width','delay','shift','method','cc'])
+    n_channels = self.dataset.num_channels
+    x = self.get_features(layer)
+    y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+    # x.shape  = n_samples x n_dims
+    # y.shape = n_samples x channels
+    T = x.shape[0]
+    r2t = np.zeros((n_channels, 2*N+1))
+    for s in range(-N,N+1):
+      score = utils.fit_and_score(x[N+s:T-N+s], y[N:T-N])
+      data = pd.DataFrame(np.array([np.ones_like(score)*layer,
+                                    np.arange(n_channels),
+                                    np.ones_like(score)*bin_width,
+                                    np.ones_like(score)*delay,
+                                    np.ones_like(score)*s,
+                                    n_channels*['linear_shift'],
+                                    score]
+                                  ).transpose(),
+                          columns=['layer','channel','bin_width','delay','shift','method','cc']
+                          )
+      null_dist = pd.concat([null_dist, data], axis=0, ignore_index=True)
+    float_cols = ['layer','channel','bin_width','delay','shift','cc']
+    for col in float_cols:
+      null_dist[col] = null_dist[col].astype('float64')
+    return null_dist
+
+  def circular_shift_null_dist(self, layer, N=100, bin_width=40, delay=0):
+    """
+    Compute correlations for null dist 'N' times using circular shift method
+     for the whole layer,
+    
+    Args:
+        layer (int): index of the layer
+        num_repeats (int): number of simulations
+    """
+    null_dist = pd.DataFrame(columns=['layer','channel','bin_width','delay','shift','method','cc'])
+    n_channels = self.dataset.num_channels
+    x = self.get_features(layer)
+    y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+    # x.shape  = n_samples x n_dims
+    # y.shape = n_samples x channels
+    T = x.shape[0]
+    # dim = x.shape[1]
+    # if dim > 500:
+    #   factor = 8
+    #   x = utils.down_sample(x.transpose(), factor).transpose()
+    # r2t = np.zeros((n_channels, 2*N+1))
+
+    for n in range(N):
+      s = np.random.randint(int(0.3*T), int(0.7*T))
+      score = utils.fit_and_score(np.concatenate([x[s:T],x[0:s]], axis=0), y)
+      data = pd.DataFrame(np.array([np.ones_like(score)*layer,
+                                    np.arange(n_channels),
+                                    np.ones_like(score)*bin_width,
+                                    np.ones_like(score)*delay,
+                                    np.ones_like(score)*(n+1),
+                                    n_channels*['circular_shift'],
+                                    score]
+                                  ).transpose(),
+                          columns=['layer','channel','bin_width','delay','shift','method','cc']
+                          )
+      null_dist = pd.concat([null_dist, data], axis=0, ignore_index=True)
+
+    float_cols = ['layer','channel','bin_width','delay','shift','cc']
+    for col in float_cols:
+      null_dist[col] = null_dist[col].astype('float64')
+    return null_dist
+
+
+  def get_betas(self, layer):
+    """
+    Returns betas for all channels of the layer,
+
+    Args:
+        layer (int): index of the layer
+    """
+    n_channels = self.dataset.num_channels
+    x = self.features[layer]
+    y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+    # x.shape  = n_samples x n_dims
+    # y.shape = n_samples x channels
+    B = utils.regression_param(x, y)
+    return B
 
 
 #########################################    ##############################
@@ -379,15 +489,15 @@ class transformer_regression():
         y_train = np.concatenate((y[:a], y[b:n2]))
         
         # Linear Regression...!
-        B = self.regression_param(x_train, y_train)
+        B = utils.regression_param(x_train, y_train)
         y_hat_train = self.predict(x_train, B)
         y_hat_val = self.predict(x_val, B)
         y_hat_test = self.predict(x_test, B)
         
         #Normalized correlation coefficient
-        r2t += self.cc_norm(y_hat_train, y_train, sp, normalize=normalize)
-        r2v += self.cc_norm(y_hat_val, y_val, sp, normalize=normalize)
-        r2tt += self.cc_norm(y_hat_test, y_test, sp, normalize=normalize)
+        r2t += utils.cc_norm(y_hat_train, y_train, sp, normalize=normalize)
+        r2v += utils.cc_norm(y_hat_val, y_val, sp, normalize=normalize)
+        r2tt += utils.cc_norm(y_hat_test, y_test, sp, normalize=normalize)
         
     r2t /= 5
     r2v /= 5
@@ -468,25 +578,50 @@ class transformer_regression():
    
     return r2t, r2v,r2tt
  
-  def cc_norm(self, y_hat, y, sp, normalize=False):
-    # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
-    try:
-      n_channels = y.shape[1]
-    except:
-      n_channels=1
-      y = np.expand_dims(y,axis=1)
-      y_hat = np.expand_dims(y_hat,axis=1)
-    corr_coeff = np.zeros((1, n_channels))
-    for ch in range(n_channels):
-      if not normalize:
-          sp = np.var(y[:,ch])
-      corr_coeff[:,ch] = np.cov(y_hat[:,ch], y[:,ch])[0,1]/(np.sqrt(np.var(y_hat[:,ch])*sp))
+  # def cc_norm(self, y_hat, y, sp, normalize=False):
+  #   """
 
-    return corr_coeff
+  #   Args: y_hat (ndarray): (n_samples, channels) or (repeats, n_samples, channels) for null dist
+  #         y (ndarray): (n_samples, channels)   
+  #   """
+  #   # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
+  #   try:
+  #     n_channels = y.shape[1]
+  #   except:
+  #     n_channels=1
+  #     y = np.expand_dims(y,axis=1)
+  #     y_hat = np.expand_dims(y_hat,axis=1)
+  #   corr_coeff = np.zeros((1, n_channels))
+  #   for ch in range(n_channels):
+  #     corr_coeff[:,ch] = self.cc_single_channel(y_hat[:,ch],y[:,ch])
+  #     # if not normalize:
+  #     #     sp = np.var(y[:,ch])
+  #     # corr_coeff[:,ch] = np.cov(y_hat[:,ch], y[:,ch])[0,1]/(np.sqrt(np.var(y_hat[:,ch])*sp))
 
-  def regression_param(self, X, y):
-    B = linalg.lstsq(X, y)[0]
-    return B
+  #   return corr_coeff
+  # def cc_single_channel(self, y_hat, y):
+  #   """
+  #   computes correlations for the given spikes and predictions 'single channel'
+
+  #   Args: y_hat (ndarray): (n_sampes,) or (repeats,n_samples) spike predictions
+  #         y (ndarray): (n_samples) actual spikes for single channel 
+    
+  #   Returns:  ndarray: (1,) or (repeats, 1) correlation value or array (for repeats). 
+  #   """
+
+
+
+
+  # def regression_param(self, X, y):
+  #   """
+  #   Computes the least-square solution to the equation Xz = y,
+  
+  #   Args:
+  #       X (ndarray): (M,N) left-hand side array
+  #       y (adarray): (M,) or (M,K) right-hand side array
+  #   """
+  #   B = linalg.lstsq(X, y)[0]
+  #   return B
 
   def predict(self, X, B):
     return X@B
@@ -558,7 +693,7 @@ class transformer_regression():
         y = utils.down_sample(y,k)
       y_train = y[0:m]
       y_test = y[m:]
-      B = self.regression_param(x_train, y_train)
+      B = utils.regression_param(x_train, y_train)
  
       r2t[i] = self.regression_score(x_train, y_train, B)
       r2v[i] = self.regression_score(x_test, y_test, B)
@@ -604,7 +739,7 @@ class transformer_regression():
         x_train = np.concatenate((feats[:a,:], feats[b:n2,:]), axis=0)
         y_train = np.concatenate((y[:a], y[b:n2]))
         # Linear Regression...!
-        B = self.regression_param(x_train, y_train)
+        B = utils.regression_param(x_train, y_train)
         y_hat_train = self.predict(x_train, B)
         y_hat_val = self.predict(x_val, B)
         y_hat_test = self.predict(x_test, B)
@@ -644,7 +779,7 @@ class transformer_regression():
       y = self.down_sample_spikes(y,k)
     y_train = y[0:m]
     y_test = y[m:]
-    B = self.regression_param(x_train, y_train)
+    B = utils.regression_param(x_train, y_train)
 
     r2t = self.regression_score(x_train, y_train, B)
     r2v = self.regression_score(x_test, y_test, B)

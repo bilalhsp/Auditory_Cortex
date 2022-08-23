@@ -59,8 +59,16 @@ class FeatureExtractor(ABC):
     offset = self.offsets[layer]
     return def_w, offset
 
+  def translate(self, aud, grad=False):
+    if grad:
+      input = self.fwd_pass(aud)
+    else:
+      with torch.no_grad():
+        input = self.fwd_pass(aud)
+    return input
+
   @abstractmethod
-  def translate(self, aud):
+  def fwd_pass(self, aud):
     pass
 
 
@@ -68,20 +76,23 @@ class FeatureExtractorW2L(FeatureExtractor):
   def __init__(self, model):
     super(FeatureExtractorW2L, self).__init__(model, f'{model.model_name}.yml')
     
-  def translate(self, aud):
+  def fwd_pass(self, aud):
     """
     Forward passes audio input through the model and captures 
     the features in the 'self.features' dict.
 
     Args:
         aud (ndarray): single 'wav' input of shape (t,) 
+    
+    Returns:
+        input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
     """
-    with torch.no_grad():
-      input = torch.tensor(aud, dtype=torch.float32)
-      input = input.unsqueeze(dim=0)
-      self.model.eval()
-      out = self.model(input)
-    return None
+    input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+    input = input.unsqueeze(dim=0)
+    input.requires_grad=True
+    self.model.eval()
+    out = self.model(input)
+    return input
 
 class Feature_Extractor_S2T(FeatureExtractor):
   def __init__(self, model, processor):
