@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import os
 import pandas as pd
+from scipy import linalg
 
 def down_sample(data, k):
     #down samples 'data' by factor 'k' along dim=0 
@@ -18,13 +19,6 @@ def down_sample(data, k):
       else:  
         out[i] = data[k*i:k*(i+1)].sum(axis=0)
     return out
-
-def regression_param(X, y):
-    B = linalg.lstsq(X, y)[0]
-    return B
-
-def predict(X, B):
-    return X@B
 
 @torch.no_grad()
 def poisson_regression_score(model, X, Y):
@@ -110,6 +104,24 @@ def poiss_regression(x_train, y_train):
             break
       
     return model, loss_history, P_scores
+def write_df_to_disk(df, file_path):
+    """
+    Takes in any pandas dataframe 'df' and writes as csv file 'file_path',
+    appends data to existing file, if it already exists.
+
+    Args:
+        df (dataframe): dataframe containing data to write
+        file_path (str): name of the file to write to.
+    """
+    if os.path.isfile(file_path):
+        data = pd.read_csv(file_path)
+        action = 'appended'
+    else:
+        data = pd.DataFrame(columns= df.columns)
+        action = 'written'
+    data = pd.concat([data,df], axis=0, ignore_index=True)
+    data.to_csv(file_path, index=False)
+    print(f"Dataframe {action} to {file_path}.")
 
 def write_to_disk(corr, file_path):
     """
@@ -141,3 +153,87 @@ def write_to_disk(corr, file_path):
     data.to_csv(file_path, index=False)
     print(f"Data saved for bin-width: {win}, delay: {delay} at file: '{file_path}'")
     return data
+
+def cc_norm(y_hat, y, sp=1, normalize=False):
+    """
+    Args:   
+        y_hat (ndarray): (n_samples, channels) or (n_samples, channels, repeats) for null dist
+        y (ndarray): (n_samples, channels)  
+        sp & normalize are redundant...! 
+    """
+    # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
+    try:
+        n_channels = y.shape[1]
+    except:
+        n_channels=1
+        y = np.expand_dims(y,axis=1)
+        y_hat = np.expand_dims(y_hat,axis=1)
+        
+    corr_coeff = np.zeros(y_hat.shape[1:])
+    for ch in range(n_channels):
+        corr_coeff[ch] = cc_single_channel(y_hat[:,ch],y[:,ch])
+    return corr_coeff
+
+def cc_single_channel(y_hat, y):
+    """
+    computes correlations for the given spikes and predictions 'single channel'
+
+    Args:   
+        y_hat (ndarray): (n_sampes,) or (n_samples,repeats) spike predictions
+        y (ndarray): (n_samples) actual spikes for single channel 
+
+    Returns:  
+        ndarray: (1,) or (repeats, ) correlation value or array (for repeats). 
+    """
+    try:
+        y_hat = np.transpose(y_hat,(1,0))
+    except:
+        y_hat = np.expand_dims(y_hat, axis=0)
+    return np.cov(y_hat, y)[0,1:] / np.sqrt(np.var(y)*np.var(y_hat, axis=1))
+
+
+def regression_param(X, y):
+    """
+    Computes the least-square solution to the equation Xz = y,
+  
+    Args:
+        X (ndarray): (M,N) left-hand side array
+        y (adarray): (M,) or (M,K) right-hand side array
+    Returns:
+        ndarray: (N,) or (N,K)
+    """
+    B = linalg.lstsq(X, y)[0]
+    return B
+
+
+# def regression_param(X, y):
+#     B = linalg.lstsq(X, y)[0]
+#     return B
+
+def predict(X, B):
+    """
+    Args:
+        X (ndarray): X (ndarray): (M,N) left-hand side array
+        B (ndarray): (N,) or (N,K)
+    Returns:
+        ndarray: (M,) or (M,K)
+    """
+    return X@B
+
+def fit_and_score(X, y):
+    x_train, y_train, x_test, y_test = train_test_split(X,y, split=0.7)
+    B = regression_param(x_train,y_train)
+    y_hat = predict(x_test,B)
+    cc = cc_norm(y_hat, y_test)
+    return cc
+
+# def fit_and_score(X, y):
+#     B = regression_param(X,y)
+#     y_hat = predict(X,B)
+#     cc = cc_norm(y_hat, y)
+#     return cc
+
+def train_test_split(x,y, split=0.7):
+    split = int(x.shape[0]*split)
+    return x[0:split], y[0:split], x[split:], y[split:]
+
