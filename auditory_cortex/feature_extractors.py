@@ -1,6 +1,7 @@
 import os
 import yaml
 import torch
+import cupy as cp
 from torch import nn, Tensor
 from abc import ABC, abstractmethod
 
@@ -19,12 +20,12 @@ class FeatureExtractor(ABC):
       )
     with open(config_file, 'r') as f:
       self.config = yaml.load(f, yaml.FullLoader)
-    self.num_layers = len(self.config)
+    self.num_layers = len(self.config['layers'])
     
     for i in range(self.num_layers):
-      self.layers.append(self.config[i]['layer_name'])
-      self.bin_widths.append(self.config[i]['bin_width'])
-      self.offsets.append(self.config[i]['offset'])
+      self.layers.append(self.config['layers'][i]['layer_name'])
+      self.bin_widths.append(self.config['layers'][i]['bin_width'])
+      self.offsets.append(self.config['layers'][i]['offset'])
  
     # Register a hook for the given layer
     for layer_name in self.layers:
@@ -99,12 +100,12 @@ class Feature_Extractor_S2T(FeatureExtractor):
     super(Feature_Extractor_S2T, self).__init__(model, 'speech2text.yml')
     self.processor = processor 
 
-  def translate(self, aud):
+  def fwd_pass(self, aud):
     inputs_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
     with torch.no_grad():
       self.model.eval()
       generated_ids = self.model.generate(inputs_features)
-    return None
+    return generated_ids
 
 
 # class FeatureExtractorW2L(nn.Module):

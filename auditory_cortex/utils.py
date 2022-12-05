@@ -1,9 +1,11 @@
 import numpy as np
+import cupy as cp
 import torch
 import torch.nn as nn
 import os
 import pandas as pd
 from scipy import linalg
+import torchaudio
 
 def down_sample(data, k):
     #down samples 'data' by factor 'k' along dim=0 
@@ -65,7 +67,7 @@ def MSE_poisson_predictions(Y, poisson_pred):
     return score
 
 def MSE_Linear_predictions(Y, linear_reg_pred):
-    # using Y_hat 'prediction from linear regression' with Poisson Loss     
+    # using Y_hat 'prediction from linear regression' with MSE Loss     
     loss_fn = nn.MSELoss()
     score = loss_fn(Y, linear_reg_pred)
     
@@ -123,7 +125,7 @@ def write_df_to_disk(df, file_path):
     data.to_csv(file_path, index=False)
     print(f"Dataframe {action} to {file_path}.")
 
-def write_to_disk(corr, file_path):
+def write_to_disk(corr_dict, file_path, normalizer=None):
     """
     | Takes in the 'corr' dict and stores the results
     | at the 'file_path', (concatenates if file already exists)
@@ -135,46 +137,100 @@ def write_to_disk(corr, file_path):
     if os.path.isfile(file_path):
         data = pd.read_csv(file_path)
     else:
-        data = pd.DataFrame(columns=['layer','channel','bin_width','delay','train_cc', 'val_cc','test_cc'])
-    win = corr['win']
-    delay = corr['delay']
-    ch = np.arange(corr['train'].shape[1])
-    layers = np.arange(corr['train'].shape[0])
+        data = pd.DataFrame(columns=['session','layer','channel','bin_width',
+                                    'delay','train_cc_raw','test_cc_raw', 'normalizer', 'N_sents'])
+    session = corr_dict['session']
+    model_name = corr_dict['model']
+    win = corr_dict['win']
+    delay = corr_dict['delay']
+    ch = np.arange(corr_dict['test_cc_raw'].shape[1])
+    layers = np.arange(corr_dict['test_cc_raw'].shape[0])
+    N_sents = corr_dict['N_sents']
+    if normalizer is None:
+        normalizer = np.zeros_like(ch)
     for layer in layers:
-        df = pd.DataFrame(np.array([np.ones_like(ch)*layer,ch, 
-                        np.ones_like(ch)*win, 
-                        np.ones_like(ch)*delay,
-                        corr['train'][layer,:],
-                        corr['val'][layer,:],
-                        corr['test'][layer,:]]).transpose(),
-                        columns=['layer','channel','bin_width','delay','train_cc', 'val_cc','test_cc']
+        df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
+                                    np.ones_like(ch)*layer,
+                                    ch, 
+                                    np.ones_like(ch)*win, 
+                                    np.ones_like(ch)*delay,
+                                    corr_dict['train_cc_raw'][layer,:],
+                                    corr_dict['test_cc_raw'][layer,:],
+                                    normalizer,
+                                    np.ones_like(ch)*N_sents
+                                    ]).transpose(),
+                        columns=data.columns
                         )
         data = pd.concat([data,df], axis=0, ignore_index=True)
     data.to_csv(file_path, index=False)
-    print(f"Data saved for bin-width: {win}, delay: {delay} at file: '{file_path}'")
+    print(f"Data saved for model: '{model_name}', session: '{session}',\
+    bin-width: {win}ms, delay: {delay}ms at file: '{file_path}'")
     return data
 
-def cc_norm(y_hat, y, sp=1, normalize=False):
+def cc_norm(y, y_hat, sp=1, normalize=False):
     """
     Args:   
         y_hat (ndarray): (n_samples, channels) or (n_samples, channels, repeats) for null dist
         y (ndarray): (n_samples, channels)  
         sp & normalize are redundant...! 
     """
+    #check if incoming array is np or cp,
+    #and decide which module to use...!
+    if type(y).__module__ == np.__name__:
+        module = np
+    else:
+        module = cp
     # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
     try:
         n_channels = y.shape[1]
     except:
         n_channels=1
-        y = np.expand_dims(y,axis=1)
-        y_hat = np.expand_dims(y_hat,axis=1)
+        y = module.expand_dims(y,axis=1)
+        y_hat = module.expand_dims(y_hat,axis=1)
         
-    corr_coeff = np.zeros(y_hat.shape[1:])
+    corr_coeff = module.zeros(y_hat.shape[1:])
     for ch in range(n_channels):
-        corr_coeff[ch] = cc_single_channel(y_hat[:,ch],y[:,ch])
+        corr_coeff[ch] = cc_single_channel(y[:,ch],y_hat[:,ch])
     return corr_coeff
 
-def cc_single_channel(y_hat, y):
+# def cc_norm_cp(y, y_hat, sp=1, normalize=False):
+#     """
+#     Args:   
+#         y_hat (ndarray): (n_samples, channels) or (n_samples, channels, repeats) for null dist
+#         y (ndarray): (n_samples, channels)  
+#         sp & normalize are redundant...! 
+#     """
+#     # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
+#     try:
+#         n_channels = y.shape[1]
+#     except:
+#         n_channels=1
+#         y = cp.expand_dims(y,axis=1)
+#         y_hat = cp.expand_dims(y_hat,axis=1)
+        
+#     corr_coeff = cp.zeros(y_hat.shape[1:])
+#     for ch in range(n_channels):
+#         corr_coeff[ch] = cc_single_channel_cp(y[:,ch],y_hat[:,ch])
+#     return corr_coeff
+
+# def cc_single_channel_cp(y, y_hat):
+#     """
+#     computes correlations for the given spikes and predictions 'single channel'
+
+#     Args:   
+#         y_hat (ndarray): (n_sampes,) or (n_samples,repeats) spike predictions
+#         y (ndarray): (n_samples) actual spikes for single channel 
+
+#     Returns:  
+#         ndarray: (1,) or (repeats, ) correlation value or array (for repeats). 
+#     """
+#     try:
+#         y_hat = cp.transpose(y_hat,(1,0))
+#     except:
+#         y_hat = cp.expand_dims(y_hat, axis=0)
+#     return cp.cov(y, y_hat)[0,1:] / (cp.sqrt(cp.var(y)*cp.var(y_hat, axis=1)) + 1.0e-8)
+
+def cc_single_channel(y, y_hat):
     """
     computes correlations for the given spikes and predictions 'single channel'
 
@@ -185,12 +241,17 @@ def cc_single_channel(y_hat, y):
     Returns:  
         ndarray: (1,) or (repeats, ) correlation value or array (for repeats). 
     """
+    #check if incoming array is np or cp,
+    #and decide which module to use...!
+    if type(y).__module__ == np.__name__:
+        module = np
+    else:
+        module = cp
     try:
-        y_hat = np.transpose(y_hat,(1,0))
+        y_hat = module.transpose(y_hat,(1,0))
     except:
-        y_hat = np.expand_dims(y_hat, axis=0)
-    return np.cov(y_hat, y)[0,1:] / np.sqrt(np.var(y)*np.var(y_hat, axis=1))
-
+        y_hat = module.expand_dims(y_hat, axis=0)
+    return module.cov(y, y_hat)[0,1:] / (module.sqrt(module.var(y)*module.var(y_hat, axis=1)) + 1.0e-8)
 
 def regression_param(X, y):
     """
@@ -204,7 +265,38 @@ def regression_param(X, y):
     """
     B = linalg.lstsq(X, y)[0]
     return B
+def reg(X,y, lmbda=0):
 
+    #check if incoming array is np or cp,
+    #and decide which module to use...!
+    if type(X).__module__ == np.__name__:
+        module = np
+    else:
+        module = cp
+    
+    if X.ndim ==2:
+        X = module.expand_dims(X,axis=0)
+    d = X.shape[2]
+    m = X.shape[1]
+    I = module.eye(d)
+    X_T = X.transpose((0,2,1))
+    a = module.matmul(X_T, X) + m*lmbda*I
+    b = module.matmul(X_T, y)
+    B = module.linalg.solve(a,b)
+    return B.squeeze()
+
+# def reg_cp(X,y, lmbda=0):
+#     # takes in cupy arrays and uses gpu...!
+#     if X.ndim ==2:
+#         X = cp.expand_dims(X,axis=0)
+#     d = X.shape[2]
+#     m = X.shape[1]
+#     I = cp.eye(d)
+#     X_T = X.transpose((0,2,1))
+#     a = cp.matmul(X_T, X) + m*lmbda*I
+#     b = cp.matmul(X_T, y)
+#     B = cp.linalg.solve(a,b)
+#     return B.squeeze()
 
 # def regression_param(X, y):
 #     B = linalg.lstsq(X, y)[0]
@@ -213,12 +305,37 @@ def regression_param(X, y):
 def predict(X, B):
     """
     Args:
-        X (ndarray): X (ndarray): (M,N) left-hand side array
+        X (ndarray): (M,N) left-hand side array
         B (ndarray): (N,) or (N,K)
     Returns:
         ndarray: (M,) or (M,K)
     """
-    return X@B
+
+    #check if incoming array is np or cp,
+    #and decide which module to use...!
+    if type(X).__module__ == np.__name__:
+        module = np
+    else:
+        module = cp
+    pred = module.matmul(X,B)
+    if pred.ndim ==3:
+        return pred.transpose(1,2,0) 
+    return pred 
+
+# def predict_cp(X, B):
+#     """
+#     Args:
+#         X (ndarray): (M,N) left-hand side array
+#         B (ndarray): (N,) or (N,K)
+#     Returns:
+#         ndarray: (M,) or (M,K)
+#     """
+#     # pred = X@B
+#     # cp.matmul is supposed to be faster...!
+#     pred = cp.matmul(X,B)
+#     if pred.ndim ==3:
+#         return pred.transpose(1,2,0) 
+#     return pred 
 
 def fit_and_score(X, y):
     x_train, y_train, x_test, y_test = train_test_split(X,y, split=0.7)
@@ -237,3 +354,54 @@ def train_test_split(x,y, split=0.7):
     split = int(x.shape[0]*split)
     return x[0:split], y[0:split], x[split:], y[split:]
 
+
+def mse_loss(y, y_hat):
+    #check if incoming array is np or cp,
+    #and decide which module to use...!
+    if type(y).__module__ == np.__name__:
+        module = np
+    else:
+        module = cp
+    if y.ndim < y_hat.ndim:
+        y = module.expand_dims(y, axis=-1)
+    return (module.sum((y - y_hat)**2, axis=0))/y_hat.shape[0]
+
+# def mse_loss_cp(y, y_hat):
+#     if y.ndim < y_hat.ndim:
+#         y = cp.expand_dims(y, axis=-1)
+#     return (cp.sum((y - y_hat)**2, axis=0))/y_hat.shape[0]
+
+def inter_trial_corr(spikes, n=1000):
+    """
+    Computes distribution of inter-trials correlations and returns 'median'.
+    
+    Args: 
+        spikes (ndarray): (repeats, samples/time, channels)
+    Returns:
+        trials_corr (ndarray): (n,channels) distribution of inter-trial correlations
+    """
+    trials_corr = np.zeros((n, spikes.shape[2]))
+    for t in range(n):
+        trials = np.random.choice(np.arange(0,spikes.shape[0]), size=2, replace=False)
+        trials_corr[t] = cc_norm(spikes[trials[0]].squeeze(), spikes[trials[1]].squeeze())
+
+    return trials_corr
+
+def normalize(x):
+    # Normalize for spectrogram
+    mean = x.mean(axis=0)
+    square_sums = (x ** 2).sum(axis=0)
+    x = np.subtract(x, mean)
+    var = square_sums / x.shape[0] - mean ** 2
+    std = np.sqrt(np.maximum(var, 1e-10))
+    x = np.divide(x, std)
+
+    return x
+
+def spectrogram(aud):
+    waveform = torch.tensor(aud, dtype=torch.float32).unsqueeze(dim=0)
+    waveform = waveform * (2 ** 15)
+    kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
+    kaldi = normalize(kaldi)
+
+    return kaldi.transpose(0,1)

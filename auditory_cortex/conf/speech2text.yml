@@ -1,3 +1,4 @@
+layers:
 - layer_name: model.encoder.conv.conv_layers.0
   bin_width: 20
   offset: -1.25

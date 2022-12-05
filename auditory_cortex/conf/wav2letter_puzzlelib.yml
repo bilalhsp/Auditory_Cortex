@@ -2,3 +2,45 @@
 - layer_name: conv1
   bin_width: 20  #same for all layers
   offset: 1.014  #same for all layers
+- layer_name: conv2
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv3
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv4
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv5
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv6
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv7
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv8
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv9
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv10
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv11
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv12
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv13
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv14
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
+- layer_name: conv15
+  bin_width: 20  #same for all layers
+  offset: 1.014  #same for all layers
