@@ -24,6 +24,7 @@ class optimal_input():
         self.model_extractor = FeatureExtractorW2L(self.model)
         self.model_name = model.model_name
         self.layers = self.model_extractor.layers
+        self.B = {}
 
         for param in self.model.parameters():
             param.requires_grad = False
@@ -111,38 +112,65 @@ class optimal_input():
         n_channels = self.dataset.num_channels
         x = self.features[layer]
         y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
-        self.B = torch.tensor(utils.regression_param(x, y), dtype=torch.float32)
+        self.B[layer] = torch.tensor(utils.regression_param(x, y), dtype=torch.float32)
         
-    def get_input(self, sent):
+    def get_input(self, sent=12, random=False):
         inp = torch.tensor(self.dataset.audio(sent), dtype=torch.float32)
+        if random:
+            inp = torch.randn(16000, dtype=torch.float32)
         inp = inp.unsqueeze(dim=0)
         return inp
 
-    def optimize(self, inp, layer, ch, epochs=100, lr=0.1):
+    def optimize(self, inp, layer, ch, epochs=100, lr=0.1, w1=1, w2=1):
         inp.requires_grad = True
         self.get_betas(layer)      
         opt = torch.optim.Adam([inp], lr=lr)
         loss_history = []
         inps_history = []
+        basic_loss_history = []
+        TVloss_history = []
+        grads = []
         for i in range(epochs):
             # fwd pass
             opt.zero_grad()
             pred = self.fwd_pass(inp, layer, ch)
-            loss = -1*pred.mean()
+            loss = -pred.mean()
+            basic_loss_history.append(loss.item())            
+            TVloss = torch.nn.functional.mse_loss(inp[:,1:], inp[:,:-1])
+            TVloss_history.append(TVloss.item())
+
+            # print(f'Loss: {loss}')
+            loss = w1*loss + w2*TVloss
             loss.backward(inputs=inp)
+            ### Normalize grad by the 'global norm'
+            var, mean = torch.var_mean(inp.grad, unbiased=False)
+            inp.grad = inp.grad / (torch.sqrt(var) + 1e-8)
+            grads.append(inp.grad.clone().detach().numpy())
+            
             opt.step()
+            
+            ### Clip input values at -1 and 1 (after update)
+            with torch.no_grad():
+                inp[inp > 1] = 1
+                inp[inp<-1] = -1
+            # grads.append(np.zeros(16000))
             loss_history.append(loss.item())
             inps_history.append(inp.clone().detach())
-        return inps_history, loss_history
+        return inps_history, loss_history, basic_loss_history, TVloss_history, grads
 
     def fwd_pass(self, input, layer, ch):
             self.model.eval()
             self.model(input)
             feats = self.model_extractor.features[self.layers[layer]]
-            pred = feats @ self.B[:,ch]
+            pred = feats @ self.B[layer][:,ch]
             return pred
             
 def normalize(x):
+    """
+    ONLY USED FOR VISUALIZING THE SPECTROGRAM...!
+    Normalizes the spectrogram (obtained using kaldi transform),
+    done to match the spectrogram exactly to the Speec2Text transform
+    """
     mean = x.mean(axis=0)
     square_sums = (x ** 2).sum(axis=0)
     x = np.subtract(x, mean)
@@ -152,8 +180,13 @@ def normalize(x):
 
     return x
 
-def plot_spect(waveform):
+def plot_spect(waveform, ax):
     waveform = waveform * (2 ** 15)
     kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
     kaldi = normalize(kaldi)
-    plt.imshow(kaldi.transpose(1,0), cmap='turbo')
+    x_ticks = np.arange(0,kaldi.shape[0],20)
+    data = ax.imshow(kaldi.transpose(1,0), cmap='turbo', origin='lower')
+    ax.set_xticks(x_ticks, 10*x_ticks)
+    ax.set_xlabel('time (ms)')
+    ax.set_ylabel('mel filters')
+    return data

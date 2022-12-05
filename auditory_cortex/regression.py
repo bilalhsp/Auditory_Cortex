@@ -1,6 +1,8 @@
 import numpy as np
+import cupy as cp
 import torch
 import os
+import time
 import pandas as pd
 from scipy import linalg, signal
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor,Wav2Vec2Processor, Wav2Vec2ForCTC
@@ -16,9 +18,11 @@ import torchaudio
 
 class transformer_regression():
   def __init__(self, dir, subject, model='speech2text', load_features = True):
+    self.session = subject
     self.dir = os.path.join(dir, subject)
     print("Creating dataset and other objects...")
     self.dataset = Neural_Data(dir, subject)
+    self.sents = np.arange(1,500)
     if model == 'speech2text':
         print(f"Creating regression obj for: 'speech2text'")
         self.model_name=model
@@ -45,7 +49,7 @@ class transformer_regression():
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
         self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
         self.model_extractor = feature_extractor_wav2vec(self.model, self.processor, self.layers)
-        self.seq_lengths = {s:int(np.floor(self.dataset.duration(s)/0.02 - 0.25)) for s in np.arange(1,499)}
+        self.seq_lengths = {s:int(np.floor(self.dataset.duration(s)/0.02 - 0.25)) for s in self.sents}
     
     elif model == 'gru':
         print(f"Creating regression obj for: 'gru'")
@@ -66,58 +70,13 @@ class transformer_regression():
          self.model_extractor = FeatureExtractorW2L(self.model)
          self.model_name = model.model_name
          self.layers = self.model_extractor.layers
-
+    self.num_channels = self.dataset.num_channels
+    self.num_layers = len(self.layers)
+    
     if load_features:
         # print("Loading model features now...!")
         # self.load_features()
         self.raw_features = self.extract_features()
-
-  # def load_features(self, resample=False, bin_width=5, sents=np.arange(1,499)):
-  #   """
-  #   | wrapper function to load features dict into
-  #   | 'self.features'
-  #   """
-  #   print("Loading model features now...!")
-  #   # self.features = self.get_transformer_features(sents)
-  #   self.raw_features = self.extract_features(sents)
-  #   if resample:
-  #     features = self.resample(features, bin_width)
-  #   else:
-  #     features = self.raw_features
-  #   self.features = self.unroll_time(features)
-    
-
-  def get_transformer_features(self, sents=np.arange(1,499)):
-    """
-    | Returns features (as dict) for given 'sents'
-    | and all layers.
-    """
-    features = [{} for _ in range(len(self.layers))]
-    demean_features = [{} for _ in range(len(self.layers))]
-    f_mean = {}    
-    feats = {}
-    demean_feats = {}
-    # sum = 0
-    for x, i in enumerate(sents):
-      self.model_extractor.translate(self.dataset.audio(i))
-
-      for j, l in enumerate(self.layers):
-        features[j][x] = self.model_extractor.features[l]
-        # a = self.dataset.duration(i)
-        # b = self.model_extractor.features[l].shape[0]
-        # w = 20
-        # offset = 0
-        # print(f"Duration: {a:.3f}, features: {b}, bio: {a*1000/w + offset},diff:{b - np.floor(a*1000/w + offset)}")
-        # # sum += b - round(a*1000/19.9)
-        if self.model_name=='wav2vec':
-                features[j][x] = features[j][x][:self.seq_lengths[i]]
-        #f_mean[x] = np.mean(features[j][x], axis = 0)    
-        #demean_features[j][x]= features[j][x] - f_mean[x]
-  
-    for j, l in enumerate(self.layers):
-      feats[j] = np.concatenate([features[j][i] for i,se in enumerate(sents)], axis=0)
-      #demean_feats[j] = np.concatenate([demean_features[j][i] for i,se in enumerate(sents)], axis=0)
-    return feats#, demean_feats
 
 
     ##############################
@@ -141,8 +100,8 @@ class transformer_regression():
         List of dict: List index corresponds to layer number carrying 
                       dict of extracted features for all sentences. 
     """
-    if sents == None:
-      sents=np.arange(1,499)
+    if sents is None:
+      sents=self.sents
     features = [{} for _ in range(len(self.layers))]
     for x, i in enumerate(sents):
       self.model_extractor.translate(self.dataset.audio(i), grad = grad)
@@ -152,7 +111,7 @@ class transformer_regression():
                 features[j][i] = features[j][x][:self.seq_lengths[i]]
     return features
 
-  def resample(self, features, bin_width):
+  def resample(self, bin_width, numpy=True):
     """
     resample all layer features to specific bin_width
 
@@ -164,49 +123,63 @@ class transformer_regression():
     """
     resampled_features = [{} for _ in range(len(self.layers))]
     bin_width = bin_width/1000 # ms
-    for sent in features[0].keys():
+    for sent in self.raw_features[0].keys():
       n = int(np.ceil(round(self.dataset.duration(sent)/bin_width, 3)))
       for j, l in enumerate(self.layers):
-        resampled_features[j][sent] = signal.resample(features[j][sent],n, axis=0)
+        tmp = signal.resample(self.raw_features[j][sent],n, axis=0)
+        if not numpy:
+          tmp = cp.array(tmp)
+        resampled_features[j][sent] = tmp
     return resampled_features
 
-  def unroll_time(self, features):
+  def unroll_features(self, sents = None, numpy=True):
     """
     Unroll and concatenate time axis of extracted features.
 
     Args:
-        features (List of dict): features for all layers.
+        sents (List of int ID's): ID's of sentences 
     
     Returns:
         dict: 
     """
+    if sents is None:
+      sents = self.sampled_features[0].keys()
     feats = {}
     for j, l in enumerate(self.layers):
-      feats[j] = np.concatenate([features[j][sent] for sent in features[j].keys()], axis=0)
+      if numpy:
+        feats[j] = np.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
+      else:
+        feats[j] = cp.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
     return feats
 
-  def load_features_and_spikes(self, bin_width=40, delay=0, offset=0, sents=None, load_raw=False):
-    if sents == None:
-      sents = np.arange(1,499)
+
+  def load_features_and_spikes(self, bin_width=40, delay=0, offset=0, sents=None, load_raw=False, numpy=True):
+    if sents is None:
+      sents = self.sents
     if load_raw:
       self.raw_features = self.extract_features(sents)
-    self.features = self.unroll_time(self.resample(self.raw_features, bin_width))
-    self.spikes = self.all_channel_spikes(bin_width=bin_width, delay=delay, offset=offset, sents=sents)
+    self.sampled_features = self.resample(bin_width, numpy=numpy)
+    self.features = self.unroll_features(numpy=numpy)
+    self.raw_spikes = self.extract_spikes(bin_width=bin_width, delay=delay,
+               offset=offset, sents=sents, numpy=numpy)
+    self.spikes = self.unroll_spikes(numpy=numpy)
 
-  # def corr_coeffs(self, layers=None, channels=None):
-  #   if layers == None:
-  #     layers = np.arange(len(self.layers))
-  #   if channels == None:
-  #     channels = np.arange(self.dataset.num_channels)
-  #   train_cc = np.zeros((len(layers), len(channels)))
-  #   val_cc = np.zeros((len(layers), len(channels)))
-  #   test_cc = np.zeros((len(layers), len(channels)))
-  #   for l,layer in enumerate(layers):
-  #     print(f"Computing correlations for layer {layer}")
-  #     for c,ch in enumerate(channels):
-  #       train_cc[l,c], val_cc[l,c], test_cc[l,c] = \
-  #               self.compute_cc_norm(self.features[layer], self.spikes[ch])
-  #   return train_cc, val_cc, test_cc
+  def features_to_cp(self, features):
+    # converts complicated data structure containing np-arrays to cp-arrays
+    features_cp = []
+    for l in range(len(features)):
+        feats = {}
+        for k,v in features[l].items():
+            feats[k] = cp.array(v)
+        features_cp.append(feats)
+    return features_cp
+  def spikes_to_cp(self, spikes):
+    # converts complicated data structure containing np-arrays to cp-arrays
+    spikes_cp = {}
+    for k,v in spikes.items():
+        spikes_cp[k] = cp.array(v)
+    return spikes_cp
+
 
   def save_corr_coeffs(self, win, delay, file_path, null_dist=False):
     print(f"Working on win: {win}ms, delay: {delay}ms")
@@ -373,7 +346,168 @@ class transformer_regression():
     # y.shape = n_samples x channels
     B = utils.regression_param(x, y)
     return B
+    
+  def normalizer(self, bin_width=40, delay=0):
+    sents = [12,13,32,43,56,163,212,218,287,308]
+    spikes_dict = {}
+    min_repeats = 500
+    for s in sents:
+        spikes_sentence = self.dataset.retrieve_spike_counts_for_all_trials(sent=s, win = bin_width, delay=delay)
+        spikes_dict[s] =np.stack([spikes_sentence[ch] for ch in range(self.num_channels)], axis=-1)
+        if spikes_dict[s].shape[0] < min_repeats:
+          min_repeats = spikes_dict[s].shape[0] 
+    all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
+    normalizer_all = utils.inter_trial_corr(all_repeated_trials)
+    normalizer_all_med = np.median(normalizer_all, axis=0)
+    
+    return normalizer_all_med
 
+  def cross_validated_regression(self, bin_width=40, delay=0, k=10, num_lmbdas=20, N=10, N_sents=500,
+              load_features=True, return_dict=False, numpy=False, sents=None):
+    """
+    Returns distribution of correlations for all (12) layers and all channels
+
+    Args:
+      bin_width (int):        bin width in ms.
+      delay (int):            delay (ms) (post onset time) to extract neural activity
+      k (int):                k-fold cross validation parameter
+      lmbdas (list):          list of lmbdas to consider for cross-validation
+      N (int):                Number of iterations of cross-validation (to get the distribution)
+      load_features (bool):   flag for loading features (required if features and spikes not already loaded)
+      return_dict (bool):     flag to return dict (ready to save format) when true, otherewise return 
+                              distribution of correlations computed.
+
+    Returns:
+      corr_coeff (3d-array):  distribution of correlations for all layers and channels (if return_dict=False)
+      corr (dict):  median(corr_coeff) stored in dict, along with other details, ready to save (if return_dict=True)
+    """
+    if load_features:
+        start_load = time.time()
+        self.load_features_and_spikes(bin_width=bin_width, delay=delay, numpy=numpy)
+        end_load = time.time()
+        print(f"It takes {end_load - start_load:.2f} sec to load features...!")
+    if numpy:
+      module = np
+    else:
+      module = cp
+    
+    if sents is None:
+      sents = self.sents
+    if N_sents > len(sents):
+      N_sents = len(sents)
+
+    lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
+    B = module.zeros((12, 250, self.num_channels))
+    corr_coeff = module.zeros((N,self.num_channels,12))
+    corr_coeff_train = module.zeros((N,self.num_channels,12))
+    # stimuli = np.array(list(self.raw_features[0].keys()))
+    
+    stimuli = np.random.permutation(sents)[0:N_sents]
+    mapping_sents = int(N_sents*0.7) # 70% test set...!
+    size_of_chunk = int(mapping_sents/k)
+    print(f"# of iterations requested: {N}, \n# of lambda samples per iteration: {len(lmbdas)}")
+    time_itr = 0
+    time_lmbda = 0
+    time_map = 0
+    time_fold = 0
+    for n in range(N): 
+        print(f"Itr: {n+1}:")
+        start_itr = time.time()
+        
+        np.random.shuffle(stimuli)
+        mapping_set = stimuli[:mapping_sents]
+        test_set = stimuli[mapping_sents:]
+        
+        lmbda_loss = module.zeros(((len(lmbdas),self.num_channels,12)))
+        for i,l in enumerate(lmbdas):
+            start_lmbda = time.time()
+            loss = 0
+            for r in range(k):
+                start_fold = time.time()
+                if r<(k-1):
+                  val_set = mapping_set[r*size_of_chunk:(r+1)*size_of_chunk]
+                else:
+                  val_set = mapping_set[r*size_of_chunk:]
+                
+                train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
+                train_x = self.unroll_features(train_set, numpy=numpy)
+                train_x = module.stack([train_x[i] for i in range(12)], axis=0)
+
+                val_x = self.unroll_features(val_set, numpy=numpy)
+                val_x = module.stack([val_x[i] for i in range(12)], axis=0)
+
+                train_y = self.unroll_spikes(sents=train_set, numpy=numpy)
+                val_y = self.unroll_spikes(sents=val_set, numpy=numpy)
+
+                Beta = utils.reg(train_x, train_y, l)
+                val_pred = utils.predict(val_x, Beta)
+                # to be defined...
+                loss += utils.mse_loss(val_y, val_pred)
+                end_fold = time.time()
+                time_fold += end_fold - start_fold
+            lmbda_loss[i] = loss/k
+            end_lmbda = time.time()
+            time_lmbda += end_lmbda-start_lmbda
+            
+#             print(f"Takes {(end_lmbda-start_lmbda):.2f} sec, loss: {lmbda_loss[i].sum():.2f}")
+        optimal_lmbdas = lmbdas[module.argmin(lmbda_loss, axis=0)]
+        start_map = time.time()
+        # Loading Mapping set...!
+        mapping_x = self.unroll_features(mapping_set, numpy=numpy)
+        mapping_x = module.stack([mapping_x[i] for i in range(12)], axis=0)
+        mapping_y = self.unroll_spikes(sents=mapping_set, numpy=numpy)
+        
+        #computing betas
+        for l in range(12):
+            for ch in range(self.num_channels):
+                B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
+        self.B = B
+
+        # Loading test set...!
+        test_x = self.unroll_features(test_set, numpy=numpy)
+        test_x = module.stack([test_x[i] for i in range(12)], axis=0)
+        test_y = self.unroll_spikes(sents=test_set, numpy=numpy) 
+
+        train_pred = utils.predict(train_x, B)
+        test_pred = utils.predict(test_x, B)
+        
+        corr_coeff[n] = utils.cc_norm(test_y,test_pred)
+        corr_coeff_train[n] = utils.cc_norm(train_y, train_pred)
+        end_map = time.time()
+        end_itr = time.time()
+        time_map += end_map - start_map
+        time_itr += (end_itr - start_itr)
+#         print(f"itr-{n}: It takes {(end_itr - start_itr):.2f} seconds for all lambdas")
+    print(f"It takes (on avg.) {time_fold/(k*N*len(lmbdas)):.2f} sec for each step of cross validation (1 fold)")
+    print(f"It takes (on avg.) {time_lmbda/(N*len(lmbdas)):.2f} sec/lmbda. (time for {k}-folds)")
+    print(f"It takes (on avg.) {time_map/(N):.2f} sec/mapping.")
+    print(f"It takes (on avg.) {time_itr/(N*60):.2f} minutes/iteration...!")
+    corr_coeff = cp.asnumpy(corr_coeff.transpose((0,2,1)))
+    corr_coeff_train = cp.asnumpy(corr_coeff_train.transpose((0,2,1)))
+    if return_dict:
+        corr_coeff = np.median(corr_coeff, axis=0)
+        corr_coeff_train = np.median(corr_coeff_train, axis=0)
+        corr = {'test_cc_raw': corr_coeff, 'train_cc_raw': corr_coeff_train,
+                'win': bin_width, 'delay': delay, 
+                'session': self.session, 'model': self.model_name,
+                'N_sents': N_sents}
+        return corr
+    return corr_coeff
+
+
+  def neural_prediction(self, sent):
+    """
+    Returns prediction for neural activity 
+    
+    Args:
+      sent (int): index of sentence ID 
+    
+    Returns:
+      ndarray : (layers, ch, time) Prdicted neural activity 
+    """
+    dict_feats = self.unroll_features(sent)
+    features = np.stack([dict_feats[i] for i in range(12)], axis=0)
+    return cp.asnumpy(utils.predict(features, self.B))
 
 #########################################    ##############################
 
@@ -387,15 +521,62 @@ class transformer_regression():
     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
     return spikes
 
-  def all_channel_spikes(self, bin_width=40, delay=0, offset=0, sents = np.arange(1,499)):
+  def all_channel_spikes(self, bin_width=40, delay=0, offset=0, sents = None):
+    if sents is None:
+      sents = self.sents
     spikes = []
     result = {}
     for x,i in enumerate(sents):
         spikes.append(self.dataset.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,early_spikes=False,offset=offset))
     for ch in range(self.dataset.num_channels):
         result[ch] = np.concatenate([spikes[i][ch] for i in range(len(spikes))], axis=0)
-
     return result
+
+  def extract_spikes(self, bin_width=40, delay=0, offset=0, sents = None, numpy=True):
+    if sents is None:
+      sents = self.sents
+    raw_spikes = {}
+    for x,i in enumerate(sents):
+        spikes = self.dataset.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
+                                                    early_spikes=False,offset=offset)
+        tmp = np.stack([spikes[ch] for ch in range(self.dataset.num_channels)], axis=1)
+        if not numpy:
+          tmp = cp.array(tmp)
+        raw_spikes[i] = tmp
+    return raw_spikes
+    
+  def unroll_spikes(self, sents=None, numpy=True):
+    """
+    Unroll and concatenate time axis of extracted spikes.
+
+    Args:
+        sents (List): indices of sents.
+    
+    Returns:
+        
+    """
+    if sents is None:
+      sents = self.raw_spikes.keys()
+    if numpy:
+      spikes = np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
+    else:
+      spikes = cp.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
+    return spikes
+
+  def unroll_spikes_cp(self, sents=None):
+    """
+    Unroll and concatenate time axis of extracted spikes.
+
+    Args:
+        sents (List): indices of sents.
+    
+    Returns:
+        
+    """
+    if sents is None:
+      sents = self.raw_spikes.keys()
+    spikes = cp.array(np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0))
+    return spikes
 
   def get_cc_norm_layer(self, layer, win, delay=0, sents= np.arange(1,499),normalize = False, load_features=False):
     """
@@ -505,25 +686,6 @@ class transformer_regression():
    
     return r2t, r2v,r2tt  
 
-  # def compute_and_store_corr(self, wins, delays, file_path):
-  #   """computes correlations for all layers and channels,
-  #   | for all combinations of 'wins' and 'delays' and stores them 
-  #   | to the 'file_path'.
-  #   | wins: list
-  #   | delays: list
-  #   | file_path: path of csv file
-  #   """
-  #   num_layers = len(self.layers)
-  #   num_channels = self.dataset.num_channels
-  #   for win in wins:
-  #       for delay in delays:
-  #           train_cc = np.zeros((num_layers, num_channels))
-  #           val_cc = np.zeros((num_layers, num_channels))
-  #           test_cc = np.zeros((num_layers, num_channels)) 
-  #           for layer in range(0, num_layers):
-  #               train_cc[layer,:], val_cc[layer,:], test_cc[layer,:] = self.get_cc_norm_layer(layer, win, delay, normalize=False)
-  #           corr = {'train': train_cc, 'val': val_cc, 'test': test_cc, 'win': win, 'delay': delay}
-  #           data = utils.write_to_disk(corr, file_path)
 
   def get_Poiss_scores_layer(self, layer, win, delay=0, sents= np.arange(1,499), load_features=False):
     print(f"Computing Poisson scores for layer:{layer} ...")
@@ -577,51 +739,6 @@ class transformer_regression():
     ps_tt /= 5
    
     return r2t, r2v,r2tt
- 
-  # def cc_norm(self, y_hat, y, sp, normalize=False):
-  #   """
-
-  #   Args: y_hat (ndarray): (n_samples, channels) or (repeats, n_samples, channels) for null dist
-  #         y (ndarray): (n_samples, channels)   
-  #   """
-  #   # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
-  #   try:
-  #     n_channels = y.shape[1]
-  #   except:
-  #     n_channels=1
-  #     y = np.expand_dims(y,axis=1)
-  #     y_hat = np.expand_dims(y_hat,axis=1)
-  #   corr_coeff = np.zeros((1, n_channels))
-  #   for ch in range(n_channels):
-  #     corr_coeff[:,ch] = self.cc_single_channel(y_hat[:,ch],y[:,ch])
-  #     # if not normalize:
-  #     #     sp = np.var(y[:,ch])
-  #     # corr_coeff[:,ch] = np.cov(y_hat[:,ch], y[:,ch])[0,1]/(np.sqrt(np.var(y_hat[:,ch])*sp))
-
-  #   return corr_coeff
-  # def cc_single_channel(self, y_hat, y):
-  #   """
-  #   computes correlations for the given spikes and predictions 'single channel'
-
-  #   Args: y_hat (ndarray): (n_sampes,) or (repeats,n_samples) spike predictions
-  #         y (ndarray): (n_samples) actual spikes for single channel 
-    
-  #   Returns:  ndarray: (1,) or (repeats, 1) correlation value or array (for repeats). 
-  #   """
-
-
-
-
-  # def regression_param(self, X, y):
-  #   """
-  #   Computes the least-square solution to the equation Xz = y,
-  
-  #   Args:
-  #       X (ndarray): (M,N) left-hand side array
-  #       y (adarray): (M,) or (M,K) right-hand side array
-  #   """
-  #   B = linalg.lstsq(X, y)[0]
-  #   return B
 
   def predict(self, X, B):
     return X@B
@@ -700,117 +817,3 @@ class transformer_regression():
       pct[i] = (np.corrcoef(self.predict(x_train, B), y_train)[0,1])**2
       pcv[i] = (np.corrcoef(self.predict(x_test, B), y_test)[0,1])**2
     return r2t, r2v, pct, pcv
-
-
-
-  def compute_r2_channel(self, layer, win, channel, delay):
-    k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
-    print(f"k = {k}")
-    
-    # print(f"k = {k}")
-    r2t = np.zeros(1)
-    r2v = np.zeros(1)
-    r2tt = np.zeros(1)
-    pct = np.zeros(1)
-    pcv = np.zeros(1)
-    pctt = np.zeros(1)
-
-    #downsamples if k>1 
-    if k >1:
-      feats = utils.down_sample(self.features[layer], k)
-    else:
-      feats = self.features[layer]
-
-    y = self.simply_spikes(ch=channel, delay=delay)
-    if k>1:
-      y = utils.down_sample(y,k)
-    m = int(feats.shape[0])
-    n2 = int(m*0.9)
-    x_test = feats[n2:, :]
-    y_test = y[n2:]    
-    
-    for i in range(5):
-        a = int(i*0.2*n2)
-        b = int((i+1)*0.2*n2)
-        
-        x_val = feats[a:b, :] 
-        y_val = y[a:b] 
-        
-        x_train = np.concatenate((feats[:a,:], feats[b:n2,:]), axis=0)
-        y_train = np.concatenate((y[:a], y[b:n2]))
-        # Linear Regression...!
-        B = utils.regression_param(x_train, y_train)
-        y_hat_train = self.predict(x_train, B)
-        y_hat_val = self.predict(x_val, B)
-        y_hat_test = self.predict(x_test, B)
-        
-        pct += np.corrcoef(y_hat_train, y_train)[0,1]
-        pcv += np.corrcoef(y_hat_val, y_val)[0,1]
-        pctt += np.corrcoef(y_hat_test, y_test)[0,1]
-        
-    pct /= 5
-    pcv /= 5
-    pctt /= 5
-    
-    return pct, pcv,pctt
-
-
-
-  def FE_r2_channel(self, layer, win, channel):
-    k = int(win/40)    # 40 is the min, bin size for 'Speech2Text' transformer model 
-    print(f"k = {k}")
-    r2t = np.zeros(1)
-    r2v = np.zeros(1)
-    pct = np.zeros(1)
-    pcv = np.zeros(1)
-    #downsamples if k>1 
-    if k >1:
-      feats = self.down_sample_features(self.demean_features[layer], k)
-    else:
-      feats = self.demean_features[layer]
-
-    m = int(feats.shape[0] *0.75)
-    x_train = feats[0:m, :]
-    x_test = feats[m:, :]
-    
-    # for i in range(self.dataset.num_channels):
-    y = self.demean_spikes(ch=channel)
-    if k>1:
-      y = self.down_sample_spikes(y,k)
-    y_train = y[0:m]
-    y_test = y[m:]
-    B = utils.regression_param(x_train, y_train)
-
-    r2t = self.regression_score(x_train, y_train, B)
-    r2v = self.regression_score(x_test, y_test, B)
-    pct = (np.corrcoef(self.predict(x_train, B), y_train)[0,1])**2
-    pcv = (np.corrcoef(self.predict(x_test, B), y_test)[0,1])**2
-    return r2t, r2v, pct, pcv
-
-#   def signal_power(self, win, ch):
-#     sents = [12,13,32,43,56,163,212,218,287,308]
-#     sp = 0
-#     for s in sents:
-#         r = self.dataset.retrieve_spike_counts_for_all_trials(sent=s, w=win)[ch]
-#         N = r.shape[0]
-#         s = np.sum(r, axis=0)
-#         n1 = np.var(s, axis=0)
-#         n2 = 0
-#         for i in range(r.shape[0]):
-#             n2 += np.var(r[i])
-#         sp += (n1 - n2)/(N*(N-1))
-#     sp /= len(sents)
-#     return sp 
-
-
-
-  # def translate(self, aud, fs = 16000):
-  #   if self.model_name == 'speech2text':
-  #       inputs_features = self.processor(aud,padding=True, sampling_rate=fs, return_tensors="pt").input_features
-  #   elif self.model_name == 'wav2vec':
-  #       inputs_features = self.prepare_wav2vec_input(aud, fs)
-  #   elif self.model_name == 'gru':
-  #       inputs_features = self.prepare_GRU_input(aud)
-  #   else:
-  #       inputs_features = aud
-  #   generated_ids = self.model_extractor(inputs_features)

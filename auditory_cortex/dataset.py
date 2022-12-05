@@ -97,34 +97,27 @@ class Neural_Data:
     #sents = [12,13,32,43,56,163,212,218,287,308]
 
     #trials = np.unique(obj.dataset.spikes[1].trial[obj.dataset.spikes[1].timitStimcode==sent])
-    # Using channel 1 trials dict to get list of trials for 'sent', but trials for all the channels are the same 
+    # Using channel 0 trials dict to get list of trials for 'sent', but trials for all the channels are the same 
     #only the outcome 'spikes' can vary, so that is the reason of not using spikes
     
-    trials = (np.where(self.trials[1].timitStimcode == sent)[0]) + 1          # adding 1 to match the indexes
-    return trials
+    try: 
+      trials = (np.where(self.trials[0].timitStimcode == sent)[0]) + 1          # adding 1 to match the indexes
+      return trials
+    except:
+      print("No trial data found...!")
+    
 
-  def retrieve_spike_counts_for_all_trials(self, sent, w=50):
+  def retrieve_spike_counts_for_all_trials(self, sent, win=50, delay=0):
     
     trials = self.get_trials(sent)
-    spk = self.retrieve_spike_counts(trial=trials[0], win = w, early_spikes = False)
+    spk = self.retrieve_spike_counts(trial=trials[0], win = win, delay=0, early_spikes = False)
     spikes = {i:np.zeros((len(trials), spk[0].shape[0])) for i in range(self.num_channels)}
     for i in range(self.num_channels):
         spikes[i][0] = spk[i]
     for x, tr in enumerate(trials[1:]):
-        spikes_tr = self.retrieve_spike_counts(trial=tr, win = w, early_spikes = True)
+        spikes_tr = self.retrieve_spike_counts(trial=tr, win = win, delay=0, early_spikes = True)
         for i in range(self.num_channels):
             spikes[i][x+1] = spikes_tr[i]
-
-    
-#     trials = self.get_trials(sent)
-#     spikes = {}
-#     for i in range(self.num_channels):
-#       spk = self.retrieve_spike_counts(trial=trials[0], win = w, early_spikes = False)[i]
-#       spikes_ch = np.zeros((len(trials), spk.shape[0]))
-#       spikes_ch[0] = spk
-#       for x, tr in enumerate(trials[1:]):
-#         spikes_ch[x+1] = self.retrieve_spike_counts(trial=tr, win = w, early_spikes = True)[i]
-#       spikes[i] = spikes_ch
     return spikes
 
   def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative', early_spikes = True):
@@ -144,7 +137,9 @@ class Neural_Data:
       # if no trial # is provided, use the first trial for the given sentence
       # tr carries the trial # to index through spike data
       #tr = self.spikes[1].trial[self.spikes[1].timitStimcode==sent][trial] 
-      tr = (np.where(self.trials[1].timitStimcode == sent)[0][0]) + 1      # adding 1 to match the indexes
+      # Extracting 'trial #' using the first channel...!
+      # tr = (np.where(self.trials[0].timitStimcode == sent)[0][0]) + 1      # adding 1 to match the indexes
+      tr = self.get_trials(sent)[0]           # Using 1st trial for stimuli with multiple trials
     else:
       #print('Please provide Trial # corresponding to the provided sentence using of spike.trial')
       tr = trial
@@ -173,7 +168,7 @@ class Neural_Data:
     """
     if trial != 0:
         trial -= 1
-        sent = self.trials[1].timitStimcode[trial]
+        sent = self.trials[0].timitStimcode[trial]
     win = win/1000
     delay = delay/1000
     bins = {}             #miliseconds
