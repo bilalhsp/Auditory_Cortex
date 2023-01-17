@@ -5,7 +5,7 @@ pretrained: True
 use_cpu: False
 pretrained_dir: /depot/jgmakin/data/auditory_cortex/pretrained_weights/w2l_modified/
 checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
-pretrained_correlations_file: w2l_corr_repeated_sents_itr.csv #'std_error_cc.csv' #'c_w2l_correlations.csv'
+pretrained_correlations_file: demain_corr.csv #w2l_corr_repeated_sents_itr.csv #'std_error_cc.csv' #'c_w2l_correlations.csv'
 untrained_correlations_file: 'correlations_w2l_untrained.csv'
 bad_sessions:
 - '200312'
@@ -14,9 +14,10 @@ bad_sessions:
 - '180619'
 - '180405'
 - '180406'
-delays:
-- 0
-# - 5
+delays_param:
+  start: 120
+  stop: 201
+  step: 10
 bin_widths:
 - 20
 dataset_sizes:

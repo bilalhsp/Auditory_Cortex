@@ -6,6 +6,7 @@ import os
 import pandas as pd
 from scipy import linalg
 import torchaudio
+import pickle
 
 def down_sample(data, k):
     #down samples 'data' by factor 'k' along dim=0 
@@ -191,7 +192,7 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
     corr_coeff = module.zeros(y_hat.shape[1:])
     for ch in range(n_channels):
         corr_coeff[ch] = cc_single_channel(y[:,ch],y_hat[:,ch])
-    return corr_coeff
+    return cp.asnumpy(corr_coeff)
 
 # def cc_norm_cp(y, y_hat, sp=1, normalize=False):
 #     """
@@ -372,13 +373,13 @@ def mse_loss(y, y_hat):
 #     return (cp.sum((y - y_hat)**2, axis=0))/y_hat.shape[0]
 
 def inter_trial_corr(spikes, n=1000):
-    """
-    Computes distribution of inter-trials correlations and returns 'median'.
-    
+    """Compute distribution of inter-trials correlations.
+
     Args: 
         spikes (ndarray): (repeats, samples/time, channels)
+
     Returns:
-        trials_corr (ndarray): (n,channels) distribution of inter-trial correlations
+        trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
     """
     trials_corr = np.zeros((n, spikes.shape[2]))
     for t in range(n):
@@ -405,3 +406,14 @@ def spectrogram(aud):
     kaldi = normalize(kaldi)
 
     return kaldi.transpose(0,1)
+
+def write_optimal_delays(filename, result):
+    if os.path.exists(filename):
+        with open(filename, 'rb') as f:
+            prev_result = pickle.load(f)
+        result['corr'] = np.concatenate([prev_result['corr'], result['corr']], axis=0)
+        result['loss'] = np.concatenate([prev_result['loss'], result['loss']], axis=0)
+        result['delays'] = np.concatenate([np.array([0,10,20,30]), result['delays']], axis=0)
+
+    with open(filename, 'wb') as file:
+        pickle.dump(result, file)
