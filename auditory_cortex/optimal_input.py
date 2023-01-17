@@ -23,6 +23,7 @@ class optimal_input():
         self.model = model
         self.model_extractor = FeatureExtractorW2L(self.model)
         self.model_name = model.model_name
+        self.num_channels = self.dataset.num_channels
         self.layers = self.model_extractor.layers
         self.B = {}
 
