@@ -15,14 +15,14 @@ bad_sessions:
 - '180405'
 - '180406'
 delays_param:
-  start: 120
-  stop: 201
+  start: 0
+  stop: 1
   step: 10
 bin_widths:
 - 20
 dataset_sizes:
 # - 10
-- 500
+- 499
 - 501
 - 5
 k_folds_validation: 5
