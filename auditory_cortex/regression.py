@@ -9,6 +9,7 @@ from transformers import Speech2TextForConditionalGeneration, Speech2TextProcess
 
 from auditory_cortex.dataset import Neural_Data
 from auditory_cortex.feature_extractors import Feature_Extractor_S2T,Feature_Extractor_GRU,FeatureExtractorW2L
+import auditory_cortex.feature_extractors as feature_extractors
 import auditory_cortex.utils as utils
 
 #from sklearn.decomposition import PCA
@@ -19,10 +20,12 @@ import torchaudio
 class transformer_regression():
     def __init__(self, dir, subject, model='speech2text', load_features = True):
         self.session = subject
+        self.data_dir = dir
         self.dir = os.path.join(dir, subject)
-        print("Creating dataset and other objects...")
+        print("Regression object...")
         self.dataset = Neural_Data(dir, subject)
         self.sents = np.arange(1,500)
+        self.spike_datasets = {}
         if model == 'speech2text':
             print(f"Creating regression obj for: 'speech2text'")
             self.model_name=model
@@ -34,22 +37,27 @@ class transformer_regression():
             #                 "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2",
             #                 ]
             
-            self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-small-librispeech-asr")
-            self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-small-librispeech-asr")
+            self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-large-librispeech-asr")
+            self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
             self.model_extractor = Feature_Extractor_S2T(self.model, self.processor)
             self.layers = self.model_extractor.layers
 
-        elif model == 'wav2vec':
+        elif model == 'wav2vec2':
             print(f"Creating regression obj for: 'wav2vec'")
             self.model_name = model
-            self.layers = ['wav2vec2.feature_extractor.conv_layers.0.conv','wav2vec2.feature_extractor.conv_layers.1.conv',
-                            'wav2vec2.feature_extractor.conv_layers.2.conv','wav2vec2.feature_extractor.conv_layers.3.conv',
-                            'wav2vec2.feature_extractor.conv_layers.4.conv','wav2vec2.feature_extractor.conv_layers.5.conv',
-                            'wav2vec2.feature_extractor.conv_layers.6.conv']
-            self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+            # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
             self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-            self.model_extractor = feature_extractor_wav2vec(self.model, self.processor, self.layers)
-            self.seq_lengths = {s:int(np.floor(self.dataset.duration(s)/0.02 - 0.25)) for s in self.sents}
+            self.model_extractor = feature_extractors.FeatureExtractorW2V2(self.model)
+            self.layers = self.model_extractor.layers
+            # self.model_name = model
+            # self.layers = ['wav2vec2.feature_extractor.conv_layers.0.conv','wav2vec2.feature_extractor.conv_layers.1.conv',
+            #                 'wav2vec2.feature_extractor.conv_layers.2.conv','wav2vec2.feature_extractor.conv_layers.3.conv',
+            #                 'wav2vec2.feature_extractor.conv_layers.4.conv','wav2vec2.feature_extractor.conv_layers.5.conv',
+            #                 'wav2vec2.feature_extractor.conv_layers.6.conv']
+            # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+            # self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+            # self.model_extractor = feature_extractor_wav2vec(self.model, self.processor, self.layers)
+            # self.seq_lengths = {s:int(np.floor(self.dataset.duration(s)/0.02 - 0.25)) for s in self.sents}
 
         elif model == 'gru':
             print(f"Creating regression obj for: 'gru'")
@@ -89,6 +97,28 @@ class transformer_regression():
         except AttributeError:
             raise AttributeError("Run 'load_features_and_spikes()' method before using hidden features...")
         return feats
+
+    def get_neural_spikes(self, session, sents=None, force_reload=False):
+        """Retrieves neural spikes for the argument session, loads spikes 
+        if not already loaded or force_reload=True."""
+        if session in self.list_loaded_sessions() and not force_reload:
+            return self.spike_datasets[session].unroll_spikes(sents=sents)
+        print(f"Creating new dataset object for session-{session}...")
+        self.spike_datasets[session] = Neural_Data(self.data_dir, session)
+        return self.spike_datasets[session].load_spikes(sents=sents)
+    
+    def list_loaded_sessions(self):
+        """Returns the list of sessions for which neural data has
+        been loaded."""
+        return self.spike_datasets.keys()
+
+    def get_dataset_object(self, session):
+        """Returns spike dataset object if neural data for the input 
+        session has already been loaded, otherwise return False."""
+        try:
+            return self.spike_datasets[session]
+        except:
+            raise AttributeError(f"Create dataset object for session-{session} before using it.")
 
     def extract_features(self, sents = None, grad=False):
         """
@@ -131,7 +161,7 @@ class transformer_regression():
                 if not numpy:
                     tmp = cp.array(tmp)
                 mean = np.mean(tmp, axis=0)
-                resampled_features[j][sent] = tmp - mean
+                resampled_features[j][sent] = tmp #- mean
         return resampled_features
 
     def unroll_features(self, sents = None, numpy=True):
@@ -155,6 +185,7 @@ class transformer_regression():
         return feats
         
     def load_features(self,bin_width=20, sents=None, load_raw=False, numpy=False):
+        print(f"Loading ANN features at bin-width: {bin_width}")
         if sents is None:
             sents = self.sents
         if load_raw:
@@ -276,33 +307,33 @@ class transformer_regression():
             layer (int): index of the layer
             num_repeats (int): number of simulations
         """
-        null_dist = pd.DataFrame(columns=['layer','channel','bin_width','delay','shift','method','cc'])
+        null_dist = pd.DataFrame(columns=['session','layer','channel','bin_width','delay','shift','method','cc'], dtype=np.float64)
         n_channels = self.dataset.num_channels
+        session = float(self.session)
         x = self.get_features(layer)
-        y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+        y = np.stack([self.spikes[:,i] for i in range(n_channels)], axis=1)
         # x.shape  = n_samples x n_dims
         # y.shape = n_samples x channels
         T = x.shape[0]
         r2t = np.zeros((n_channels, 2*N+1))
         for s in range(-N,N+1):
             score = utils.fit_and_score(x[N+s:T-N+s], y[N:T-N])
-            data = pd.DataFrame(np.array([np.ones_like(score)*layer,
-                                        np.arange(n_channels),
-                                        np.ones_like(score)*bin_width,
-                                        np.ones_like(score)*delay,
-                                        np.ones_like(score)*s,
-                                        n_channels*['linear_shift'],
-                                        score]
-                                        ).transpose(),
-                                columns=['layer','channel','bin_width','delay','shift','method','cc']
-                                )
+            data = pd.DataFrame(np.array([
+                                    np.ones_like(score)*session,
+                                    np.ones_like(score)*layer,
+                                    np.arange(n_channels),
+                                    np.ones_like(score)*bin_width,
+                                    np.ones_like(score)*delay,
+                                    np.ones_like(score)*s,
+                                    n_channels*['linear_shift'],
+                                    score
+                                ]).transpose(),
+                                columns=null_dist.columns#['layer','channel','bin_width','delay','shift','method','cc']
+            )
             null_dist = pd.concat([null_dist, data], axis=0, ignore_index=True)
-        float_cols = ['layer','channel','bin_width','delay','shift','cc']
-        for col in float_cols:
-            null_dist[col] = null_dist[col].astype('float64')
         return null_dist
 
-    def circular_shift_null_dist(self, layer, N=100, bin_width=40, delay=0):
+    def circular_shift_null_dist(self, layer, N=100, bin_width=20, delay=0):
         """
         Compute correlations for null dist 'N' times using circular shift method
             for the whole layer,
@@ -311,10 +342,11 @@ class transformer_regression():
             layer (int): index of the layer
             num_repeats (int): number of simulations
         """
-        null_dist = pd.DataFrame(columns=['layer','channel','bin_width','delay','shift','method','cc'])
+        null_dist = pd.DataFrame(columns=['session','layer','channel','bin_width','delay','shift','method','cc'])
         n_channels = self.dataset.num_channels
+        session = float(self.session)
         x = self.get_features(layer)
-        y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+        y = np.stack([self.spikes[:,i] for i in range(n_channels)], axis=1)
         # x.shape  = n_samples x n_dims
         # y.shape = n_samples x channels
         T = x.shape[0]
@@ -325,21 +357,23 @@ class transformer_regression():
         # r2t = np.zeros((n_channels, 2*N+1))
 
         for n in range(N):
-            s = np.random.randint(int(0.3*T), int(0.7*T))
+            s = np.random.randint(int(0.2*T), int(0.7*T))
             score = utils.fit_and_score(np.concatenate([x[s:T],x[0:s]], axis=0), y)
-            data = pd.DataFrame(np.array([np.ones_like(score)*layer,
-                                        np.arange(n_channels),
-                                        np.ones_like(score)*bin_width,
-                                        np.ones_like(score)*delay,
-                                        np.ones_like(score)*(n+1),
-                                        n_channels*['circular_shift'],
-                                        score]
-                                        ).transpose(),
-                                columns=['layer','channel','bin_width','delay','shift','method','cc']
+            data = pd.DataFrame(np.array([
+                                    np.ones_like(score)*session,
+                                    np.ones_like(score)*layer,
+                                    np.arange(n_channels),
+                                    np.ones_like(score)*bin_width,
+                                    np.ones_like(score)*delay,
+                                    np.ones_like(score)*(n+1),
+                                    n_channels*['circular_shift'],
+                                    score
+                                ]).transpose(),
+                                columns=null_dist.columns#['layer','channel','bin_width','delay','shift','method','cc']
                                 )
             null_dist = pd.concat([null_dist, data], axis=0, ignore_index=True)
 
-        float_cols = ['layer','channel','bin_width','delay','shift','cc']
+        float_cols = ['session','layer','channel','bin_width','delay','shift','cc']
         for col in float_cols:
             null_dist[col] = null_dist[col].astype('float64')
         return null_dist
@@ -416,10 +450,11 @@ class transformer_regression():
         if N_sents > len(sents):
             N_sents = len(sents)
 
+        feature_dims = self.features[0].shape[1]
         lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
-        B = module.zeros((12, 250, self.num_channels))
-        corr_coeff = np.zeros((N,self.num_channels,12))
-        corr_coeff_train = np.zeros((N,self.num_channels,12))
+        B = module.zeros((self.num_layers, feature_dims, self.num_channels))
+        corr_coeff = np.zeros((N,self.num_channels, self.num_layers))
+        corr_coeff_train = np.zeros((N,self.num_channels,self.num_layers))
         # stimuli = np.array(list(self.raw_features[0].keys()))
 
         stimuli = np.random.permutation(sents)[0:N_sents]
@@ -479,18 +514,18 @@ class transformer_regression():
             start_map = time.time()
             # Loading Mapping set...!
             mapping_x = self.unroll_features(mapping_set, numpy=numpy)
-            mapping_x = module.stack([mapping_x[i] for i in range(12)], axis=0)
+            mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
             mapping_y = self.unroll_spikes(sents=mapping_set, numpy=numpy)
             
             #computing betas
-            for l in range(12):
+            for l in range(self.num_layers):
                 for ch in range(self.num_channels):
                     B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
             self.B = B
 
             # Loading test set...!
             test_x = self.unroll_features(test_set, numpy=numpy)
-            test_x = module.stack([test_x[i] for i in range(12)], axis=0)
+            test_x = module.stack([test_x[i] for i in range(self.num_layers)], axis=0)
             test_y = self.unroll_spikes(sents=test_set, numpy=numpy) 
 
             train_pred = utils.predict(mapping_x, B)
@@ -683,7 +718,7 @@ class transformer_regression():
             if not numpy:
                 tmp = cp.array(tmp)
             mean = np.mean(tmp, axis=0)    
-            raw_spikes[i] = tmp - mean
+            raw_spikes[i] = tmp #- mean
         return raw_spikes
 
     def unroll_spikes(self, sents=None, numpy=True):

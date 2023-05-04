@@ -1,0 +1,321 @@
+gilbreth-e015.rcac.purdue.edu
+0
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) xalt/1.1.2
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=004-val_loss=1.56.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 36.52 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 9.01 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=04_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=009-val_loss=0.84.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 32.27 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.91 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=09_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=011-val_loss=0.42.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 32.87 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.91 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=11_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=011-val_loss=0.43.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.75 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.92 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=11_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=015-val_loss=0.42.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.13 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.90 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=15_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=019-val_loss=0.37.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.36 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.91 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=19_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=023-val_loss=0.34.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.11 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.91 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=23_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=027-val_loss=0.41.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.76 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.94 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=27_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=031-val_loss=0.48.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.29 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.91 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=31_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=035-val_loss=0.30.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 34.16 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.94 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=35_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=039-val_loss=0.39.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.33 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.95 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=39_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=043-val_loss=0.31.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.77 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.92 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=43_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=047-val_loss=0.29.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.48 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.92 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=47_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=051-val_loss=0.28.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.48 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.92 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=51_session_200206_corr.csv'
+loading weights from: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=055-val_loss=0.39.ckpt
+Regression object...
+Creating regression obj for: 'wav2letter_modified'
+Loading ANN features at bin-width: 20
+It takes 33.37 sec to load features...!
+# of iterations requested: 10, 
+# of lambda samples per iteration: 20
+Itr: 1:
+Itr: 2:
+Itr: 3:
+Itr: 4:
+Itr: 5:
+Itr: 6:
+Itr: 7:
+Itr: 8:
+Itr: 9:
+Itr: 10:
+It takes (on avg.) 8.92 sec (all lmbdas). (time for 10-folds)
+It takes (on avg.) 2.99 sec/mapping.
+It takes (on avg.) 0.20 minutes/iteration...!
+Data saved for model: 'wav2letter_modified', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/saved_results/task_optimization/w2l_epochs=55_session_200206_corr.csv'

@@ -113,7 +113,9 @@ class optimal_input():
         n_channels = self.dataset.num_channels
         x = self.features[layer]
         y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
-        self.B[layer] = torch.tensor(utils.regression_param(x, y), dtype=torch.float32)
+        # regression_param replaced with reg()
+        #self.B[layer] = torch.tensor(utils.regression_param(x, y), dtype=torch.float32)
+        self.B[layer] = torch.tensor(utils.reg(x, y), dtype=torch.float32)
         
     def get_input(self, sent=12, random=False):
         inp = torch.tensor(self.dataset.audio(sent), dtype=torch.float32)
@@ -181,12 +183,12 @@ def normalize(x):
 
     return x
 
-def plot_spect(waveform, ax):
+def plot_spect(waveform, ax, cmap='turbo'):
     waveform = waveform * (2 ** 15)
     kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
     kaldi = normalize(kaldi)
     x_ticks = np.arange(0,kaldi.shape[0],20)
-    data = ax.imshow(kaldi.transpose(1,0), cmap='turbo', origin='lower')
+    data = ax.imshow(kaldi.transpose(1,0), cmap=cmap, origin='lower')
     ax.set_xticks(x_ticks, 10*x_ticks)
     ax.set_xlabel('time (ms)')
     ax.set_ylabel('mel filters')

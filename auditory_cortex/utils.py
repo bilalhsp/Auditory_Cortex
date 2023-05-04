@@ -7,6 +7,31 @@ import pandas as pd
 from scipy import linalg
 import torchaudio
 import pickle
+import matplotlib as mpl
+import auditory_cortex.helpers as helpers
+
+
+def get_2d_cmap(session, clrm1 ='YlGnBu', clrm2 = 'YlOrRd'):
+    
+    cmap1 = mpl.cm.get_cmap(clrm1)
+    cmap2 = mpl.cm.get_cmap(clrm2)    
+    # make a copy of session to coordinates...
+    session_to_coordinates =  helpers.session_to_coordinates.copy()
+    """"maps coordinates to 2d color map."""
+    session = int(float(session))
+    coordinates = session_to_coordinates[session]
+
+    # mapping to 0-1 range
+    coords_x = (coordinates[0] + 2)/4.0
+    coords_y = (coordinates[1] + 2)/4.0
+    c1 = cmap1(coords_x)
+    c2 = cmap2(coords_y)
+    # c3 = (c1[0],c2[1] ,0.5, c1[3])
+    # c3 = ((c1[0] + c2[0])/2.0,(c1[1] + c2[1])/2.0 ,0.5, c1[3])
+    # c3 = (c1[0],c2[1] ,0.0, c1[3])
+    c3 = (c1[0],c2[1] ,0.0, c1[3])
+    # c3 = cmap_2d(c1, c2)
+    return c3
 
 def down_sample(data, k):
     #down samples 'data' by factor 'k' along dim=0 
@@ -254,18 +279,18 @@ def cc_single_channel(y, y_hat):
         y_hat = module.expand_dims(y_hat, axis=0)
     return module.cov(y, y_hat)[0,1:] / (module.sqrt(module.var(y)*module.var(y_hat, axis=1)) + 1.0e-8)
 
-def regression_param(X, y):
-    """
-    Computes the least-square solution to the equation Xz = y,
+# def regression_param(X, y):
+#     """
+#     Computes the least-square solution to the equation Xz = y,
   
-    Args:
-        X (ndarray): (M,N) left-hand side array
-        y (adarray): (M,) or (M,K) right-hand side array
-    Returns:
-        ndarray: (N,) or (N,K)
-    """
-    B = linalg.lstsq(X, y)[0]
-    return B
+#     Args:
+#         X (ndarray): (M,N) left-hand side array
+#         y (adarray): (M,) or (M,K) right-hand side array
+#     Returns:
+#         ndarray: (N,) or (N,K)
+#     """
+#     B = linalg.lstsq(X, y)[0]
+#     return B
 def reg(X,y, lmbda=0):
 
     #check if incoming array is np or cp,
@@ -339,10 +364,14 @@ def predict(X, B):
 #     return pred 
 
 def fit_and_score(X, y):
-    x_train, y_train, x_test, y_test = train_test_split(X,y, split=0.7)
-    B = regression_param(x_train,y_train)
-    y_hat = predict(x_test,B)
-    cc = cc_norm(y_hat, y_test)
+    # x_train, y_train, x_test, y_test = train_test_split(X,y, split=0.7)
+    # B = reg(x_train,y_train)
+    # y_hat = predict(x_test,B)
+    # cc = cc_norm(y_hat, y_test)
+
+    B = reg(X,y)
+    y_hat = predict(X,B)
+    cc = cc_norm(y_hat, y)
     return cc
 
 # def fit_and_score(X, y):
@@ -413,7 +442,10 @@ def write_optimal_delays(filename, result):
             prev_result = pickle.load(f)
         result['corr'] = np.concatenate([prev_result['corr'], result['corr']], axis=0)
         result['loss'] = np.concatenate([prev_result['loss'], result['loss']], axis=0)
-        result['delays'] = np.concatenate([np.array([0,10,20,30]), result['delays']], axis=0)
+        result['delays'] = np.concatenate([prev_result['delays'], result['delays']], axis=0)
+        # temporary change...should be removed after run..!
+        # result['delays'] = np.concatenate([np.arange(0,201,10), result['delays']], axis=0)
+        
 
     with open(filename, 'wb') as file:
         pickle.dump(result, file)

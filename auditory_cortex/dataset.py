@@ -23,6 +23,7 @@ class Neural_Data:
     # print(self.names)
     self.spikes, self.trials = self.load_data(verbose=verbose)
     self.num_channels = len(self.spikes.keys())
+    self.sents = np.arange(1,500)
     # print(f"Data from {self.num_channels} channels loaded...!")
 
   def load_data(self, verbose):
@@ -238,6 +239,45 @@ class Neural_Data:
     for i in range(self.num_channels):
         counts[i], _ = np.histogram(s_times[i], bins)
     return counts
+
+  def extract_spikes(self, bin_width=20, delay=0, offset=0, sents = None):
+    """Return neural spikes for given sents"""
+    if sents is None:
+        sents = self.sents
+    raw_spikes = {}
+    for x,i in enumerate(sents):
+        spikes = self.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
+                                                    early_spikes=False,offset=offset)
+        raw_spikes[i] = np.stack([spikes[ch] for ch in range(self.num_channels)], axis=1)
+    return raw_spikes
+
+  def unroll_spikes(self, sents=None):
+    """
+    Unroll and concatenate time axis of extracted spikes.
+
+    Args:
+        sents (List): indices of sents.
+
+    Returns:
+        
+    """
+    if sents is None:
+      sents = self.raw_spikes.keys()
+    spikes = np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
+    return spikes
+
+  def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None):
+    if sents is None:
+        sents = self.sents
+    self.raw_spikes = self.extract_spikes(bin_width=bin_width, delay=delay,
+                offset=offset, sents=sents)
+    return self.unroll_spikes()
+
+
+
+
+
+
     
     # Neural Data Plotting Functions....
     
