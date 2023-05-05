@@ -7,103 +7,117 @@ from torch import nn, Tensor
 from abc import ABC, abstractmethod
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
+from transformers import AutoProcessor, WhisperForConditionalGeneration
 
-class FeatureExtractor(ABC):
-	def __init__(self, model, config):
-		super(FeatureExtractor, self).__init__()
-		self.layers = []
-		self.bin_widths = []
-		self.offsets = []
-		self.features = {}
-		self.model = model
-		config_file = os.path.join(
-			os.path.dirname(os.path.abspath(__file__)),
-			'conf',
-			config
-			)
-		with open(config_file, 'r') as f:
-			self.config = yaml.load(f, yaml.FullLoader)
-		self.num_layers = len(self.config['layers'])
+# local
+from auditory_cortex import config_dir
+from wav2letter.models import Wav2LetterRF
 
-		for i in range(self.num_layers):
-			self.layers.append(self.config['layers'][i]['layer_name'])
-			self.bin_widths.append(self.config['layers'][i]['bin_width'])
-			self.offsets.append(self.config['layers'][i]['offset'])
 
-		# Register a hook for the given layer
-		for layer_name in self.layers:
-			layer = dict([*self.model.named_modules()])[layer_name]
-			layer.__name__ = layer_name
-			layer.register_forward_hook(self.create_hooks())
+class FeatureExtractor():
+    def __init__(self, model_name = 'wave2letter_modified'):
+        # super(FeatureExtractor, self).__init__()
+        self.layers = []
+        self.bin_widths = []
+        self.offsets = []
+        self.features = {}
+        # self.model = model
             
-	def create_hooks(self):
-		def fn(layer, _, output):
-			output = output.squeeze()
-			if 'conv' in layer.__name__:
-				output = output.transpose(0,1)
-			self.features[layer.__name__] = output
-		return fn
+        # read yaml config file
+        config_file = os.path.join(config_dir, f"{model_name}_config.yml")
+        with open(config_file, 'r') as f:
+            self.config = yaml.load(f, yaml.FullLoader)
+        self.num_layers = len(self.config['layers'])
+        
+        # create feature extractor as per model_name
+        if model_name == 'wave2letter_modified':
+            self.extractor = FeatureExtractorW2L(self.config['saved_checkpoint'])
+        elif model_name == 'wave2vec2':
+            self.extractor = FeatureExtractorW2V2()
+        elif model_name == 'speech2text':
+            self.extractor = FeatureExtractorS2T()
+        elif model_name == 'whisper':
+            self.extractor = FeatureExtractorWhisper()
+        else:
+            raise NotImplementedError(f"FeatureExtractor class does not support '{model_name}'")
 
-	def get_features(self, layer_index):
-		'''
-		Use to extract features for specific layer after calling 'translate()' method 
-		for given audio input.
+        for i in range(self.num_layers):
+            self.layers.append(self.config['layers'][i]['layer_name'])
+            self.bin_widths.append(self.config['layers'][i]['bin_width'])
+            self.offsets.append(self.config['layers'][i]['offset'])
 
-		Args:
-		
-			layer_index (int): layer index in the range [0, Total_Layers)
+        # Register fwd hooks for the given layers
+        for layer_name in self.layers:
+            layer = dict([*self.extractor.model.named_modules()])[layer_name]
+            layer.__name__ = layer_name
+            layer.register_forward_hook(self.create_hooks())
+            
+    def create_hooks(self):
+        def fn(layer, _, output):
+            output = output.squeeze()
+            if 'conv' in layer.__name__:
+                output = output.transpose(0,1)
+            self.features[layer.__name__] = output
+        return fn
 
-		returns:
-			(dim, time) features extracted for layer at 'layer_index' location 
-		'''
-		return self.features[self.layers[layer_index]]
+    def get_features(self, layer_index):
+        '''
+        Use to extract features for specific layer after calling 'translate()' method 
+        for given audio input.
 
-	def def_bin_width(self, layer):
-		def_w = self.bin_widths[layer]
-		offset = self.offsets[layer]
-		return def_w, offset
+        Args:
+        
+            layer_index (int): layer index in the range [0, Total_Layers)
 
-	def translate(self, aud, grad=False):
-		if grad:
-			input = self.fwd_pass(aud)
-		else:
-			with torch.no_grad():
-				input = self.fwd_pass(aud)
-		return input
+        returns:
+            (dim, time) features extracted for layer at 'layer_index' location 
+        '''
+        return self.features[self.layers[layer_index]]
 
-	@abstractmethod
-	def fwd_pass(self, aud):
-		pass
+    def def_bin_width(self, layer):
+        def_w = self.bin_widths[layer]
+        offset = self.offsets[layer]
+        return def_w, offset
+
+    def translate(self, aud, grad=False):
+        if grad:
+            input = self.extractor.fwd_pass(aud)
+        else:
+            with torch.no_grad():
+                input = self.extractor.fwd_pass(aud)
+        return input
 
 
-class FeatureExtractorW2L(FeatureExtractor):
-	def __init__(self, model):
-		super(FeatureExtractorW2L, self).__init__(model, f'{model.model_name}.yml')
-		
-	def fwd_pass(self, aud):
-		"""
-		Forward passes audio input through the model and captures 
-		the features in the 'self.features' dict.
 
-		Args:
-			aud (ndarray): single 'wav' input of shape (t,) 
-		
-		Returns:
-			input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
-		"""
-		input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
-		input = input.unsqueeze(dim=0)
-		input.requires_grad=True
-		self.model.eval()
-		out = self.model(input)
-		return input
 
-class FeatureExtractorW2V2(FeatureExtractor):
-	def __init__(self, model):
-		super(FeatureExtractorW2V2, self).__init__(model, f'wav2vec2.yml')
+class FeatureExtractorW2L():
+    def __init__(self, checkpoint):		
+        self.model = Wav2LetterRF.load_from_checkpoint(checkpoint)
+    
+
+    def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+        input = input.unsqueeze(dim=0)
+        input.requires_grad=True
+        self.model.eval()
+        out = self.model(input)
+        return input
+
+class FeatureExtractorW2V2():
+	def __init__(self):
 		self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-		# self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-		self.model = model 
+		self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+		# self.model = model 
 		########################## NEED TO MAKE THIS CONSISTENT>>>##################
 	def fwd_pass(self, aud):
 		"""
@@ -129,20 +143,108 @@ class FeatureExtractorW2V2(FeatureExtractor):
 		# out = self.model(input)
 		return input
 
-
-
-class Feature_Extractor_S2T(FeatureExtractor):
-	def __init__(self, model, processor):
-		super(Feature_Extractor_S2T, self).__init__(model, 'speech2text.yml')
-		self.processor = processor 
-
+class FeatureExtractorS2T():
+    def __init__(self):
+        self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-large-librispeech-asr")
+        self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
+                
+    def fwd_pass(self, aud):
+        input_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
+        with torch.no_grad():
+            self.model.eval()
+            generated_ids = self.model.generate(input_features, max_new_tokens=200)
+        return generated_ids
+    
+    
+class FeatureExtractorWhisper():
+	def __init__(self):
+		self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
+		self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
+				
 	def fwd_pass(self, aud):
-		inputs_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
+		input_features = self.processor(aud, sampling_rate=16000, return_tensors="pt").input_features
 		with torch.no_grad():
 			self.model.eval()
-		generated_ids = self.model.generate(inputs_features)
+			generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
+			# transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 		return generated_ids
+    
 
+
+# class FeatureExtractorW2L(FeatureExtractor):
+# 	def __init__(self, model):
+# 		super(FeatureExtractorW2L, self).__init__(model, f'{model.model_name}.yml')
+		
+# 	def fwd_pass(self, aud):
+# 		"""
+# 		Forward passes audio input through the model and captures 
+# 		the features in the 'self.features' dict.
+
+# 		Args:
+# 			aud (ndarray): single 'wav' input of shape (t,) 
+		
+# 		Returns:
+# 			input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+# 		"""
+# 		input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+# 		input = input.unsqueeze(dim=0)
+# 		input.requires_grad=True
+# 		self.model.eval()
+# 		out = self.model(input)
+# 		return input
+
+# class FeatureExtractorW2V2(FeatureExtractor):
+# 	def __init__(self, model):
+# 		super(FeatureExtractorW2V2, self).__init__(model, f'wav2vec2.yml')
+# 		self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+# 		# self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+# 		self.model = model 
+# 		########################## NEED TO MAKE THIS CONSISTENT>>>##################
+# 	def fwd_pass(self, aud):
+# 		"""
+# 		Forward passes audio input through the model and captures 
+# 		the features in the 'self.features' dict.
+
+# 		Args:
+# 			aud (ndarray): single 'wav' input of shape (t,) 
+		
+# 		Returns:
+# 			input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+# 		"""
+# 		input = aud.astype(np.float64)
+# 		input_values = self.processor(input, sampling_rate=16000, return_tensors="pt", padding="longest").input_values  # Batch size 1
+# 		self.model.eval()
+# 		with torch.no_grad():
+# 			logits = self.model(input_values).logits
+		
+# 		# input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+# 		# input = input.unsqueeze(dim=0)
+# 		# input.requires_grad=True
+# 		# self.model.eval()
+# 		# out = self.model(input)
+# 		return input
+
+
+
+# class Feature_Extractor_S2T(FeatureExtractor):
+# 	def __init__(self, model, processor):
+# 		super(Feature_Extractor_S2T, self).__init__(model, 'speech2text.yml')
+# 		self.processor = processor 
+
+# 	def fwd_pass(self, aud):
+# 		inputs_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
+# 		with torch.no_grad():
+# 			self.model.eval()
+# 		generated_ids = self.model.generate(inputs_features)
+# 		return generated_ids
+
+############ Temporarily commented out on May 4, 2023 
+#########################################################################################################
+
+
+
+####################################################3
+######## below this line, everything was commented out long ago and is not  used
 
 # class FeatureExtractorW2L(nn.Module):
 #   def __init__(self, model):

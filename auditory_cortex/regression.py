@@ -3,12 +3,17 @@ import cupy as cp
 import torch
 import os
 import time
+import yaml
 import pandas as pd
 from scipy import linalg, signal
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor,Wav2Vec2Processor, Wav2Vec2ForCTC
 
+
+# local
+from auditory_cortex import config_dir
 from auditory_cortex.dataset import Neural_Data
-from auditory_cortex.feature_extractors import Feature_Extractor_S2T,Feature_Extractor_GRU,FeatureExtractorW2L
+# from auditory_cortex.feature_extractors import Feature_Extractor_S2T,Feature_Extractor_GRU,FeatureExtractorW2L
+from auditory_cortex.feature_extractors import FeatureExtractor
 import auditory_cortex.feature_extractors as feature_extractors
 import auditory_cortex.utils as utils
 
@@ -18,74 +23,86 @@ import matplotlib.pyplot as plt
 import torchaudio
 
 class transformer_regression():
-    def __init__(self, dir, subject, model='speech2text', load_features = True):
-        self.session = subject
-        self.data_dir = dir
-        self.dir = os.path.join(dir, subject)
-        print("Regression object...")
-        self.dataset = Neural_Data(dir, subject)
+    def __init__(self, model_name='speech2text', load_features = True):
+
+        config_file = os.path.join(config_dir, f"{model_name}_config.yml")
+        with open(config_file, 'r') as f:
+            self.config = yaml.load(f, yaml.FullLoader)
+                        
+        self.data_dir = self.config['neural_data_dir']
+
+
+
+
+        # self.session = subject
+        # self.data_dir = dir
+        # self.dir = os.path.join(self.data_dir, subject)
+        # print("Regression object...")
+        # This dataset will be used for accessing stimuli to extract features...
+        self.dataset = Neural_Data(self.data_dir, '180810')
         self.sents = np.arange(1,500)
         self.spike_datasets = {}
-        if model == 'speech2text':
-            print(f"Creating regression obj for: 'speech2text'")
-            self.model_name=model
-            # self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1",
-            #                 "model.encoder.layers.0.fc2","model.encoder.layers.1.fc2",
-            #                 "model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
-            #                 "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2",
-            #                 "model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
-            #                 "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2",
-            #                 ]
+        # if model == 'speech2text':
+        #     print(f"Creating regression obj for: 'speech2text'")
+        #     self.model_name=model
+        #     # self.layers = ["model.encoder.conv.conv_layers.0","model.encoder.conv.conv_layers.1",
+        #     #                 "model.encoder.layers.0.fc2","model.encoder.layers.1.fc2",
+        #     #                 "model.encoder.layers.2.fc2","model.encoder.layers.3.fc2",
+        #     #                 "model.encoder.layers.4.fc2","model.encoder.layers.5.fc2",
+        #     #                 "model.encoder.layers.6.fc2","model.encoder.layers.7.fc2",
+        #     #                 "model.encoder.layers.8.fc2","model.encoder.layers.9.fc2",
+        #     #                 ]
             
-            self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-large-librispeech-asr")
-            self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
-            self.model_extractor = Feature_Extractor_S2T(self.model, self.processor)
-            self.layers = self.model_extractor.layers
+        #     self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-large-librispeech-asr")
+        #     self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
+        #     self.model_extractor = Feature_Extractor_S2T(self.model, self.processor)
+        #     self.layers = self.model_extractor.layers
 
-        elif model == 'wav2vec2':
-            print(f"Creating regression obj for: 'wav2vec'")
-            self.model_name = model
-            # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-            self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-            self.model_extractor = feature_extractors.FeatureExtractorW2V2(self.model)
-            self.layers = self.model_extractor.layers
-            # self.model_name = model
-            # self.layers = ['wav2vec2.feature_extractor.conv_layers.0.conv','wav2vec2.feature_extractor.conv_layers.1.conv',
-            #                 'wav2vec2.feature_extractor.conv_layers.2.conv','wav2vec2.feature_extractor.conv_layers.3.conv',
-            #                 'wav2vec2.feature_extractor.conv_layers.4.conv','wav2vec2.feature_extractor.conv_layers.5.conv',
-            #                 'wav2vec2.feature_extractor.conv_layers.6.conv']
-            # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-            # self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-            # self.model_extractor = feature_extractor_wav2vec(self.model, self.processor, self.layers)
-            # self.seq_lengths = {s:int(np.floor(self.dataset.duration(s)/0.02 - 0.25)) for s in self.sents}
+        # elif model == 'wav2vec2':
+        #     print(f"Creating regression obj for: 'wav2vec'")
+        #     self.model_name = model
+        #     # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+        #     self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+        #     self.model_extractor = feature_extractors.FeatureExtractorW2V2(self.model)
+        #     self.layers = self.model_extractor.layers
+        #     # self.model_name = model
+        #     # self.layers = ['wav2vec2.feature_extractor.conv_layers.0.conv','wav2vec2.feature_extractor.conv_layers.1.conv',
+        #     #                 'wav2vec2.feature_extractor.conv_layers.2.conv','wav2vec2.feature_extractor.conv_layers.3.conv',
+        #     #                 'wav2vec2.feature_extractor.conv_layers.4.conv','wav2vec2.feature_extractor.conv_layers.5.conv',
+        #     #                 'wav2vec2.feature_extractor.conv_layers.6.conv']
+        #     # self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+        #     # self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+        #     # self.model_extractor = feature_extractor_wav2vec(self.model, self.processor, self.layers)
+        #     # self.seq_lengths = {s:int(np.floor(self.dataset.duration(s)/0.02 - 0.25)) for s in self.sents}
 
-        elif model == 'gru':
-            print(f"Creating regression obj for: 'gru'")
-            self.model_name = model
-            self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
-            self.model = speech_recognition.SpeechRecognitionModel(3,5,512,29,128,2,0.1)
-            path = os.path.join(dir, 'rnn_model')
-            weights_file = "epoch_250.pt"
-            checkpoint = torch.load(os.path.join(path,weights_file),map_location=torch.device('cpu'))
-            self.model.load_state_dict(checkpoint['state_dict'])
-            self.model_extractor = Feature_Extractor_GRU(self.model, self.layers)
-            self.spect = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=128)
+        # elif model == 'gru':
+        #     print(f"Creating regression obj for: 'gru'")
+        #     self.model_name = model
+        #     self.layers = ['birnn_layers.0.BiGRU','birnn_layers.1.BiGRU','birnn_layers.2.BiGRU','birnn_layers.3.BiGRU','birnn_layers.4.BiGRU']
+        #     self.model = speech_recognition.SpeechRecognitionModel(3,5,512,29,128,2,0.1)
+        #     path = os.path.join(dir, 'rnn_model')
+        #     weights_file = "epoch_250.pt"
+        #     checkpoint = torch.load(os.path.join(path,weights_file),map_location=torch.device('cpu'))
+        #     self.model.load_state_dict(checkpoint['state_dict'])
+        #     self.model_extractor = Feature_Extractor_GRU(self.model, self.layers)
+        #     self.spect = torchaudio.transforms.MelSpectrogram(sample_rate=16000, n_mels=128)
 
-        else:
+        # else:
                 # This block for wav2letter trained model...!
-                print(f"Creating regression obj for: '{model.model_name}'")
-                self.model = model
-                self.model_extractor = FeatureExtractorW2L(self.model)
-                self.model_name = model.model_name
-                self.layers = self.model_extractor.layers
-        self.num_channels = self.dataset.num_channels
+        print(f"Creating regression obj for: '{model_name}'")
+        # self.model = model
+        self.model_extractor = FeatureExtractor(model_name)
+        self.model_name = model_name
+        self.layers = self.model_extractor.layers
+        # self.num_channels = self.dataset.num_channels
         self.num_layers = len(self.layers)
         self.B = {}
 
         if load_features:
-            # print("Loading model features now...!")
-            # self.load_features()
-            self.raw_features = self.extract_features()
+            print("Loading model features now...!")
+        #     # self.load_features()
+        #     self.raw_features = self.extract_features()
+            self.load_features(load_raw=True)
 
 
     ##############################
@@ -98,19 +115,43 @@ class transformer_regression():
             raise AttributeError("Run 'load_features_and_spikes()' method before using hidden features...")
         return feats
 
-    def get_neural_spikes(self, session, sents=None, force_reload=False):
+    def get_neural_spikes(
+            self, session, bin_width=20, delay=0, sents=None, force_reload=False, numpy=False
+        ):
         """Retrieves neural spikes for the argument session, loads spikes 
         if not already loaded or force_reload=True."""
-        if session in self.list_loaded_sessions() and not force_reload:
-            return self.spike_datasets[session].unroll_spikes(sents=sents)
-        print(f"Creating new dataset object for session-{session}...")
-        self.spike_datasets[session] = Neural_Data(self.data_dir, session)
-        return self.spike_datasets[session].load_spikes(sents=sents)
+        session = str(session)
+        if session not in self.list_loaded_sessions()  or force_reload:
+            self._load_dataset_session(session)
+            self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
+
+        spikes = self.spike_datasets[session].unroll_spikes(sents=sents)
+        # else:
+        #     print(f"Creating new dataset object for session-{session}...")
+        #     self.spike_datasets[session] = Neural_Data(self.data_dir, session)
+        #     spikes = self.spike_datasets[session].load_spikes(sents=sents)
+        if not numpy:
+            spikes = cp.array(spikes)
+
+        return spikes
+    
     
     def list_loaded_sessions(self):
         """Returns the list of sessions for which neural data has
         been loaded."""
         return self.spike_datasets.keys()
+    
+    def _load_dataset_session(self, session):
+        """Create dataset object for the 'session'"""
+        self.spike_datasets[session] = Neural_Data(self.data_dir, session)
+
+    def get_normalizer(self, session, sents=None, bin_width=20, delay=0):
+        """Compute dist. of normalizer and return median."""
+        if session not in self.list_loaded_sessions():
+            self._load_dataset_session(session)
+            _ = self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
+        return self.spike_datasets[session].get_normalizer(sents=sents, bin_width=bin_width, delay=delay)
+        
 
     def get_dataset_object(self, session):
         """Returns spike dataset object if neural data for the input 
@@ -191,21 +232,22 @@ class transformer_regression():
         if load_raw:
             self.raw_features = self.extract_features(sents)
         self.sampled_features = self.resample(bin_width, numpy=numpy)
-        
-        return self.unroll_features(sents = sents, numpy=numpy)
+        self.features = self.unroll_features(sents = sents, numpy=numpy)
 
-    def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None, numpy=False):
-        if sents is None:
-            sents = self.sents
-        self.raw_spikes = self.extract_spikes(bin_width=bin_width, delay=delay,
-                    offset=offset, sents=sents, numpy=numpy)
-        return self.unroll_spikes(numpy=numpy)
+    # def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None, numpy=False):
+    #     if sents is None:
+    #         sents = self.sents
+    #     self.raw_spikes = self.extract_spikes(bin_width=bin_width, delay=delay,
+    #                 offset=offset, sents=sents, numpy=numpy)
+    #     return self.unroll_spikes(numpy=numpy)
 
-    def load_features_and_spikes(self, bin_width=20, delay=0, offset=0, sents=None, load_raw=False, numpy=True):
+    def load_features_and_spikes(self, session, bin_width=20, delay=0, offset=0, sents=None, load_raw=False, numpy=True):
+        session = str(session)
         if sents is None:
             sents = self.sents
         self.features = self.load_features(bin_width=bin_width, sents=sents, load_raw=load_raw, numpy=numpy)
-        self.spikes = self.load_spikes(bin_width=bin_width, delay=delay, offset=offset, sents=sents, numpy=numpy)
+        # self.spikes = self.load_spikes(bin_width=bin_width, delay=delay, offset=offset, sents=sents, numpy=numpy)
+        self.spikes[session] = self.get_neural_spikes(session, sents=sents, numpy=numpy)
         
     def features_to_cp(self, features):
         # converts complicated data structure containing np-arrays to cp-arrays
@@ -393,35 +435,38 @@ class transformer_regression():
         # y.shape = n_samples x channels
         B = utils.regression_param(x, y)
         return B
-    def get_repeated_trials(self, sents=None, bin_width=20, delay=0):
-        """Get repeated trials for given sents as 'ndarray'. """
-        if sents is None:
-            sents = [12,13,32,43,56,163,212,218,287,308]
-        spikes_dict = {}
-        min_repeats = 500   #repetition of trials (mostly it is 11)
-        for s in sents:
-            spikes_sentence = self.dataset.retrieve_spike_counts_for_all_trials(sent=s, win = bin_width, delay=delay)
-            spikes_dict[s] = np.stack([spikes_sentence[ch] for ch in range(self.num_channels)], axis=-1)
-            if spikes_dict[s].shape[0] < min_repeats:
-                min_repeats = spikes_dict[s].shape[0] 
-        all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
-        return all_repeated_trials
+    # def get_repeated_trials(self, sents=None, bin_width=20, delay=0):
+    #     """Get repeated trials for given sents as 'ndarray'. """
+    #     if sents is None:
+    #         sents = [12,13,32,43,56,163,212,218,287,308]
+    #     spikes_dict = {}
+    #     min_repeats = 500   #repetition of trials (mostly it is 11)
+    #     for s in sents:
+    #         spikes_sentence = self.dataset.retrieve_spike_counts_for_all_trials(sent=s, win = bin_width, delay=delay)
+    #         spikes_dict[s] = np.stack([spikes_sentence[ch] for ch in range(self.num_channels)], axis=-1)
+    #         if spikes_dict[s].shape[0] < min_repeats:
+    #             min_repeats = spikes_dict[s].shape[0] 
+    #     all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
+    #     return all_repeated_trials
 
-    def get_normalizer(self, sents=None, bin_width=20, delay=0):
-        """Compute dist. of normalizer and return median."""
-        if sents is None:
-            sents = [12,13,32,43,56,163,212,218,287,308]
-        all_repeated_trials = self.get_repeated_trials(sents=sents, bin_width=bin_width, delay=delay)
-        normalizer_all = utils.inter_trial_corr(all_repeated_trials)
-        normalizer_all_med = np.median(normalizer_all, axis=0)
-        return normalizer_all_med
+    # def get_normalizer(self, sents=None, bin_width=20, delay=0):
+    #     """Compute dist. of normalizer and return median."""
+    #     if sents is None:
+    #         sents = [12,13,32,43,56,163,212,218,287,308]
+    #     all_repeated_trials = self.get_repeated_trials(sents=sents, bin_width=bin_width, delay=delay)
+    #     normalizer_all = utils.inter_trial_corr(all_repeated_trials)
+    #     normalizer_all_med = np.median(normalizer_all, axis=0)
+    #     return normalizer_all_med
 
-    def cross_validated_regression(self, bin_width=40, delay=0, k=10, num_lmbdas=20, N=10, N_sents=500,
+    
+
+    def cross_validated_regression(self, session, bin_width=40, delay=0, k=10, num_lmbdas=20, N=10, N_sents=500,
                 load_features=True, return_dict=False, numpy=False, sents=None):
         """
         Returns distribution of correlations for all (12) layers and all channels
 
         Args:
+            session:                session id (int or str) 
             bin_width (int):        bin width in ms.
             delay (int):            delay (ms) (post onset time) to extract neural activity
             k (int):                k-fold cross validation parameter
@@ -435,11 +480,14 @@ class transformer_regression():
             corr_coeff (3d-array):  distribution of correlations for all layers and channels (if return_dict=False)
             corr (dict):  median(corr_coeff) stored in dict, along with other details, ready to save (if return_dict=True)
         """
-        if load_features:
-            start_load = time.time()
-            self.load_features_and_spikes(bin_width=bin_width, delay=delay, numpy=numpy)
-            end_load = time.time()
-            print(f"It takes {end_load - start_load:.2f} sec to load features...!")
+
+        # if load_features:
+        #     start_load = time.time()
+        #     self.load_features(bin_width=bin_width, sents=sents, load_raw=True, numpy=numpy)
+        #     # self.load_features_and_spikes(bin_width=bin_width, delay=delay, numpy=numpy)
+        #     end_load = time.time()
+        #     print(f"It takes {end_load - start_load:.2f} sec to load features...!")
+        # self.spikes[session] = self.get_neural_spikes(session, sents=sents, numpy=numpy)
         if numpy:
             module = np
         else:
@@ -450,11 +498,16 @@ class transformer_regression():
         if N_sents > len(sents):
             N_sents = len(sents)
 
+        # this creates a new dataset object and extrats the spikes
+        _ = self.get_neural_spikes(session)
+
+        num_channels = self.spike_datasets[session].num_channels
+
         feature_dims = self.features[0].shape[1]
         lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
-        B = module.zeros((self.num_layers, feature_dims, self.num_channels))
-        corr_coeff = np.zeros((N,self.num_channels, self.num_layers))
-        corr_coeff_train = np.zeros((N,self.num_channels,self.num_layers))
+        B = module.zeros((self.num_layers, feature_dims, num_channels))
+        corr_coeff = np.zeros((N, num_channels, self.num_layers))
+        corr_coeff_train = np.zeros((N, num_channels,self.num_layers))
         # stimuli = np.array(list(self.raw_features[0].keys()))
 
         stimuli = np.random.permutation(sents)[0:N_sents]
@@ -473,41 +526,10 @@ class transformer_regression():
             mapping_set = stimuli[:mapping_sents]
             test_set = stimuli[mapping_sents:]
             
-            lmbda_loss = module.zeros(((len(lmbdas),self.num_channels,12)))
+            lmbda_loss = module.zeros(((len(lmbdas), num_channels,12)))
             start_lmbda = time.time()
-            lmbda_loss = self.k_fold_CV(mapping_set=mapping_set, lmbdas=lmbdas, k=k)
+            lmbda_loss = self.k_fold_CV(session, mapping_set=mapping_set, lmbdas=lmbdas, k=k)
             
-        #     for i,l in enumerate(lmbdas):
-        #         start_lmbda = time.time()
-        #         # loss = 0
-        #         # for r in range(k):
-        #         #     start_fold = time.time()
-        #         #     if r<(k-1):
-        #         #       val_set = mapping_set[r*size_of_chunk:(r+1)*size_of_chunk]
-        #         #     else:
-        #         #       val_set = mapping_set[r*size_of_chunk:]
-                    
-        #         #     train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
-        #         #     train_x = self.unroll_features(train_set, numpy=numpy)
-        #         #     train_x = module.stack([train_x[i] for i in range(12)], axis=0)
-
-        #         #     val_x = self.unroll_features(val_set, numpy=numpy)
-        #         #     val_x = module.stack([val_x[i] for i in range(12)], axis=0)
-
-        #         #     train_y = self.unroll_spikes(sents=train_set, numpy=numpy)
-        #         #     val_y = self.unroll_spikes(sents=val_set, numpy=numpy)
-
-        #         #     Beta = utils.reg(train_x, train_y, l)
-        #         #     val_pred = utils.predict(val_x, Beta)
-        #         #     # to be defined...
-        #         #     loss += utils.mse_loss(val_y, val_pred)
-        #         #     end_fold = time.time()
-        #         #     time_fold += end_fold - start_fold
-        #         # lmbda_loss[i] = loss/k
-        #         end_lmbda = time.time()
-        #         time_lmbda += end_lmbda-start_lmbda
-                
-        # #             print(f"Takes {(end_lmbda-start_lmbda):.2f} sec, loss: {lmbda_loss[i].sum():.2f}")
             end_lmbda = time.time()
             time_lmbda += end_lmbda-start_lmbda
             optimal_lmbdas = lmbdas[np.argmin(lmbda_loss, axis=0)]
@@ -515,18 +537,20 @@ class transformer_regression():
             # Loading Mapping set...!
             mapping_x = self.unroll_features(mapping_set, numpy=numpy)
             mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
-            mapping_y = self.unroll_spikes(sents=mapping_set, numpy=numpy)
+            # mapping_y = self.unroll_spikes(session, sents=mapping_set, numpy=numpy)
+            mapping_y = self.get_neural_spikes(session, sents=mapping_set, numpy=numpy)
             
             #computing betas
             for l in range(self.num_layers):
-                for ch in range(self.num_channels):
+                for ch in range(num_channels):
                     B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
             self.B = B
 
             # Loading test set...!
             test_x = self.unroll_features(test_set, numpy=numpy)
             test_x = module.stack([test_x[i] for i in range(self.num_layers)], axis=0)
-            test_y = self.unroll_spikes(sents=test_set, numpy=numpy) 
+            # test_y = self.unroll_spikes(sents=test_set, numpy=numpy)
+            test_y = self.get_neural_spikes(session, sents=test_set, numpy=numpy) 
 
             train_pred = utils.predict(mapping_x, B)
             test_pred = utils.predict(test_x, B)
@@ -549,19 +573,14 @@ class transformer_regression():
             corr_coeff_train = np.median(corr_coeff_train, axis=0)
             corr = {'test_cc_raw': corr_coeff, 'train_cc_raw': corr_coeff_train,
                     'win': bin_width, 'delay': delay, 
-                    'session': self.session, 'model': self.model_name,
+                    'session': session, 'model': self.model_name,
                     'N_sents': N_sents}
             return corr
         return corr_coeff
 
-    #############
-    # def lmbda_tuning_CV(self, lmbas, stimuli, train_test_split=70):
-    #     sents_for_mapping = int(len(stimuli) * train_test_split / 100)
-    #     mapping_set = stimuli[:sents_for_mapping]
-    #     test_set = stimuli[sents_for_mapping:]
-    #     return lmbda_loss
 
-    def k_fold_CV(self, mapping_set, lmbdas, k=5, use_cpu=False):
+
+    def k_fold_CV(self, session, mapping_set, lmbdas, k=5, use_cpu=False):
         """Return MSE loss for k-fold CV regression.
 
         Args:
@@ -573,7 +592,9 @@ class transformer_regression():
         Returns:
             avg. MSE loss for validation set.     
         """
-        lmbda_loss = np.zeros(((len(lmbdas),self.num_channels,12)))
+        print(f"K_fold for session: {session}")
+        num_channels = self.spike_datasets[session].num_channels
+        lmbda_loss = np.zeros(((len(lmbdas), num_channels,self.num_layers)))
         size_of_chunk = int(len(mapping_set)/k)
         for i, lmbda in enumerate(lmbdas):
             loss = 0
@@ -586,13 +607,16 @@ class transformer_regression():
                 
                 train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
                 train_x = self.unroll_features(train_set, numpy=use_cpu)
-                train_x = np.stack([train_x[i] for i in range(12)], axis=0)
+                train_x = np.stack([train_x[i] for i in range(self.num_layers)], axis=0)
 
                 val_x = self.unroll_features(val_set, numpy=use_cpu)
-                val_x = np.stack([val_x[i] for i in range(12)], axis=0)
+                val_x = np.stack([val_x[i] for i in range(self.num_layers)], axis=0)
 
-                train_y = self.unroll_spikes(sents=train_set, numpy=use_cpu)
-                val_y = self.unroll_spikes(sents=val_set, numpy=use_cpu)
+                train_y = self.get_neural_spikes(session, sents=train_set, numpy=use_cpu)
+                val_y = self.get_neural_spikes(session, sents=val_set, numpy=use_cpu)
+
+                # train_y = self.unroll_spikes(sents=train_set, numpy=use_cpu)
+                # val_y = self.unroll_spikes(sents=val_set, numpy=use_cpu)
 
                 Beta = utils.reg(train_x, train_y, lmbda)
                 val_pred = utils.predict(val_x, Beta)
@@ -602,17 +626,18 @@ class transformer_regression():
         return lmbda_loss
 
     def map_and_score(self, mapping_set, test_set, optimal_lmbdas, use_cpu=False):
-        B = cp.zeros((12, 250, self.num_channels))
-        corr_coeff = np.zeros((self.num_channels,12))
+        feature_dims = self.features[0].shape[1]
+        B = cp.zeros((self.num_layers, feature_dims, self.num_channels))
+        corr_coeff = np.zeros((self.num_channels, self.num_layers))
         mapping_x = self.unroll_features(mapping_set, numpy=use_cpu)
-        mapping_x = np.stack([mapping_x[i] for i in range(12)], axis=0)
+        mapping_x = np.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
         mapping_y = self.unroll_spikes(sents=mapping_set, numpy=use_cpu)
         
         test_x = self.unroll_features(test_set, numpy=use_cpu)
-        test_x = np.stack([test_x[i] for i in range(12)], axis=0)
+        test_x = np.stack([test_x[i] for i in range(self.num_layers)], axis=0)
         test_y = self.unroll_spikes(sents=test_set, numpy=use_cpu) 
         
-        for l in range(12):
+        for l in range(self.num_layers):
             for ch in range(self.num_channels):
                 B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
         
@@ -707,37 +732,40 @@ class transformer_regression():
             result[ch] = np.concatenate([spikes[i][ch] for i in range(len(spikes))], axis=0)
         return result
 
-    def extract_spikes(self, bin_width=40, delay=0, offset=0, sents = None, numpy=True):
-        if sents is None:
-            sents = self.sents
-        raw_spikes = {}
-        for x,i in enumerate(sents):
-            spikes = self.dataset.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
-                                                        early_spikes=False,offset=offset)
-            tmp = np.stack([spikes[ch] for ch in range(self.dataset.num_channels)], axis=1)
-            if not numpy:
-                tmp = cp.array(tmp)
-            mean = np.mean(tmp, axis=0)    
-            raw_spikes[i] = tmp #- mean
-        return raw_spikes
+    # def extract_spikes(self, bin_width=40, delay=0, offset=0, sents = None, numpy=True):
+    #     if sents is None:
+    #         sents = self.sents
+    #     raw_spikes = {}
+    #     for x,i in enumerate(sents):
+    #         spikes = self.dataset.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
+    #                                                     early_spikes=False,offset=offset)
+    #         tmp = np.stack([spikes[ch] for ch in range(self.dataset.num_channels)], axis=1)
+    #         if not numpy:
+    #             tmp = cp.array(tmp)
+    #         mean = np.mean(tmp, axis=0)    
+    #         raw_spikes[i] = tmp #- mean
+    #     return raw_spikes
 
-    def unroll_spikes(self, sents=None, numpy=True):
-        """
-        Unroll and concatenate time axis of extracted spikes.
+    # def unroll_spikes(self, sents=None, numpy=True):
+    #     """
+    #     Unroll and concatenate time axis of extracted spikes.
 
-        Args:
-            sents (List): indices of sents.
+    #     Args:
+    #         sents (List): indices of sents.
 
-        Returns:
+    #     Returns:
             
-        """
-        if sents is None:
-            sents = self.raw_spikes.keys()
-        if numpy:
-            spikes = np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
-        else:
-            spikes = cp.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
-        return spikes
+    #     """
+    #     if sents is None:
+    #         sents = self.raw_spikes.keys()
+    #     if numpy:
+    #         spikes = np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
+    #     else:
+    #         spikes = cp.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
+    #     return spikes
+
+    # def unroll_spikes(self, session, sents=mapping_set, numpy=numpy):
+
 
     def unroll_spikes_cp(self, sents=None):
         """
