@@ -1,0 +1,31 @@
+gilbreth-f001.rcac.purdue.edu
+0
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) xalt/1.1.2
+/home/ahmedb/.conda/envs/cent7/2020.11-py38/wav2letter/lib/python3.8/site-packages/torch/_tensor.py:575: UserWarning: floor_divide is deprecated, and will be removed in a future version of pytorch. It currently rounds toward 0 (like the 'trunc' function NOT 'floor'). This results in incorrect rounding for negative values.
+To keep the current behavior, use torch.div(a, b, rounding_mode='trunc'), or for actual floor division, use torch.div(a, b, rounding_mode='floor'). (Triggered internally at  /opt/conda/conda-bld/pytorch_1623448278899/work/aten/src/ATen/native/BinaryOps.cpp:467.)
+  return torch.floor_divide(self, other)
+Creating regression obj for: 'speech2text'
+Loading model features now...!
+Loading ANN features at bin-width: 20
+It takes 527.90 seconds to load features...!
+Working with '200206'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200206
+Itr: 2:
+K_fold for session: 200206
+Itr: 3:
+K_fold for session: 200206
+Itr: 4:
+K_fold for session: 200206
+Itr: 5:
+K_fold for session: 200206
+It takes (on avg.) 31.33 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 14.28 sec/mapping.
+It takes (on avg.) 0.76 minutes/iteration...!
+Data saved for model: 'speech2text', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/speech2text_corr_results.csv'
+Took 13.41 min., for bin_widths: '[20]' and delays: '[0]'.

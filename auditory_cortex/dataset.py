@@ -4,6 +4,8 @@ import json
 import os
 import matplotlib.pyplot as plt
 
+import auditory_cortex.utils as utils
+
 class Neural_Data:
   """Neural_dataset class loads neural data, from the directory specified at creation & 
   provides functions to retrieve 'relative/absolute' spike times, or spike counts in the durations
@@ -249,7 +251,7 @@ class Neural_Data:
         spikes = self.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
                                                     early_spikes=False,offset=offset)
         raw_spikes[i] = np.stack([spikes[ch] for ch in range(self.num_channels)], axis=1)
-    return raw_spikes
+    self.raw_spikes =  raw_spikes
 
   def unroll_spikes(self, sents=None):
     """
@@ -269,11 +271,33 @@ class Neural_Data:
   def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None):
     if sents is None:
         sents = self.sents
-    self.raw_spikes = self.extract_spikes(bin_width=bin_width, delay=delay,
-                offset=offset, sents=sents)
+    self.extract_spikes(
+       bin_width=bin_width, delay=delay, offset=offset, sents=sents
+    )
     return self.unroll_spikes()
 
+  def get_repeated_trials(self, sents=None, bin_width=20, delay=0):
+      """Get repeated trials for given sents as 'ndarray'. """
+      if sents is None:
+          sents = [12,13,32,43,56,163,212,218,287,308]
+      spikes_dict = {}
+      min_repeats = 500   #repetition of trials (mostly it is 11)
+      for s in sents:
+          spikes_sentence = self.retrieve_spike_counts_for_all_trials(sent=s, win = bin_width, delay=delay)
+          spikes_dict[s] = np.stack([spikes_sentence[ch] for ch in range(self.num_channels)], axis=-1)
+          if spikes_dict[s].shape[0] < min_repeats:
+              min_repeats = spikes_dict[s].shape[0] 
+      all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
+      return all_repeated_trials
 
+  def get_normalizer(self, sents=None, bin_width=20, delay=0):
+      """Compute dist. of normalizer and return median."""
+      if sents is None:
+          sents = [12,13,32,43,56,163,212,218,287,308]
+      all_repeated_trials = self.get_repeated_trials(sents=sents, bin_width=bin_width, delay=delay)
+      normalizer_all = utils.inter_trial_corr(all_repeated_trials)
+      normalizer_all_med = np.median(normalizer_all, axis=0)
+      return normalizer_all_med
 
 
 
