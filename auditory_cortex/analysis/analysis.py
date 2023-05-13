@@ -9,11 +9,14 @@ import matplotlib as mpl
 from matplotlib.lines import Line2D
 import pickle
 from sklearn.decomposition import PCA
-# 
+
+#local 
 from auditory_cortex.analysis.config import *
 import auditory_cortex.analysis.config as config
 import auditory_cortex.helpers as helpers
 import auditory_cortex.utils as utils
+
+from auditory_cortex import session_to_coordinates
 
 from scipy.signal import resample
 from sklearn.linear_model import Ridge, ElasticNet
@@ -98,14 +101,21 @@ class STRF:
 class correlations:
     def __init__(self, corr_file_path=None, sig_threshold=0.1) -> None:
         if corr_file_path is None:
-            corr_file_path = os.path.join(results_dir, corr_sub_dir, corr_data_filename)
-        self.data = pd.read_csv(corr_file_path)
+            self.corr_file_path = os.path.join(results_dir, corr_sub_dir, corr_data_filename)
+        else:
+            self.corr_file_path = corr_file_path
+        self.data = pd.read_csv(self.corr_file_path)
         self.data['normalized_test_cc'] = self.data['test_cc_raw']/self.data['normalizer']
         self.sig_threshold = sig_threshold
+    
+    def write_back(self):
+        self.data.to_csv(self.corr_file_path)
 
-    def get_significant_sessions(self):
+    def get_significant_sessions(self, threshold = None):
         """Returns sessions with corr scores above significant threshold for at least 1 channel"""
-        sig_data = self.data[self.data['normalizer'] > self.sig_threshold]
+        if threshold is None:
+            threshold = self.sig_threshold
+        sig_data = self.data[self.data['normalizer'] > threshold]
         return sig_data['session'].unique()
     
     def get_all_sessions(self):
@@ -115,6 +125,9 @@ class correlations:
     def get_all_channels(self, session):
         """Return list of channels indices for given session."""
         return self.data[self.data['session'] == float(session)]['channel'].unique()
+    def get_all_layers(self, session):
+        """Return layers indices for given session."""
+        return self.data[self.data['session'] == float(session)]['layer'].unique()
     
     def get_corr_score(self, session, layer, ch, bin_width=20, delay=0, N_sents=500):
         """Return the correlation coefficient for given specs."""
@@ -127,7 +140,92 @@ class correlations:
             (self.data['channel']==ch)   
             ]
         return select_data['test_cc_raw'].item()
+    
+    def get_session_corr(self, session, bin_width = 20, delay = 0, N_sents = 499):
+        """Returns correlations result for the specific 'session' and given selections
+        """
+        select_data = self.data[
+            (self.data['session']==float(session)) &\
+            (self.data['bin_width']==bin_width) &\
+            (self.data['delay']==delay) &\
+            (self.data['N_sents']>=N_sents)
+            ]
+        return select_data
+    
+    def session_bar_plot(
+            self, session = 200206,
+            column = 'test_cc_raw', 
+            cmap = 'magma', 
+            ax = None, 
+            separate_color_maps = True,
+            vmin = 0,
+            vmax = 1
+            ):
+        """Bar plots for session correlations (mean across channels for all layers)"""
+        if ax is None:
+            _, ax = plt.subplots()
 
+        corr = self.get_session_corr(session)
+        mean_layer_scores = corr.groupby('layer', as_index=False).mean()[column]
+        num_layers = mean_layer_scores.shape[0]
+        # print(mean_layer_scores.shape[0])
+        if separate_color_maps:
+            vmin = mean_layer_scores.min()
+            vmax = mean_layer_scores.max()
+
+        plt.imshow(np.atleast_2d(mean_layer_scores), extent=(0,num_layers,0,4), cmap=cmap, vmin=vmin, vmax=vmax)
+
+    def topographic_bar_plots(
+            self,
+            fig_size=10, 
+            normalized=False, 
+            threshold=0.1,
+            separate_color_maps=True
+        ):
+        fig, axes = plt.subplots(figsize=(fig_size,fig_size))
+        plt.grid(True)
+        circle = plt.Circle((0,0),2, fill=False)
+        axes.set_aspect(1)
+        axes.add_artist(circle)
+        axes.set_xlim([-2.0,2.0])
+        axes.set_ylim([-2.0,2.0])
+        # axes.set_title(f"Monkey, {monkey}")
+        vmin = 0
+        if normalized:
+            column = 'normalized_test_cc'
+            vmax = 1
+        else:
+            column = 'test_cc_raw'
+            vmax = self.get_peak_corr(column=column)
+
+
+
+        sessions = self.get_significant_sessions(threshold=threshold)
+        sessions.sort()
+
+        for session in sessions:
+            cx, cy = session_to_coordinates[int(session)]
+            cx = (cx + 2)/4 - 0.1
+            cy = (cy + 2)/4 - 0.025
+            ax = plt.axes([cx, cy, 0.2, 0.05])
+            self.session_bar_plot(
+                session, column=column, ax=ax, vmax=vmax, separate_color_maps=separate_color_maps
+            )
+            ax.set_title(session)
+            ax.set_axis_off()
+
+
+    def get_peak_corr(self, column, bin_width=20, delay=0, N_sents=499):
+        
+        select_data = self.data[
+            (self.data['bin_width']==bin_width) &\
+            (self.data['delay']==delay) &\
+            (self.data['N_sents']>=N_sents)
+            ]
+
+        id = select_data.idxmax()[column]
+        return self.data.iloc[id][column]
+        
 
     def get_best_channel(self, session, layer, bin_width=20, delay=0, N_sents=500):
         """Returns channel id for max correlation with given data selection."""
@@ -160,7 +258,7 @@ class correlations:
             (self.data['session']==float(session)) & \
             (self.data['bin_width']==bin_width) & \
             (self.data['delay']==delay) & \
-            (self.data['N_sents']==N_sents) &\
+            (self.data['N_sents']>=N_sents) &\
             (self.data['normalizer'] >= threshold)     
             ]
         

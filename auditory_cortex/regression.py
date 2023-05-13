@@ -1,6 +1,7 @@
 import numpy as np
 import cupy as cp
 import torch
+import gc
 import os
 import time
 import yaml
@@ -99,10 +100,10 @@ class transformer_regression():
         self.B = {}
 
         if load_features:
-            print("Loading model features now...!")
+            # print("Loading model features now...!")
         #     # self.load_features()
         #     self.raw_features = self.extract_features()
-            self.load_features(load_raw=True)
+            self.load_features()
 
 
     ##############################
@@ -121,9 +122,20 @@ class transformer_regression():
         """Retrieves neural spikes for the argument session, loads spikes 
         if not already loaded or force_reload=True."""
         session = str(session)
+        # check if session is already loaded, reuse it, otherwise clear all sessions to saved memory.
         if session not in self.list_loaded_sessions()  or force_reload:
+            # de-allocate memory for the previously loaded sessions...
+            for sess in self.spike_datasets.keys():
+                del self.spike_datasets[sess]
+                del self.num_channels[sess]
+            gc.collect()
+            # de-allocation of memory ends here...
+
+            self.spike_datasets = {}
+            self.num_channels = {}
             self._load_dataset_session(session)
             self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
+            self.num_channels[session] = self.get_dataset_object(session).num_channels
 
         spikes = self.spike_datasets[session].unroll_spikes(sents=sents)
         # else:
@@ -161,7 +173,7 @@ class transformer_regression():
         except:
             raise AttributeError(f"Create dataset object for session-{session} before using it.")
 
-    def extract_features(self, sents = None, grad=False):
+    def extract_features(self):
         """
         Returns all layer features for given 'sents'
 
@@ -172,18 +184,16 @@ class transformer_regression():
             List of dict: List index corresponds to layer number carrying 
                             dict of extracted features for all sentences. 
         """
-        if sents is None:
-            sents=self.sents
+        sents = self.sents
         features = [{} for _ in range(self.num_layers)]
         for x, i in enumerate(sents):
-            self.model_extractor.translate(self.dataset.audio(i), grad = grad)
+            self.model_extractor.translate(self.dataset.audio(i), grad = False)
             for j in range(self.num_layers):
                 features[j][i] = self.model_extractor.get_features(j)
-                if self.model_name=='wav2vec':
-                        features[j][i] = features[j][x][:self.seq_lengths[i]]
+
         return features
 
-    def resample(self, bin_width, numpy=True):
+    def resample(self, raw_features, bin_width):
         """
         resample all layer features to specific bin_width
 
@@ -195,17 +205,15 @@ class transformer_regression():
         """
         resampled_features = [{} for _ in range(len(self.layers))]
         bin_width = bin_width/1000 # ms
-        for sent in self.raw_features[0].keys():
+        for sent in raw_features[0].keys():
             n = int(np.ceil(round(self.dataset.duration(sent)/bin_width, 3)))
             for j, l in enumerate(self.layers):
-                tmp = signal.resample(self.raw_features[j][sent],n, axis=0)
-                if not numpy:
-                    tmp = cp.array(tmp)
+                tmp = signal.resample(raw_features[j][sent],n, axis=0)
                 mean = np.mean(tmp, axis=0)
                 resampled_features[j][sent] = tmp #- mean
         return resampled_features
 
-    def unroll_features(self, sents = None, numpy=True):
+    def unroll_features(self, sents = None, numpy=True, return_dict=False):
         """
         Unroll and concatenate time axis of extracted features.
 
@@ -216,23 +224,25 @@ class transformer_regression():
             dict: 
         """
         if sents is None:
-            sents = self.sampled_features[0].keys()
+            sents = self.sents
+        # sampled_features = self.resample(bin_width)
         feats = {}
         for j, l in enumerate(self.layers):
-            if numpy:
-                feats[j] = np.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
-            else:
-                feats[j] = cp.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
+            feats[j] = np.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
+            if not numpy:
+                feats[j] = cp.array(feats[j])
+        if not return_dict:
+            feats = np.stack([feats[i] for i in range(self.num_layers)], axis=0)
         return feats
         
-    def load_features(self,bin_width=20, sents=None, load_raw=False, numpy=False):
+    def load_features(self, bin_width=20):
         print(f"Loading ANN features at bin-width: {bin_width}")
-        if sents is None:
-            sents = self.sents
-        if load_raw:
-            self.raw_features = self.extract_features(sents)
-        self.sampled_features = self.resample(bin_width, numpy=numpy)
-        self.features = self.unroll_features(sents = sents, numpy=numpy)
+        # if sents is None:
+        #     sents = self.sents
+        raw_features = self.extract_features()
+        self.feature_dims = raw_features[0][1].shape[1]
+        self.sampled_features = self.resample(raw_features, bin_width)
+        # self.features = self.unroll_features(sents = sents, numpy=numpy, return_dict=True)
 
     # def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None, numpy=False):
     #     if sents is None:
@@ -241,13 +251,13 @@ class transformer_regression():
     #                 offset=offset, sents=sents, numpy=numpy)
     #     return self.unroll_spikes(numpy=numpy)
 
-    def load_features_and_spikes(self, session, bin_width=20, delay=0, offset=0, sents=None, load_raw=False, numpy=True):
-        session = str(session)
-        if sents is None:
-            sents = self.sents
-        self.features = self.load_features(bin_width=bin_width, sents=sents, load_raw=load_raw, numpy=numpy)
-        # self.spikes = self.load_spikes(bin_width=bin_width, delay=delay, offset=offset, sents=sents, numpy=numpy)
-        self.spikes[session] = self.get_neural_spikes(session, sents=sents, numpy=numpy)
+    # def load_features_and_spikes(self, session, bin_width=20, delay=0, offset=0, sents=None, load_raw=False, numpy=True):
+    #     session = str(session)
+    #     if sents is None:
+    #         sents = self.sents
+    #     self.features = self.load_features(bin_width=bin_width, sents=sents, load_raw=load_raw, numpy=numpy)
+    #     # self.spikes = self.load_spikes(bin_width=bin_width, delay=delay, offset=offset, sents=sents, numpy=numpy)
+    #     self.spikes[session] = self.get_neural_spikes(session, sents=sents, numpy=numpy)
         
     def features_to_cp(self, features):
         # converts complicated data structure containing np-arrays to cp-arrays
@@ -421,20 +431,27 @@ class transformer_regression():
         return null_dist
 
 
-    def get_betas(self, layer):
+    def get_betas(self, session, use_cpu=False):
         """
         Returns betas for all channels of the layer,
 
         Args:
             layer (int): index of the layer
         """
-        n_channels = self.dataset.num_channels
-        x = self.features[layer]
-        y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
-        # x.shape  = n_samples x n_dims
-        # y.shape = n_samples x channels
-        B = utils.regression_param(x, y)
+        features = self.unroll_features(numpy=use_cpu)
+        spikes = self.get_neural_spikes(session, numpy=use_cpu)
+        print("loading features and spikes for beta calculation in regression class...")
+        # print(type(features))
+        # print(type(spikes))
+        B = utils.reg(features, spikes)
         return B
+        # n_channels = self.dataset.num_channels
+    #     # x = self.features[layer]
+    #     # y = np.stack([self.spikes[i] for i in range(n_channels)], axis=1)
+    #     # # x.shape  = n_samples x n_dims
+    #     # # y.shape = n_samples x channels
+    #     # B = utils.regression_param(x, y)
+    #     return B
     # def get_repeated_trials(self, sents=None, bin_width=20, delay=0):
     #     """Get repeated trials for given sents as 'ndarray'. """
     #     if sents is None:
@@ -461,7 +478,7 @@ class transformer_regression():
     
 
     def cross_validated_regression(self, session, bin_width=40, delay=0, k=10, num_lmbdas=20, N=10, N_sents=500,
-                load_features=True, return_dict=False, numpy=False, sents=None):
+                return_dict=False, numpy=False, sents=None):
         """
         Returns distribution of correlations for all (12) layers and all channels
 
@@ -503,9 +520,9 @@ class transformer_regression():
 
         num_channels = self.spike_datasets[session].num_channels
 
-        feature_dims = self.features[0].shape[1]
+        # feature_dims = self.sampled_features[0].shape[1]
         lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
-        B = module.zeros((self.num_layers, feature_dims, num_channels))
+        B = module.zeros((self.num_layers, self.feature_dims, num_channels))
         corr_coeff = np.zeros((N, num_channels, self.num_layers))
         corr_coeff_train = np.zeros((N, num_channels,self.num_layers))
         # stimuli = np.array(list(self.raw_features[0].keys()))
@@ -526,7 +543,7 @@ class transformer_regression():
             mapping_set = stimuli[:mapping_sents]
             test_set = stimuli[mapping_sents:]
             
-            lmbda_loss = module.zeros(((len(lmbdas), num_channels,12)))
+            # lmbda_loss = module.zeros(((len(lmbdas), num_channels, self.num_layers)))
             start_lmbda = time.time()
             lmbda_loss = self.k_fold_CV(session, mapping_set=mapping_set, lmbdas=lmbdas, k=k)
             
@@ -535,8 +552,8 @@ class transformer_regression():
             optimal_lmbdas = lmbdas[np.argmin(lmbda_loss, axis=0)]
             start_map = time.time()
             # Loading Mapping set...!
-            mapping_x = self.unroll_features(mapping_set, numpy=numpy)
-            mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
+            mapping_x = self.unroll_features(sents=mapping_set, numpy=numpy)
+            # mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
             # mapping_y = self.unroll_spikes(session, sents=mapping_set, numpy=numpy)
             mapping_y = self.get_neural_spikes(session, sents=mapping_set, numpy=numpy)
             
@@ -547,8 +564,8 @@ class transformer_regression():
             self.B = B
 
             # Loading test set...!
-            test_x = self.unroll_features(test_set, numpy=numpy)
-            test_x = module.stack([test_x[i] for i in range(self.num_layers)], axis=0)
+            test_x = self.unroll_features(sents=test_set, numpy=numpy)
+            # test_x = module.stack([test_x[i] for i in range(self.num_layers)], axis=0)
             # test_y = self.unroll_spikes(sents=test_set, numpy=numpy)
             test_y = self.get_neural_spikes(session, sents=test_set, numpy=numpy) 
 
@@ -561,6 +578,8 @@ class transformer_regression():
             end_itr = time.time()
             time_map += end_map - start_map
             time_itr += (end_itr - start_itr)
+        # deallocate the memory of Neural data for current session, this will save memory used.
+        del self.spike_datasets[session]
         #         print(f"itr-{n}: It takes {(end_itr - start_itr):.2f} seconds for all lambdas")
         # print(f"It takes (on avg.) {time_fold/(k*N*len(lmbdas)):.2f} sec for each step of cross validation (1 fold)")
         print(f"It takes (on avg.) {time_lmbda/(N):.2f} sec (all lmbdas). (time for {k}-folds)")
@@ -594,7 +613,7 @@ class transformer_regression():
         """
         print(f"K_fold for session: {session}")
         num_channels = self.spike_datasets[session].num_channels
-        lmbda_loss = np.zeros(((len(lmbdas), num_channels,self.num_layers)))
+        lmbda_loss = np.zeros(((len(lmbdas), num_channels, self.num_layers)))
         size_of_chunk = int(len(mapping_set)/k)
         for i, lmbda in enumerate(lmbdas):
             loss = 0
@@ -606,19 +625,29 @@ class transformer_regression():
                     val_set = mapping_set[r*size_of_chunk:]
                 
                 train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
-                train_x = self.unroll_features(train_set, numpy=use_cpu)
-                train_x = np.stack([train_x[i] for i in range(self.num_layers)], axis=0)
-
-                val_x = self.unroll_features(val_set, numpy=use_cpu)
-                val_x = np.stack([val_x[i] for i in range(self.num_layers)], axis=0)
-
+                train_x = self.unroll_features(sents=train_set, numpy=use_cpu)
+                # train_x = np.stack([train_x[i] for i in range(self.num_layers)], axis=0)
                 train_y = self.get_neural_spikes(session, sents=train_set, numpy=use_cpu)
+
+                Beta = utils.reg(train_x, train_y, lmbda)
+
+                # de-allocate train_x and train_y to reduce memroy utilization...
+                del train_x
+                del train_y
+                gc.collect()
+                # de-allocation of memory ends here...
+
+
+                val_x = self.unroll_features(sents=val_set, numpy=use_cpu)
+                # val_x = np.stack([val_x[i] for i in range(self.num_layers)], axis=0)
                 val_y = self.get_neural_spikes(session, sents=val_set, numpy=use_cpu)
+                
+
 
                 # train_y = self.unroll_spikes(sents=train_set, numpy=use_cpu)
                 # val_y = self.unroll_spikes(sents=val_set, numpy=use_cpu)
 
-                Beta = utils.reg(train_x, train_y, lmbda)
+
                 val_pred = utils.predict(val_x, Beta)
                 # to be defined...
                 loss += utils.mse_loss(val_y, val_pred)
@@ -633,8 +662,8 @@ class transformer_regression():
         mapping_x = np.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
         mapping_y = self.unroll_spikes(sents=mapping_set, numpy=use_cpu)
         
-        test_x = self.unroll_features(test_set, numpy=use_cpu)
-        test_x = np.stack([test_x[i] for i in range(self.num_layers)], axis=0)
+        test_x = self.unroll_features(sents=test_set, numpy=use_cpu)
+        # test_x = np.stack([test_x[i] for i in range(self.num_layers)], axis=0)
         test_y = self.unroll_spikes(sents=test_set, numpy=use_cpu) 
         
         for l in range(self.num_layers):
@@ -705,8 +734,8 @@ class transformer_regression():
         Returns:
             ndarray : (layers, ch, time) Prdicted neural activity 
         """
-        dict_feats = self.unroll_features(sent)
-        features = np.stack([dict_feats[i] for i in range(12)], axis=0)
+        features = self.unroll_features(sents=sent)
+        # features = np.stack([dict_feats[i] for i in range(12)], axis=0)
         return cp.asnumpy(utils.predict(features, self.B))
 
     #########################################    ##############################

@@ -29,3 +29,20 @@ dataset_sizes:
 - 5
 k_folds_validation: 5
 iterations: 5
+
+optimal_inputs_param:
+  model: wave2letter_modified
+  # model: wave2vec2
+  # model: speech2text
+  # model: whisper
+  starting_sent: 13        # 0 would mean, starting from random noise.
+  force_redo: False
+  layers: 
+  - 6
+  - 7
+  channels: 
+  - 10
+  - 32
+  - 60
+  - 62
+

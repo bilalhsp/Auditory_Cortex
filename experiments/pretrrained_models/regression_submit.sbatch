@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#SBATCH --output=./result_regression.out
+#SBATCH --output=./result_regression2.out
 
 #SBATCH	-A standby
 
