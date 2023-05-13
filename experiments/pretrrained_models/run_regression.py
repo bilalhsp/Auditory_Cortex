@@ -51,9 +51,10 @@ dataset_sizes = np.arange(dataset_sizes[0], dataset_sizes[1], dataset_sizes[2])
 
 # model_name = 'wave2letter_modified'
 # model_name = 'wave2vec2'
-model_name = 'speech2text'
-# model_name = 'whisper'
+# model_name = 'speech2text'
+model_name = 'whisper'
 
+# use_cpu = True
 # csv_file_name = 'testing_for_modified_code.csv'
 csv_file_name = 'corr_results.csv'
 
@@ -78,14 +79,14 @@ print(f"It takes {elapsed_time:.2f} seconds to load features...!")
 # sents = [12,13,32,43,56,163,212,218,287,308]
 for delay in delays:
     for bin_width in bin_widths:
-
+        # sessions = ['200206']
         # Session in data_dir that we do not have results for...
         if file_exists:
             sessions_done = data[(data['delay']==delay) & (data['bin_width']==bin_width)]['session'].unique()
             subjects = sessions[np.isin(sessions,sessions_done.astype(int).astype(str), invert=True)]
         else:
             subjects = sessions
-        subjects = ['200206']
+        
         for session in subjects:
             print(f"Working with '{session}'")
             # obj = get_reg_obj(data_dir, sub)
@@ -94,7 +95,7 @@ for delay in delays:
             for N_sents in dataset_sizes:
                 corr_dict = obj.cross_validated_regression(session, bin_width=bin_width, delay=delay,
                             N=iterations, k=k_folds_validation, N_sents=N_sents,
-                            load_features=True, return_dict=True, numpy=use_cpu)
+                            return_dict=True, numpy=use_cpu)
                 df = utils.write_to_disk(corr_dict, file_path, normalizer=norm)
 
 END = time.time()

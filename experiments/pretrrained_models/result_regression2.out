@@ -1,0 +1,758 @@
+gilbreth-b003.rcac.purdue.edu
+0
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) xalt/1.1.2
+Creating regression obj for: 'whisper'
+Loading ANN features at bin-width: 20
+It takes 462.79 seconds to load features...!
+Working with '180420'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180420
+Itr: 2:
+K_fold for session: 180420
+Itr: 3:
+K_fold for session: 180420
+Itr: 4:
+K_fold for session: 180420
+Itr: 5:
+K_fold for session: 180420
+It takes (on avg.) 25.06 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.73 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '180420',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180613'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180613
+Itr: 2:
+K_fold for session: 180613
+Itr: 3:
+K_fold for session: 180613
+Itr: 4:
+K_fold for session: 180613
+Itr: 5:
+K_fold for session: 180613
+It takes (on avg.) 23.39 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.71 sec/mapping.
+It takes (on avg.) 0.40 minutes/iteration...!
+Data saved for model: 'whisper', session: '180613',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191219'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191219
+Itr: 2:
+K_fold for session: 191219
+Itr: 3:
+K_fold for session: 191219
+Itr: 4:
+K_fold for session: 191219
+Itr: 5:
+K_fold for session: 191219
+It takes (on avg.) 24.35 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.93 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '191219',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180731'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180731
+Itr: 2:
+K_fold for session: 180731
+Itr: 3:
+K_fold for session: 180731
+Itr: 4:
+K_fold for session: 180731
+Itr: 5:
+K_fold for session: 180731
+It takes (on avg.) 23.47 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.70 sec/mapping.
+It takes (on avg.) 0.40 minutes/iteration...!
+Data saved for model: 'whisper', session: '180731',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200213'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200213
+Itr: 2:
+K_fold for session: 200213
+Itr: 3:
+K_fold for session: 200213
+Itr: 4:
+K_fold for session: 200213
+Itr: 5:
+K_fold for session: 200213
+It takes (on avg.) 24.47 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.98 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '200213',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190726'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190726
+Itr: 2:
+K_fold for session: 190726
+Itr: 3:
+K_fold for session: 190726
+Itr: 4:
+K_fold for session: 190726
+Itr: 5:
+K_fold for session: 190726
+It takes (on avg.) 23.85 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.88 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '190726',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191206'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191206
+Itr: 2:
+K_fold for session: 191206
+Itr: 3:
+K_fold for session: 191206
+Itr: 4:
+K_fold for session: 191206
+Itr: 5:
+K_fold for session: 191206
+It takes (on avg.) 24.10 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.90 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180720'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180720
+Itr: 2:
+K_fold for session: 180720
+Itr: 3:
+K_fold for session: 180720
+Itr: 4:
+K_fold for session: 180720
+Itr: 5:
+K_fold for session: 180720
+It takes (on avg.) 23.58 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.72 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180720',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191125'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191125
+Itr: 2:
+K_fold for session: 191125
+Itr: 3:
+K_fold for session: 191125
+Itr: 4:
+K_fold for session: 191125
+Itr: 5:
+K_fold for session: 191125
+It takes (on avg.) 24.09 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.87 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191125',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190605'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190605
+Itr: 2:
+K_fold for session: 190605
+Itr: 3:
+K_fold for session: 190605
+Itr: 4:
+K_fold for session: 190605
+Itr: 5:
+K_fold for session: 190605
+It takes (on avg.) 24.43 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.99 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '190605',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200318'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200318
+Itr: 2:
+K_fold for session: 200318
+Itr: 3:
+K_fold for session: 200318
+Itr: 4:
+K_fold for session: 200318
+Itr: 5:
+K_fold for session: 200318
+It takes (on avg.) 24.23 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.48 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '200318',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190604'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190604
+Itr: 2:
+K_fold for session: 190604
+Itr: 3:
+K_fold for session: 190604
+Itr: 4:
+K_fold for session: 190604
+Itr: 5:
+K_fold for session: 190604
+It takes (on avg.) 24.89 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.98 sec/mapping.
+It takes (on avg.) 0.45 minutes/iteration...!
+Data saved for model: 'whisper', session: '190604',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180413'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180413
+Itr: 2:
+K_fold for session: 180413
+Itr: 3:
+K_fold for session: 180413
+Itr: 4:
+K_fold for session: 180413
+Itr: 5:
+K_fold for session: 180413
+It takes (on avg.) 23.92 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.72 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180413',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200226'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200226
+Itr: 2:
+K_fold for session: 200226
+Itr: 3:
+K_fold for session: 200226
+Itr: 4:
+K_fold for session: 200226
+Itr: 5:
+K_fold for session: 200226
+It takes (on avg.) 24.40 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.98 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '200226',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190606'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190606
+Itr: 2:
+K_fold for session: 190606
+Itr: 3:
+K_fold for session: 190606
+Itr: 4:
+K_fold for session: 190606
+Itr: 5:
+K_fold for session: 190606
+It takes (on avg.) 25.23 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.99 sec/mapping.
+It takes (on avg.) 0.45 minutes/iteration...!
+Data saved for model: 'whisper', session: '190606',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180814'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180814
+Itr: 2:
+K_fold for session: 180814
+Itr: 3:
+K_fold for session: 180814
+Itr: 4:
+K_fold for session: 180814
+Itr: 5:
+K_fold for session: 180814
+It takes (on avg.) 24.63 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.24 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '180814',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200207'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200207
+Itr: 2:
+K_fold for session: 200207
+Itr: 3:
+K_fold for session: 200207
+Itr: 4:
+K_fold for session: 200207
+Itr: 5:
+K_fold for session: 200207
+It takes (on avg.) 24.40 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.94 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '200207',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180501'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180501
+Itr: 2:
+K_fold for session: 180501
+Itr: 3:
+K_fold for session: 180501
+Itr: 4:
+K_fold for session: 180501
+Itr: 5:
+K_fold for session: 180501
+It takes (on avg.) 23.98 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.71 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180501',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180724'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180724
+Itr: 2:
+K_fold for session: 180724
+Itr: 3:
+K_fold for session: 180724
+Itr: 4:
+K_fold for session: 180724
+Itr: 5:
+K_fold for session: 180724
+It takes (on avg.) 24.12 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.72 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180724',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180622'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180622
+Itr: 2:
+K_fold for session: 180622
+Itr: 3:
+K_fold for session: 180622
+Itr: 4:
+K_fold for session: 180622
+Itr: 5:
+K_fold for session: 180622
+It takes (on avg.) 23.81 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.70 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180622',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191210'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191210
+Itr: 2:
+K_fold for session: 191210
+Itr: 3:
+K_fold for session: 191210
+Itr: 4:
+K_fold for session: 191210
+Itr: 5:
+K_fold for session: 191210
+It takes (on avg.) 24.16 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.89 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191210',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191211'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191211
+Itr: 2:
+K_fold for session: 191211
+Itr: 3:
+K_fold for session: 191211
+Itr: 4:
+K_fold for session: 191211
+Itr: 5:
+K_fold for session: 191211
+It takes (on avg.) 24.04 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.90 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191211',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191115'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191115
+Itr: 2:
+K_fold for session: 191115
+Itr: 3:
+K_fold for session: 191115
+Itr: 4:
+K_fold for session: 191115
+Itr: 5:
+K_fold for session: 191115
+It takes (on avg.) 24.05 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.82 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191115',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191113'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191113
+Itr: 2:
+K_fold for session: 191113
+Itr: 3:
+K_fold for session: 191113
+Itr: 4:
+K_fold for session: 191113
+Itr: 5:
+K_fold for session: 191113
+It takes (on avg.) 23.82 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.87 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191113',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190703'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190703
+Itr: 2:
+K_fold for session: 190703
+Itr: 3:
+K_fold for session: 190703
+Itr: 4:
+K_fold for session: 190703
+Itr: 5:
+K_fold for session: 190703
+It takes (on avg.) 24.35 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.98 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '190703',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180502'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180502
+Itr: 2:
+K_fold for session: 180502
+Itr: 3:
+K_fold for session: 180502
+Itr: 4:
+K_fold for session: 180502
+Itr: 5:
+K_fold for session: 180502
+It takes (on avg.) 23.77 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.70 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180502',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191209'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191209
+Itr: 2:
+K_fold for session: 191209
+Itr: 3:
+K_fold for session: 191209
+Itr: 4:
+K_fold for session: 191209
+Itr: 5:
+K_fold for session: 191209
+It takes (on avg.) 24.23 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.85 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191209',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180719'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180719
+Itr: 2:
+K_fold for session: 180719
+Itr: 3:
+K_fold for session: 180719
+Itr: 4:
+K_fold for session: 180719
+Itr: 5:
+K_fold for session: 180719
+It takes (on avg.) 23.81 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.72 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180719',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180725'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180725
+Itr: 2:
+K_fold for session: 180725
+Itr: 3:
+K_fold for session: 180725
+Itr: 4:
+K_fold for session: 180725
+Itr: 5:
+K_fold for session: 180725
+It takes (on avg.) 23.67 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.71 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180725',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200212'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200212
+Itr: 2:
+K_fold for session: 200212
+Itr: 3:
+K_fold for session: 200212
+Itr: 4:
+K_fold for session: 200212
+Itr: 5:
+K_fold for session: 200212
+It takes (on avg.) 24.13 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.97 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '200212',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180730'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180730
+Itr: 2:
+K_fold for session: 180730
+Itr: 3:
+K_fold for session: 180730
+Itr: 4:
+K_fold for session: 180730
+Itr: 5:
+K_fold for session: 180730
+It takes (on avg.) 23.77 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.71 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180730',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191212'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191212
+Itr: 2:
+K_fold for session: 191212
+Itr: 3:
+K_fold for session: 191212
+Itr: 4:
+K_fold for session: 191212
+Itr: 5:
+K_fold for session: 191212
+It takes (on avg.) 24.26 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.80 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '191212',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180728'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180728
+Itr: 2:
+K_fold for session: 180728
+Itr: 3:
+K_fold for session: 180728
+Itr: 4:
+K_fold for session: 180728
+Itr: 5:
+K_fold for session: 180728
+It takes (on avg.) 23.77 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.71 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180728',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180717'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180717
+Itr: 2:
+K_fold for session: 180717
+Itr: 3:
+K_fold for session: 180717
+Itr: 4:
+K_fold for session: 180717
+Itr: 5:
+K_fold for session: 180717
+It takes (on avg.) 23.67 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.72 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180717',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180627'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180627
+Itr: 2:
+K_fold for session: 180627
+Itr: 3:
+K_fold for session: 180627
+Itr: 4:
+K_fold for session: 180627
+Itr: 5:
+K_fold for session: 180627
+It takes (on avg.) 23.76 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.71 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180627',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180807'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180807
+Itr: 2:
+K_fold for session: 180807
+Itr: 3:
+K_fold for session: 180807
+Itr: 4:
+K_fold for session: 180807
+Itr: 5:
+K_fold for session: 180807
+It takes (on avg.) 23.33 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.72 sec/mapping.
+It takes (on avg.) 0.40 minutes/iteration...!
+Data saved for model: 'whisper', session: '180807',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200205'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200205
+Itr: 2:
+K_fold for session: 200205
+Itr: 3:
+K_fold for session: 200205
+Itr: 4:
+K_fold for session: 200205
+Itr: 5:
+K_fold for session: 200205
+It takes (on avg.) 24.10 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.87 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '200205',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200219'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200219
+Itr: 2:
+K_fold for session: 200219
+Itr: 3:
+K_fold for session: 200219
+Itr: 4:
+K_fold for session: 200219
+Itr: 5:
+K_fold for session: 200219
+It takes (on avg.) 24.12 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.95 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '200219',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180808'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180808
+Itr: 2:
+K_fold for session: 180808
+Itr: 3:
+K_fold for session: 180808
+Itr: 4:
+K_fold for session: 180808
+Itr: 5:
+K_fold for session: 180808
+It takes (on avg.) 23.76 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.70 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180808',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '180810'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 180810
+Itr: 2:
+K_fold for session: 180810
+Itr: 3:
+K_fold for session: 180810
+Itr: 4:
+K_fold for session: 180810
+Itr: 5:
+K_fold for session: 180810
+It takes (on avg.) 23.76 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 0.70 sec/mapping.
+It takes (on avg.) 0.41 minutes/iteration...!
+Data saved for model: 'whisper', session: '180810',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '200313'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 200313
+Itr: 2:
+K_fold for session: 200313
+Itr: 3:
+K_fold for session: 200313
+Itr: 4:
+K_fold for session: 200313
+Itr: 5:
+K_fold for session: 200313
+It takes (on avg.) 24.10 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.95 sec/mapping.
+It takes (on avg.) 0.43 minutes/iteration...!
+Data saved for model: 'whisper', session: '200313',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190801'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190801
+Itr: 2:
+K_fold for session: 190801
+Itr: 3:
+K_fold for session: 190801
+Itr: 4:
+K_fold for session: 190801
+Itr: 5:
+K_fold for session: 190801
+It takes (on avg.) 24.22 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.98 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '190801',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '190607'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 190607
+Itr: 2:
+K_fold for session: 190607
+Itr: 3:
+K_fold for session: 190607
+Itr: 4:
+K_fold for session: 190607
+Itr: 5:
+K_fold for session: 190607
+It takes (on avg.) 24.61 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.98 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '190607',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Working with '191121'
+# of iterations requested: 5, 
+# of lambda samples per iteration: 20
+Itr: 1:
+K_fold for session: 191121
+Itr: 2:
+K_fold for session: 191121
+Itr: 3:
+K_fold for session: 191121
+Itr: 4:
+K_fold for session: 191121
+Itr: 5:
+K_fold for session: 191121
+It takes (on avg.) 24.31 sec (all lmbdas). (time for 5-folds)
+It takes (on avg.) 1.94 sec/mapping.
+It takes (on avg.) 0.44 minutes/iteration...!
+Data saved for model: 'whisper', session: '191121',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/whisper_corr_results.csv'
+Took 120.02 min., for bin_widths: '[20]' and delays: '[0]'.

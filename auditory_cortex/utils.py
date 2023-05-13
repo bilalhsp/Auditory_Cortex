@@ -304,10 +304,8 @@ def reg(X,y, lmbda=0):
         X = module.expand_dims(X,axis=0)
     d = X.shape[2]
     m = X.shape[1]
-    I = module.eye(d)
-    X_T = X.transpose((0,2,1))
-    a = module.matmul(X_T, X) + m*lmbda*I
-    b = module.matmul(X_T, y)
+    a = module.matmul(X.transpose((0,2,1)), X) + m*lmbda*module.eye(d)
+    b = module.matmul(X.transpose((0,2,1)), y)
     B = module.linalg.solve(a,b)
     return B.squeeze()
 

@@ -81,13 +81,11 @@ class FeatureExtractor():
 
     def translate(self, aud, grad=False):
         if grad:
-            input = self.extractor.fwd_pass(aud)
+            input = self.extractor.fwd_pass_tensor(aud)
         else:
             with torch.no_grad():
                 input = self.extractor.fwd_pass(aud)
         return input
-
-
 
 
 class FeatureExtractorW2L():
@@ -112,36 +110,51 @@ class FeatureExtractorW2L():
         self.model.eval()
         out = self.model(input)
         return input
+    
+    def fwd_pass_tensor(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (tensor): input tensor 'wav' input of shape (1, t) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        out = self.model(aud)
+        return input
 
 class FeatureExtractorW2V2():
-	def __init__(self):
-		self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
-		self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
-		# self.model = model 
-		########################## NEED TO MAKE THIS CONSISTENT>>>##################
-	def fwd_pass(self, aud):
-		"""
-		Forward passes audio input through the model and captures 
-		the features in the 'self.features' dict.
+    def __init__(self):
+        self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+        self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+        # self.model = model 
+        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
+    def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
 
-		Args:
-			aud (ndarray): single 'wav' input of shape (t,) 
-		
-		Returns:
-			input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
-		"""
-		input = aud.astype(np.float64)
-		input_values = self.processor(input, sampling_rate=16000, return_tensors="pt", padding="longest").input_values  # Batch size 1
-		self.model.eval()
-		with torch.no_grad():
-			logits = self.model(input_values).logits
-		
-		# input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
-		# input = input.unsqueeze(dim=0)
-		# input.requires_grad=True
-		# self.model.eval()
-		# out = self.model(input)
-		return input
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        input = aud.astype(np.float64)
+        input_values = self.processor(input, sampling_rate=16000, return_tensors="pt", padding="longest").input_values  # Batch size 1
+        self.model.eval()
+        # with torch.no_grad():
+        logits = self.model(input_values).logits
+
+        # input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+        # input = input.unsqueeze(dim=0)
+        # input.requires_grad=True
+        # self.model.eval()
+        # out = self.model(input)
+        return input
 
 class FeatureExtractorS2T():
     def __init__(self):
@@ -150,24 +163,24 @@ class FeatureExtractorS2T():
                 
     def fwd_pass(self, aud):
         input_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
-        with torch.no_grad():
-            self.model.eval()
-            generated_ids = self.model.generate(input_features, max_new_tokens=200)
+        # with torch.no_grad():
+        self.model.eval()
+        generated_ids = self.model.generate(input_features, max_new_tokens=200)
         return generated_ids
     
     
 class FeatureExtractorWhisper():
-	def __init__(self):
-		self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
-		self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
+    def __init__(self):
+        self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
+        self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
 				
-	def fwd_pass(self, aud):
-		input_features = self.processor(aud, sampling_rate=16000, return_tensors="pt").input_features
-		with torch.no_grad():
-			self.model.eval()
-			generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
-			# transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-		return generated_ids
+    def fwd_pass(self, aud):
+        input_features = self.processor(aud, sampling_rate=16000, return_tensors="pt").input_features
+        # with torch.no_grad():
+        self.model.eval()
+        generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
+            # transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        return generated_ids
     
 
 
