@@ -1,4 +1,5 @@
 neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+use_pca: False
 
 layers:
 - layer_name: model.encoder.conv1

@@ -1,5 +1,9 @@
 # standard libraries
 import os
+from pycolormap_2d import ColorMap2DBremm, ColorMap2DZiegler
+
+# select 2d color map to be used
+CMAP_2D = ColorMap2DZiegler
 
 config_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
 

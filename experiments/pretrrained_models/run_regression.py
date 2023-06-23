@@ -28,12 +28,16 @@ bad_sessions = config['bad_sessions']
 results_dir = config['results_dir']
 delays = config['delays']
 bin_widths = config['bin_widths']
-pretrained = config['pretrained']
+# pretrained = config['pretrained']
 k_folds_validation = config['k_folds_validation']
 iterations = config['iterations']
 use_cpu = config['use_cpu']
 dataset_sizes = config['dataset_sizes']
 dataset_sizes = np.arange(dataset_sizes[0], dataset_sizes[1], dataset_sizes[2])
+
+model_name = config['model_name']
+identifier = config['identifier']
+delay_features = config['delay_features']
 
 # # Create w2l model..
 # if pretrained:
@@ -50,13 +54,25 @@ dataset_sizes = np.arange(dataset_sizes[0], dataset_sizes[1], dataset_sizes[2])
 # csv_file_name = config['pretrained_correlations_file']
 
 # model_name = 'wave2letter_modified'
+# identifier = 'delay_zeropad'
+# identifier = 'E6'
+
+
 # model_name = 'wave2vec2'
 # model_name = 'speech2text'
-model_name = 'whisper'
+# model_name = 'speech2text_layer1'
+# model_name = 'whisper'
+
+# model_name = 'deepspeech2'
+# # identifier = 'rnn_1st_half'
+# identifier = 'rnn_2nd_half'
+
 
 # use_cpu = True
 # csv_file_name = 'testing_for_modified_code.csv'
 csv_file_name = 'corr_results.csv'
+if identifier != '':
+    csv_file_name = identifier + '_' + csv_file_name
 
 csv_file_name = model_name + '_' + csv_file_name
 # CSV file to save the results at
@@ -72,14 +88,16 @@ sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_
 for s in bad_sessions:
     sessions = np.delete(sessions, np.where(sessions == s))
 
-obj = Reg.transformer_regression(model_name=model_name)
+# sessions = sessions[30:42]
+
+obj = Reg.transformer_regression(model_name=model_name, delay_features=delay_features)
 current_time = time.time()
 elapsed_time = current_time - START
 print(f"It takes {elapsed_time:.2f} seconds to load features...!")
 # sents = [12,13,32,43,56,163,212,218,287,308]
 for delay in delays:
     for bin_width in bin_widths:
-        # sessions = ['200206']
+        # sessions = np.array(['200206'])
         # Session in data_dir that we do not have results for...
         if file_exists:
             sessions_done = data[(data['delay']==delay) & (data['bin_width']==bin_width)]['session'].unique()

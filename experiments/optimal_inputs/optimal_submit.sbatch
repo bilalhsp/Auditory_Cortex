@@ -19,5 +19,6 @@ module load conda-env/wav2letter-py3.8.5
 #module load conda-env/wav2letter_pretrained-py3.8.5
 
 # python run_regression.py
-python run_optimal_inputs.py
+# python run_optimal_inputs.py
+python save_optimal_inputs.py
 # echo "Done"

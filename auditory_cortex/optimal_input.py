@@ -231,7 +231,7 @@ def normalize(x):
 
     return x
 
-def plot_spect(waveform, ax, cmap='turbo'):
+def plot_spect(waveform, ax, cmap='viridis'):
     waveform = waveform * (2 ** 15)
     kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
     kaldi = normalize(kaldi)

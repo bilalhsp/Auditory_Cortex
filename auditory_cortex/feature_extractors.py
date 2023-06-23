@@ -9,6 +9,10 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
+from deepspeech_pytorch.model import DeepSpeech
+import deepspeech_pytorch.loader.data_loader as data_loader
+from deepspeech_pytorch.configs.train_config import SpectConfig
+
 # local
 from auditory_cortex import config_dir
 from wav2letter.models import Wav2LetterRF
@@ -18,8 +22,12 @@ class FeatureExtractor():
     def __init__(self, model_name = 'wave2letter_modified'):
         # super(FeatureExtractor, self).__init__()
         self.layers = []
-        self.bin_widths = []
-        self.offsets = []
+        self.layer_ids = []
+        self.layer_types = []
+        self.receptive_fields = []
+        self.features_delay = []        # features delay needed to compensate for the RFs
+        # self.bin_widths = []
+        # self.offsets = []
         self.features = {}
         # self.model = model
             
@@ -28,6 +36,9 @@ class FeatureExtractor():
         with open(config_file, 'r') as f:
             self.config = yaml.load(f, yaml.FullLoader)
         self.num_layers = len(self.config['layers'])
+        self.use_pca = self.config['use_pca']
+        if self.use_pca:
+            self.pca_comps = self.config['pca_comps']
         
         # create feature extractor as per model_name
         if model_name == 'wave2letter_modified':
@@ -38,13 +49,19 @@ class FeatureExtractor():
             self.extractor = FeatureExtractorS2T()
         elif model_name == 'whisper':
             self.extractor = FeatureExtractorWhisper()
+        elif model_name == 'deepspeech2':
+            self.extractor = FeatureExtractorDeepSpeech2(self.config['saved_checkpoint'])
         else:
             raise NotImplementedError(f"FeatureExtractor class does not support '{model_name}'")
 
         for i in range(self.num_layers):
             self.layers.append(self.config['layers'][i]['layer_name'])
-            self.bin_widths.append(self.config['layers'][i]['bin_width'])
-            self.offsets.append(self.config['layers'][i]['offset'])
+            self.layer_ids.append(self.config['layers'][i]['layer_id'])
+            self.layer_types.append(self.config['layers'][i]['layer_type'])
+            self.receptive_fields.append(self.config['layers'][i]['RF'])
+
+            # self.bin_widths.append(self.config['layers'][i]['bin_width'])
+            # self.offsets.append(self.config['layers'][i]['offset'])
 
         # Register fwd hooks for the given layers
         for layer_name in self.layers:
@@ -54,9 +71,15 @@ class FeatureExtractor():
             
     def create_hooks(self):
         def fn(layer, _, output):
-            output = output.squeeze()
-            if 'conv' in layer.__name__:
-                output = output.transpose(0,1)
+            if 'rnn' in layer.__name__:
+            #    output = output[0]
+                output = output[1][0][1].squeeze()  # reading the 2nd half of data (only backward RNNs)
+            else:
+                output = output.squeeze()
+                if 'conv' in layer.__name__:
+                    if output.ndim > 2:
+                        output = output.reshape(output.shape[0]*output.shape[1], -1)
+                    output = output.transpose(0,1)
             self.features[layer.__name__] = output
         return fn
 
@@ -72,7 +95,12 @@ class FeatureExtractor():
         returns:
             (dim, time) features extracted for layer at 'layer_index' location 
         '''
-        return self.features[self.layers[layer_index]]
+        layer = self.layers[layer_index]
+        if 'rnn' in layer:
+           return self.features[layer]
+        #    return self.features[layer].data[:,1024:] # only using fwd features (first half of concatenatation)
+        else:
+            return self.features[layer]
 
     def def_bin_width(self, layer):
         def_w = self.bin_widths[layer]
@@ -91,6 +119,7 @@ class FeatureExtractor():
 class FeatureExtractorW2L():
     def __init__(self, checkpoint):		
         self.model = Wav2LetterRF.load_from_checkpoint(checkpoint)
+        print(f"Loading from checkpoint: {checkpoint}")
     
 
     def fwd_pass(self, aud):
@@ -181,6 +210,37 @@ class FeatureExtractorWhisper():
         generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
             # transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return generated_ids
+    
+class FeatureExtractorDeepSpeech2():
+    def __init__(self, checkpoint):
+
+        audio_config = SpectConfig()
+        self.parser = data_loader.AudioParser(audio_config, normalize=True)
+        self.model = DeepSpeech.load_from_checkpoint(checkpoint_path=checkpoint)
+        # self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
+        # self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
+				
+    def fwd_pass(self, aud):
+        spect = self.parser.compute_spectrogram(aud)
+        spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
+
+        # length of the spect along time
+        lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64)
+        out = self.model(spect, lengths)
+        return out
+
+
+
+
+
+
+        # pass
+        # input_features = self.processor(aud, sampling_rate=16000, return_tensors="pt").input_features
+        # # with torch.no_grad():
+        # self.model.eval()
+        # generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
+        #     # transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        # return generated_ids
     
 
 
