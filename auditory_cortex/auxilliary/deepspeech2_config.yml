@@ -1,0 +1,30 @@
+neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+saved_checkpoint: /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
+
+use_pca: False
+
+layers:
+
+
+
+# - layer_name: conv.seq_module.2
+#   layer_id: 0
+#   layer_type: conv
+# - layer_name: conv.seq_module.5
+#   layer_id: 1
+#   layer_type: conv
+- layer_name: rnns.0.rnn
+  layer_id: 2
+  layer_type: rnn
+- layer_name: rnns.1.rnn
+  layer_id: 3
+  layer_type: rnn
+- layer_name: rnns.2.rnn
+  layer_id: 4
+  layer_type: rnn
+- layer_name: rnns.3.rnn
+  layer_id: 5
+  layer_type: rnn
+- layer_name: rnns.4.rnn
+  layer_id: 6
+  layer_type: rnn

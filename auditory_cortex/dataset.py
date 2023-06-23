@@ -14,6 +14,7 @@ class Neural_Data:
   'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
   """
   def __init__(self, dir, sub,  mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
+    print(f"Loading Neural data for session: {sub} ... ", end='')
     self.sub = sub
     self.dir = dir
     self.sentences = io.loadmat(os.path.join(self.dir, mat_file), struct_as_record = False, squeeze_me = True, )
@@ -26,6 +27,8 @@ class Neural_Data:
     self.spikes, self.trials = self.load_data(verbose=verbose)
     self.num_channels = len(self.spikes.keys())
     self.sents = np.arange(1,500)
+
+    print("Done.")
     # print(f"Data from {self.num_channels} channels loaded...!")
 
   def load_data(self, verbose):
@@ -79,6 +82,7 @@ class Neural_Data:
     return sound
 
   def duration(self, sent=1):
+    # subtracting 1 because sent_id =1 is stored at index 0 in sentdet and so on...
     sent -= 1
     bef, aft = 0.5, 0.5
     #bef = self.sentdet[sent].befaft[0]
@@ -253,7 +257,7 @@ class Neural_Data:
         raw_spikes[i] = np.stack([spikes[ch] for ch in range(self.num_channels)], axis=1)
     self.raw_spikes =  raw_spikes
 
-  def unroll_spikes(self, sents=None):
+  def unroll_spikes(self, sents=None, features_delay_trim=None):
     """
     Unroll and concatenate time axis of extracted spikes.
 
@@ -265,7 +269,12 @@ class Neural_Data:
     """
     if sents is None:
       sents = self.raw_spikes.keys()
-    spikes = np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
+
+    if features_delay_trim is None:
+       trim = 0
+    else:
+       trim = features_delay_trim
+    spikes = np.concatenate([self.raw_spikes[sent][trim:] for sent in sents], axis=0)
     return spikes
 
   def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None):
