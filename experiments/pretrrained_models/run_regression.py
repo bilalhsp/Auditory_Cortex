@@ -38,7 +38,9 @@ dataset_sizes = np.arange(dataset_sizes[0], dataset_sizes[1], dataset_sizes[2])
 model_name = config['model_name']
 identifier = config['identifier']
 delay_features = config['delay_features']
+audio_zeropad = config['audio_zeropad']
 
+delays_grid_search = config['delays_grid_search']
 # # Create w2l model..
 # if pretrained:
 # # Create model with pretrained weights....!
@@ -90,7 +92,9 @@ for s in bad_sessions:
 
 # sessions = sessions[30:42]
 
-obj = Reg.transformer_regression(model_name=model_name, delay_features=delay_features)
+obj = Reg.transformer_regression(
+            model_name=model_name, delay_features=delay_features, audio_zeropad=audio_zeropad
+        )
 current_time = time.time()
 elapsed_time = current_time - START
 print(f"It takes {elapsed_time:.2f} seconds to load features...!")
@@ -100,7 +104,11 @@ for delay in delays:
         # sessions = np.array(['200206'])
         # Session in data_dir that we do not have results for...
         if file_exists:
-            sessions_done = data[(data['delay']==delay) & (data['bin_width']==bin_width)]['session'].unique()
+            sessions_done = data[
+                    (data['delay']==delay) & \
+                    (data['bin_width']==bin_width) 
+                ]['session'].unique()
+
             subjects = sessions[np.isin(sessions,sessions_done.astype(int).astype(str), invert=True)]
         else:
             subjects = sessions
@@ -111,9 +119,19 @@ for delay in delays:
 
             norm = obj.get_normalizer(session, bin_width=bin_width, delay=delay)
             for N_sents in dataset_sizes:
-                corr_dict = obj.cross_validated_regression(session, bin_width=bin_width, delay=delay,
-                            N=iterations, k=k_folds_validation, N_sents=N_sents,
-                            return_dict=True, numpy=use_cpu)
+                if delays_grid_search:
+                    delays_grid = [5, 10, 15, 20, 25, 30]
+                    corr_dict = obj.grid_search_CV(
+                            session, bin_width=bin_width, iterations=iterations,
+                            num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
+                            numpy=use_cpu, delays=delays_grid
+                        )
+                else:
+                    corr_dict = obj.cross_validated_regression(
+                            session, bin_width=bin_width, delay=delay, iterations=iterations,
+                            num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
+                            numpy=use_cpu
+                        )
                 df = utils.write_to_disk(corr_dict, file_path, normalizer=norm)
 
 END = time.time()

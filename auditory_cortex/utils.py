@@ -204,8 +204,13 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     if os.path.isfile(file_path):
         data = pd.read_csv(file_path)
     else:
-        data = pd.DataFrame(columns=['session','layer','channel','bin_width',
-                                    'delay','train_cc_raw','test_cc_raw', 'normalizer', 'N_sents'])
+        data = pd.DataFrame(
+                columns=[
+                    'session','layer','channel','bin_width', 'delay',
+                    'train_cc_raw','test_cc_raw', 'normalizer', 'N_sents',
+                    'opt_delays'
+                    ]
+                )
     session = corr_dict['session']
     model_name = corr_dict['model']
     win = corr_dict['win']
@@ -214,8 +219,11 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     layers = np.arange(corr_dict['test_cc_raw'].shape[0])
     N_sents = corr_dict['N_sents']
     layer_ids = corr_dict['layer_ids']
+    opt_delays = corr_dict['opt_delays']
     if normalizer is None:
         normalizer = np.zeros_like(ch)
+    if opt_delays is None:
+        opt_delays = np.zeros((len(layers), len(ch)))
     for layer in layers:
         df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
                                     np.ones_like(ch)*layer_ids[int(layer)],
@@ -225,7 +233,8 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
                                     corr_dict['train_cc_raw'][layer,:],
                                     corr_dict['test_cc_raw'][layer,:],
                                     normalizer,
-                                    np.ones_like(ch)*N_sents
+                                    np.ones_like(ch)*N_sents,
+                                    opt_delays[layer,:]
                                     ]).transpose(),
                         columns=data.columns
                         )

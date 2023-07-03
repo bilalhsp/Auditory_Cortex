@@ -9,12 +9,17 @@ use_cpu: False
 # untrained_correlations_file: 'correlations_w2l_untrained.csv'
 
 # Ensure these settings before submitting every job..
+# model_name: wave2vec2
+# identifier: opt_delay
+# model_name: speech2text #
+# model_name: deepspeech2 
+# identifier: opt_delay_l2
 model_name: wave2letter_modified
-identifier: test3
-delay_features: False
+identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
+delay_features: True
+audio_zeropad: True
+delays_grid_search: True
 #### Ensure these settings before submitting every job..
-
-
 
 bad_sessions:
 - '200312'
