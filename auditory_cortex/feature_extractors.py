@@ -72,8 +72,8 @@ class FeatureExtractor():
     def create_hooks(self):
         def fn(layer, _, output):
             if 'rnn' in layer.__name__:
-            #    output = output[0]
-                output = output[1][0][1].squeeze()  # reading the 2nd half of data (only backward RNNs)
+               output = output[0].data
+                # output = output[1][0][1].squeeze()  # reading the 2nd half of data (only backward RNNs)
             else:
                 output = output.squeeze()
                 if 'conv' in layer.__name__:
@@ -221,6 +221,7 @@ class FeatureExtractorDeepSpeech2():
         # self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
 				
     def fwd_pass(self, aud):
+        
         spect = self.parser.compute_spectrogram(aud)
         spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
 
