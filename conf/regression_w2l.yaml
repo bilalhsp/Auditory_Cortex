@@ -10,14 +10,20 @@ use_cpu: False
 
 # Ensure these settings before submitting every job..
 # model_name: wave2vec2
-# identifier: opt_delay
+# identifier: all_opt_delays_feature_extractor
+# identifier: basic_features_extractor #basic 
+# identifier: RF_delay_features_extractor #RF_delay
 # model_name: speech2text #
+# identifier: all_opt_delays_l0
 # model_name: deepspeech2 
-# identifier: opt_delay_l2
+# identifier: all_opt_delays
+# identifier: all_opt_delays_l0
+# identifier: opt_delay_l0
 model_name: wave2letter_modified
-identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
-delay_features: True
-audio_zeropad: True
+identifier: neural_delay_only
+# identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
+delay_features: False
+audio_zeropad: False
 delays_grid_search: True
 #### Ensure these settings before submitting every job..
 

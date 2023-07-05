@@ -117,17 +117,17 @@ class Neural_Data:
   def retrieve_spike_counts_for_all_trials(self, sent, win=50, delay=0):
     
     trials = self.get_trials(sent)
-    spk = self.retrieve_spike_counts(trial=trials[0], win = win, delay=0, early_spikes = False)
+    spk = self.retrieve_spike_counts(trial=trials[0], win = win, delay=delay)
     spikes = {i:np.zeros((len(trials), spk[0].shape[0])) for i in range(self.num_channels)}
     for i in range(self.num_channels):
         spikes[i][0] = spk[i]
     for x, tr in enumerate(trials[1:]):
-        spikes_tr = self.retrieve_spike_counts(trial=tr, win = win, delay=0, early_spikes = True)
+        spikes_tr = self.retrieve_spike_counts(trial=tr, win = win, delay=delay)
         for i in range(self.num_channels):
             spikes[i][x+1] = spikes_tr[i]
     return spikes
 
-  def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative', early_spikes = True):
+  def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative'):
     """Returns times of spikes, relative to stimulus onset or absolute time
     'sent' (int) index of stimulus sentencce 
     'trial' (int) specific trial # for the above sentence, some sentences may have 
@@ -136,8 +136,6 @@ class Neural_Data:
     'timing_type' (string:) 'relative' (default) returns spike times relative to StimOnset time, 
                     'absolute' returns spike times in seconds.
     
-    'early_spikes' (bool: True) Neural data has some cases of spikes just before the 
-    stimulus onset time, this allows user to select or reject such spikes.
     """
     s_times = {}
     if trial ==0:
@@ -165,13 +163,18 @@ class Neural_Data:
     
     return s_times
 
-  def create_bins(self, s_times, sent=212, trial=0, win=50, delay = 0, early_spikes = True, offset = 0, ceil=True):
+  def create_bins(self, s_times, sent=212, trial=0, win=50, delay = 0):
     """Returns bins containing number of spikes in the 'win' durations
-      following the stimulus onset.
-      'win' (int) miliseconds specifing the width of time slots for binds
-      'early_spikes' (bool: default = True) to include or discard early spikes 
-      that start a little before stimulus onset time.
-      use offset = -0.25 for 1st conv layer and 0.39 for the rest layers 
+    following the stimulus onset.
+      
+    Args:
+        sent (int): ID of the audio stimulus (sentence)
+        trial (int): trial ID to create bins for. Can be used to get binned spikes
+            directly using the trial number, instead of sent ID.
+        win (int): miliseconds specifing the width of time slots for bins.
+        delay (ms): Delaying the features versus spikes. (we can also think of this
+            as advancing the spikes, that would mean delaying the spikes w.r.t. to spikes.)
+
     """
     if trial != 0:
         trial -= 1
@@ -179,29 +182,18 @@ class Neural_Data:
     win = win/1000
     delay = delay/1000
     bins = {}             #miliseconds
-    if ceil:
-      # round the 3rd decimal digit, before ceiling...!
-      n = int(np.ceil(round(self.duration(sent)/win + offset, 3)))
-    else:  
-      n = int(np.floor(self.duration(sent)/win + offset))  
+	# round the 3rd decimal digit, before ceiling...!
+    n = int(np.ceil(round(self.duration(sent)/win, 3)))
     for i in range(self.num_channels):
       tmp = np.zeros(n, dtype=np.int32) 
-      #tmp = np.zeros()  
-      #if s_times[i][-1] > 0:
       j = 0
       st = delay
       en = st+win                  #End time for ongoing search window
-      # print(s_times.keys())
       for val in s_times[i]:
         if val < (tmp.size * win + delay):
           if (val<= en and val>st):
             tmp[j] += 1
             
-#             if early_spikes:
-#               tmp[j] += 1
-#             else:      
-#               if val >= 0:
-#                 tmp[j] += 1
           elif val>en:    
             while(val > en):
               j += 1
@@ -214,7 +206,7 @@ class Neural_Data:
     
     return bins
 
-  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0, early_spikes = True, offset=0.0):
+  def retrieve_spike_counts(self, sent=212, trial = 0, win = 50, delay=0):
     """Returns number of spikes in every 'win' miliseconds duration following the 
     stimulus onset time.
     'sent' (int) index of stimulus sentencce 
@@ -222,19 +214,17 @@ class Neural_Data:
     neural spikes for more than 1 trials of the given sentence. By default result of 
     foremost trial will be returned.
     'win' (int: 50) miliseconds specifying the time duration of each bin
-    'early_spikes' (bool: True) Neural data has some cases of spikes just before the 
-    stimulus onset time, this allows user to select or reject such spikes.
     """
     #get 'relative' spike times for the given sentence and trial
-    s_times = self.retrieve_spike_times(sent=sent, trial=trial, early_spikes = early_spikes)
+    s_times = self.retrieve_spike_times(sent=sent, trial=trial)
     #return spikes count in each bin
-    output = self.create_bins(s_times, sent=sent, trial=trial, win = win,delay=delay, early_spikes = early_spikes,
-                              offset=offset)
+    output = self.create_bins(s_times, sent=sent, trial=trial, win = win,delay=delay)
     
     return output
 
   def spike_counts(self, sent=212, trial=0, win=50, delay=0):
-    ## Spike count using np.histogram function, this is in addition to my own binning implementation in Retrieve_spikes_count()
+    ## Spike count using np.histogram function, this is in addition to
+    #  my own binning implementation in Retrieve_spikes_count()
     # and they both give the same output
     s_times = self.retrieve_spike_times(sent=sent, trial=trial)
     win = win/1000
@@ -246,14 +236,13 @@ class Neural_Data:
         counts[i], _ = np.histogram(s_times[i], bins)
     return counts
 
-  def extract_spikes(self, bin_width=20, delay=0, offset=0, sents = None):
+  def extract_spikes(self, bin_width=20, delay=0, sents = None):
     """Return neural spikes for given sents"""
     if sents is None:
         sents = self.sents
     raw_spikes = {}
     for x,i in enumerate(sents):
-        spikes = self.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
-                                                    early_spikes=False,offset=offset)
+        spikes = self.retrieve_spike_counts(sent=i,win=bin_width,delay=delay)
         raw_spikes[i] = np.stack([spikes[ch] for ch in range(self.num_channels)], axis=1)
     self.raw_spikes =  raw_spikes
 
@@ -277,11 +266,11 @@ class Neural_Data:
     spikes = np.concatenate([self.raw_spikes[sent][trim:] for sent in sents], axis=0)
     return spikes
 
-  def load_spikes(self, bin_width=20, delay=0, offset=0, sents=None):
+  def load_spikes(self, bin_width=20, delay=0, sents=None):
     if sents is None:
         sents = self.sents
     self.extract_spikes(
-       bin_width=bin_width, delay=delay, offset=offset, sents=sents
+       bin_width=bin_width, delay=delay, sents=sents
     )
     return self.unroll_spikes()
 
@@ -299,12 +288,12 @@ class Neural_Data:
       all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
       return all_repeated_trials
 
-  def get_normalizer(self, sents=None, bin_width=20, delay=0):
+  def get_normalizer(self, sents=None, bin_width=20, delay=0, n=1000):
       """Compute dist. of normalizer and return median."""
       if sents is None:
           sents = [12,13,32,43,56,163,212,218,287,308]
       all_repeated_trials = self.get_repeated_trials(sents=sents, bin_width=bin_width, delay=delay)
-      normalizer_all = utils.inter_trial_corr(all_repeated_trials)
+      normalizer_all = utils.inter_trial_corr(all_repeated_trials, n=n)
       normalizer_all_med = np.median(normalizer_all, axis=0)
       return normalizer_all_med
 

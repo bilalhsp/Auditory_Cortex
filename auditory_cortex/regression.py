@@ -244,12 +244,12 @@ class transformer_regression():
         self.spike_datasets[session] = Neural_Data(self.data_dir, session)
         
 
-    def get_normalizer(self, session, sents=None, bin_width=20, delay=0):
+    def get_normalizer(self, session, sents=None, bin_width=20, delay=0, n=1000):
         """Compute dist. of normalizer and return median."""
         if session not in self.list_loaded_sessions():
             self._load_dataset_session(session)
             _ = self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
-        return self.spike_datasets[session].get_normalizer(sents=sents, bin_width=bin_width, delay=delay)
+        return self.spike_datasets[session].get_normalizer(sents=sents, bin_width=bin_width, delay=delay, n=n)
         
 
     def get_dataset_object(self, session):

@@ -17,38 +17,38 @@ saved_checkpoint: /depot/jgmakin/data/auditory_cortex/pretrained_weights/w2l_mod
 use_pca: False
 
 layers:
-# - layer_name: conv1 
-#   layer_id: 0
-#   RF: 1.94               #(1.94 ms)
-#   layer_type: conv
-# - layer_name: conv2
-#   layer_id: 1
-#   RF: 4.44               #(4.44 ms)
-#   layer_type: conv
-# - layer_name: conv3
-#   layer_id: 2
-#   RF: 9.44               #(9.44 ms)
-#   layer_type: conv
-# - layer_name: conv4
-#   layer_id: 3
-#   RF: 19.44               #(19.44 ms)
-#   layer_type: conv
-# - layer_name: conv5
-#   layer_id: 4
-#   RF: 40               #(39.44 ms)
-#   layer_type: conv
-# - layer_name: conv6
-#   layer_id: 5
-#   RF: 80               #(79.44 ms)
-#   layer_type: conv
-- layer_name: conv7
-  layer_id: 4 # 
-  RF: 60 #120 #80 #40 #20 # 120               #(119.44 ms) 20 #40 #80 #120 #
+- layer_name: conv1 
+  layer_id: 0
+  RF: 1.94               #(1.94 ms)
   layer_type: conv
-# - layer_name: conv8
-#   layer_id: 7
-#   RF: 160               #(159.44 ms)
-#   layer_type: conv
+- layer_name: conv2
+  layer_id: 1
+  RF: 4.44               #(4.44 ms)
+  layer_type: conv
+- layer_name: conv3
+  layer_id: 2
+  RF: 9.44               #(9.44 ms)
+  layer_type: conv
+- layer_name: conv4
+  layer_id: 3
+  RF: 19.44               #(19.44 ms)
+  layer_type: conv
+- layer_name: conv5
+  layer_id: 4
+  RF: 40               #(39.44 ms)
+  layer_type: conv
+- layer_name: conv6
+  layer_id: 5
+  RF: 80               #(79.44 ms)
+  layer_type: conv
+- layer_name: conv7
+  layer_id: 6 # 
+  RF: 120 #120 #80 #40 #20 # 120               #(119.44 ms) 20 #40 #80 #120 #160
+  layer_type: conv
+- layer_name: conv8
+  layer_id: 7
+  RF: 160               #(159.44 ms)
+  layer_type: conv
 
 # - layer_name: conv9
 #   layer_id: 8
