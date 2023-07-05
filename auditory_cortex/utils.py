@@ -1,5 +1,5 @@
 import numpy as np
-import cupy as cp
+# import cupy as cp
 import torch
 import torch.nn as nn
 import os
@@ -11,10 +11,16 @@ import matplotlib as mpl
 import auditory_cortex.helpers as helpers
 
 
+def coordinates_to_color(cmap_2d, coordinates):
+    return cmap_2d(coordinates[0], coordinates[1])/255.0
+
 def get_2d_cmap(session, clrm1 ='YlGnBu', clrm2 = 'YlOrRd'):
     
-    cmap1 = mpl.cm.get_cmap(clrm1)
-    cmap2 = mpl.cm.get_cmap(clrm2)    
+    # cmap1 = mpl.cm.get_cmap(clrm1)
+    # cmap2 = mpl.cm.get_cmap(clrm2)
+    cmap1 = mpl.colormaps.get_cmap(clrm1)
+    cmap2 = mpl.colormaps.get_cmap(clrm2)
+        
     # make a copy of session to coordinates...
     session_to_coordinates =  helpers.session_to_coordinates.copy()
     """"maps coordinates to 2d color map."""
