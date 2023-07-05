@@ -1,7 +1,7 @@
 import os
 import yaml
 import torch
-import cupy as cp
+# import cupy as cp
 import numpy as np
 from torch import nn, Tensor
 from abc import ABC, abstractmethod
@@ -10,7 +10,7 @@ from transformers import Speech2TextForConditionalGeneration, Speech2TextProcess
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
 # local
-from auditory_cortex import config_dir
+from auditory_cortex import config_dir, results_dir
 from wav2letter.models import Wav2LetterRF
 
 
@@ -31,7 +31,8 @@ class FeatureExtractor():
         
         # create feature extractor as per model_name
         if model_name == 'wave2letter_modified':
-            self.extractor = FeatureExtractorW2L(self.config['saved_checkpoint'])
+            checkpoint = os.path.join(results_dir, 'pretrained_weights', 'w2l_modified', self.config['saved_checkpoint'])
+            self.extractor = FeatureExtractorW2L(checkpoint)
         elif model_name == 'wave2vec2':
             self.extractor = FeatureExtractorW2V2()
         elif model_name == 'speech2text':

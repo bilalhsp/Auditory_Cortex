@@ -2,30 +2,35 @@ import os
 import pandas as pd
 import soundfile
 import yaml
-from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
-from wav2letter.models import LitWav2Letter, Wav2LetterRF
 import torchaudio
 import scipy
 import matplotlib.pyplot as plt
 import torch
 from scipy.io import wavfile
-import auditory_cortex.regression as Reg
-import auditory_cortex.utils as utils
 import numpy as np
 import pickle
 import time
 
+# local
+import auditory_cortex.regression as Reg
+import auditory_cortex.utils as utils
+from auditory_cortex import config
+
+from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
+from wav2letter.models import LitWav2Letter, Wav2LetterRF
+
 START = time.time()
 
-reg_conf = '/home/ahmedb/projects/Wav2Letter/Auditory_Cortex/conf/regression_w2l.yaml'
-with open(reg_conf, 'r') as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
+# reg_conf = '/home/ahmedb/projects/Wav2Letter/Auditory_Cortex/conf/regression_w2l.yaml'
+# with open(reg_conf, 'r') as f:
+#     config = yaml.load(f, Loader=yaml.FullLoader)
 
 
 
 data_dir = config['data_dir']
 bad_sessions = config['bad_sessions']
 results_dir = config['results_dir']
+results_dir = os.path.join(results_dir, 'cross_validated_correlations')
 delays = config['delays']
 bin_widths = config['bin_widths']
 pretrained = config['pretrained']
@@ -34,7 +39,7 @@ iterations = config['iterations']
 use_cpu = config['use_cpu']
 dataset_sizes = config['dataset_sizes']
 dataset_sizes = np.arange(dataset_sizes[0], dataset_sizes[1], dataset_sizes[2])
-
+model_name = config['model_name']
 # # Create w2l model..
 # if pretrained:
 # # Create model with pretrained weights....!
@@ -51,8 +56,8 @@ dataset_sizes = np.arange(dataset_sizes[0], dataset_sizes[1], dataset_sizes[2])
 
 # model_name = 'wave2letter_modified'
 # model_name = 'wave2vec2'
-# model_name = 'speech2text'
-model_name = 'whisper'
+# model_name = 'speech2text_pca'
+# model_name = 'whisper'
 
 # use_cpu = True
 # csv_file_name = 'testing_for_modified_code.csv'
@@ -79,7 +84,7 @@ print(f"It takes {elapsed_time:.2f} seconds to load features...!")
 # sents = [12,13,32,43,56,163,212,218,287,308]
 for delay in delays:
     for bin_width in bin_widths:
-        # sessions = ['200206']
+        sessions = ['200206']
         # Session in data_dir that we do not have results for...
         if file_exists:
             sessions_done = data[(data['delay']==delay) & (data['bin_width']==bin_width)]['session'].unique()

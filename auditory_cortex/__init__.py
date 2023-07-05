@@ -1,7 +1,31 @@
 # standard libraries
 import os
+import yaml
+import numpy as np
 
-config_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
+# config_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
+# get parent directory of directory containing __inint__.py file (parent of parent)
+config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'conf')
+
+with open(os.path.join(config_dir, 'regression_w2l.yaml'), 'r') as f:
+    config = yaml.load(f, yaml.FullLoader)
+
+results_dir = config['results_dir']
+# data_dir = manifest['_dir']
+
+
+
+# session ID's per subject and hemisphere
+c_RH_sessions = np.array([190606, 190604, 190726, 190801, 180725, 180720, 180731,
+                 180807, 180622, 190703, 190607, 190605, 180728, 180619, 180502])
+b_RH_sessions = np.array([180405, 180501, 180719, 180808, 180627, 180814, 180810,
+                 180801, 180417, 180413, 180420, 180613, 180724, 180730, 180717, 180406])
+f_RH_sessions = np.array([191209, 200226, 200325, 200213, 200313, 191211, 200323,
+                200312, 200219, 200401, 200318])
+c_LH_sessions = np.array([200207, 191212, 191206, 200206, 191125, 200610, 191113,
+                 191002, 191115, 200205, 191219, 200617, 200212, 191121, 191210])
+
+
 
 # 2d coordinates or recording sessions...!
 session_to_coordinates = {

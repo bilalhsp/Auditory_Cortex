@@ -1,5 +1,5 @@
 import numpy as np
-import cupy as cp
+# import cupy as cp
 import torch
 import gc
 import os
@@ -11,7 +11,7 @@ from transformers import Speech2TextForConditionalGeneration, Speech2TextProcess
 
 
 # local
-from auditory_cortex import config_dir
+from auditory_cortex import config_dir, config
 from auditory_cortex.dataset import Neural_Data
 # from auditory_cortex.feature_extractors import Feature_Extractor_S2T,Feature_Extractor_GRU,FeatureExtractorW2L
 from auditory_cortex.feature_extractors import FeatureExtractor
@@ -26,11 +26,12 @@ import torchaudio
 class transformer_regression():
     def __init__(self, model_name='speech2text', load_features = True):
 
-        config_file = os.path.join(config_dir, f"{model_name}_config.yml")
-        with open(config_file, 'r') as f:
-            self.config = yaml.load(f, yaml.FullLoader)
+        # config_file = os.path.join(config_dir, f"{model_name}_config.yml")
+        # with open(config_file, 'r') as f:
+        #     self.config = yaml.load(f, yaml.FullLoader)
                         
-        self.data_dir = self.config['neural_data_dir']
+        # self.data_dir = self.config['neural_data_dir']
+        self.data_dir = config['data_dir']
 
 
 

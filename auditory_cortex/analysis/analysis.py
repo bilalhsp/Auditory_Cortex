@@ -12,11 +12,12 @@ from sklearn.decomposition import PCA
 
 #local 
 from auditory_cortex.analysis.config import *
-import auditory_cortex.analysis.config as config
+# import auditory_cortex.analysis.config as config
 import auditory_cortex.helpers as helpers
 import auditory_cortex.utils as utils
 
-from auditory_cortex import session_to_coordinates
+from auditory_cortex import session_to_coordinates, config, results_dir
+
 
 from scipy.signal import resample
 from sklearn.linear_model import Ridge, ElasticNet
@@ -99,15 +100,54 @@ class STRF:
 
 
 class correlations:
-    def __init__(self, corr_file_path=None, sig_threshold=0.1) -> None:
-        if corr_file_path is None:
-            self.corr_file_path = os.path.join(results_dir, corr_sub_dir, corr_data_filename)
-        else:
-            self.corr_file_path = corr_file_path
+    def __init__(self, model=None, sig_threshold=0.1) -> None:
+        
+        if model is None:
+            model = 'wave2letter_modified'
+        self.model = model
+        filename = f'{model}_corr_results.csv'
+        self.corr_file_path = os.path.join(results_dir, 'cross_validated_correlations', filename)
+        
+        # else:
+        #     self.corr_file_path = corr_file_path
         self.data = pd.read_csv(self.corr_file_path)
-        self.data['normalized_test_cc'] = self.data['test_cc_raw']/self.data['normalizer']
+        self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
         self.sig_threshold = sig_threshold
+
+        # loading STRF baseline
+        STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_results.csv')
+        self.baseline_corr = pd.read_csv(STRF_file_path)
+        self.baseline_corr['strf_corr_normalized'] = self.baseline_corr['strf_corr']/(self.baseline_corr['normalizer'].apply(np.sqrt))
+        # STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_RidgeCV.npy')
+        # self.baseline_corr = np.load(STRF_file_path)
+        
+    def get_baseline_corr_ch(self, session, ch, bin_width=20, delay=0, column='strf_corr'):
+        corr = self.baseline_corr[
+                (self.baseline_corr['session']==float(session))&\
+                (self.baseline_corr['channel']==ch)&\
+                (self.baseline_corr['bin_width']==bin_width)&\
+                (self.baseline_corr['delay']==delay)
+            ][column].head(1).item()
+        return corr
     
+    def get_baseline_corr_session(
+            self, session=None, bin_width=20, delay=0, column='strf_corr', threshold=None):
+                
+        select_baseline = self.baseline_corr[
+                (self.baseline_corr['bin_width']==bin_width)&\
+                (self.baseline_corr['delay']==delay)
+            ]
+        if session is not None:
+            select_baseline = select_baseline[
+                (select_baseline['session']==float(session))
+            ]
+        if threshold is not None:
+            select_baseline = select_baseline[
+                (select_baseline['normalizer']>=threshold)
+            ]
+
+        return select_baseline[column]
+
     def write_back(self):
         self.data.to_csv(self.corr_file_path)
 
@@ -115,7 +155,7 @@ class correlations:
         """Returns sessions with corr scores above significant threshold for at least 1 channel"""
         if threshold is None:
             threshold = self.sig_threshold
-        sig_data = self.data[self.data['normalizer'] > threshold]
+        sig_data = self.data[self.data['normalizer'] >= threshold]
         return sig_data['session'].unique()
     
     def get_all_sessions(self):
@@ -153,7 +193,8 @@ class correlations:
         return select_data
     
     def session_bar_plot(
-            self, session = 200206,
+            self, 
+            session = 200206,
             column = 'test_cc_raw', 
             cmap = 'magma', 
             ax = None, 
@@ -177,12 +218,12 @@ class correlations:
 
     def topographic_bar_plots(
             self,
-            fig_size=10, 
+            figsize=10, 
             normalized=False, 
             threshold=0.1,
             separate_color_maps=True
         ):
-        fig, axes = plt.subplots(figsize=(fig_size,fig_size))
+        fig, axes = plt.subplots(figsize=(figsize,figsize))
         plt.grid(True)
         circle = plt.Circle((0,0),2, fill=False)
         axes.set_aspect(1)
@@ -262,10 +303,269 @@ class correlations:
             (self.data['normalizer'] >= threshold)     
             ]
         
-        std = select_data.groupby(['layer'])[col_name].describe()['std']
-        mean = select_data.groupby(['layer'])[col_name].describe()['mean']
-        max = select_data.groupby(['layer'])[col_name].describe()['max']
-        return mean, std, max
+        # std = select_data.groupby(['layer'])[col_name].describe()['std']
+        # mean = select_data.groupby(['layer'])[col_name].describe()['mean']
+        # max = select_data.groupby(['layer'])[col_name].describe()['max']
+        # return mean, std, max
+        return select_data.groupby(['layer'])[col_name].describe()
+    
+    def get_session_data(self, session=None, threshold=0.0,bin_width=20, delay=0, N_sents=499):
+        """Returns session data for given settings"""
+            
+        select_data = self.data[
+            # (self.data['session']==float(session)) & \
+            (self.data['bin_width']==bin_width) & \
+            (self.data['delay']==delay) & \
+            (self.data['N_sents']>=N_sents) &\
+            (self.data['normalizer'] >= threshold)     
+            ]
+        if session is not None:
+            select_data = select_data[
+                (select_data['session']==float(session))
+            ]
+            
+        return select_data
+    
+
+    def get_selected_data(
+                self, session=None, bin_width=None, delay=None, N_sents=None, threshold=None,
+                layer=None, channel=None
+            ):
+        """Return selected data based on provided arguments. 
+        If an argument if 'None', no filter is applied on that column."""
+        select_data = self.data
+        if session is not None:
+            select_data = select_data[select_data['session']==float(session)]
+
+        if bin_width is not None:
+            select_data = select_data[select_data['bin_width']==float(bin_width)]
+        
+        if delay is not None:
+            select_data = select_data[select_data['delay']==float(delay)]
+        
+        if N_sents is not None:
+            select_data = select_data[select_data['N_sents']>=float(N_sents)]
+        
+        if threshold is not None:
+            select_data = select_data[select_data['normalizer']>=float(threshold)]
+
+        if layer is not None:
+            select_data = select_data[select_data['layer']==float(layer)]
+
+
+        if channel is not None:
+            select_data = select_data[select_data['channel']==float(channel)]
+
+        return select_data
+
+
+    
+    def box_plot_correlations(self, session=None, threshold=0.0,bin_width=20, delay=0, N_sents=499,
+                    normalized=False, ax=None, delta_corr=False, y_axis_lim=None):
+        """Plots box and whisker graphs for each layer of the given session, 
+        if no session is mentioned, then it plots the same layer-wise plots by taking together 
+        significant neurons from all sessions.
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        if normalized:
+            norm = ', normalized'
+            column = 'normalized_test_cc'
+            strf_column = 'strf_corr_normalized'
+            y_axis_lim += 0.3
+        else:
+            norm = ''
+            column = 'test_cc_raw'
+            strf_column = 'strf_corr'
+
+        select_data = self.get_session_data(
+            session, threshold=threshold, bin_width=bin_width, delay=delay, N_sents=N_sents
+        )
+        layer_ids = np.sort(select_data['layer'].unique())
+        
+        if delta_corr:
+            layer_spread = {}
+            # layer_ids = select_data['layer'].unique()
+            # channel_ids = select_data['channel'].unique()
+            for layer in layer_ids:
+                differences = []
+                ids = select_data[select_data['layer']==layer].index
+                for id in ids:
+                    channel_corr =  select_data.loc[id, column]
+                    ch = int(select_data.loc[id, 'channel'])
+                    sess = select_data.loc[id, 'session']
+                    baseline = self.get_baseline_corr_ch(sess, ch, column=strf_column)
+                    # if normalized:
+                    #     baseline = baseline / select_data.loc[id, 'normalizer']
+                    differences.append(channel_corr - baseline)
+
+                layer_spread[int(layer)] = np.array(differences)
+            y_axis_label = "$\Delta\\rho$"
+        else:
+            layer_spread = {}
+            for layer in layer_ids:
+                ids = select_data[select_data['layer']==layer].index
+                layer_spread[int(layer)] = np.array(select_data.loc[ids, column]).squeeze()
+
+            # layer_ids = select_data['layer'].unique()
+            # for layer in layer_ids:
+            #     layer_spread[int(layer)] =  np.array(select_data[select_data['layer']==layer][column])
+            # # plotting the baseline...
+            baseline_corr = self.get_baseline_corr_session(session, column=strf_column, threshold=threshold)
+            print(f"Baseline median: {np.median(baseline_corr):.3f}")
+            plt.axhline(baseline_corr.median(),
+                        c='r', linewidth=3, ls='--', label='STRF baseline - (median)')
+            plt.axhline(baseline_corr.max(),
+                        c='r', linewidth=3, ls='--', alpha=0.3, label='STRF baseline - (peak)')
+            plt.legend(loc='best')
+            y_axis_label = "$\\rho$"
+            if y_axis_lim is not None:
+                ax.set_ylim([-0.05, y_axis_lim])
+
+        # plotting function
+        # ax1.set_title('Basic Plot')
+        green_diamonds = dict(marker='D', markerfacecolor = 'g')
+        red_lines = dict(color='r', linewidth=3)  
+        ax.boxplot(layer_spread.values(), positions = np.arange(1, len(layer_spread.keys())+1), labels=layer_spread.keys(),
+                    whis=[5,95], notch=True, flierprops = green_diamonds, medianprops=red_lines)
+
+        ax.set_title(f"{self.model}, session-{session}{norm}")
+        ax.set_xlabel('layer IDs')
+        ax.set_ylabel(y_axis_label)
+        # remove borders
+        # ax.spines['top'].set_visible(False)
+        # ax.spines['right'].set_visible(False)
+        # ax.spines['left'].set_visible(False)
+        # # remove y-axis tick marsks
+        # ax.yaxis.set_ticks_position('none')
+        # add major grid lines in y-axis
+        ax.grid(color='grey', axis='y', linestyle='-', linewidth = 0.5, alpha=0.5)
+
+    
+        return ax, layer_spread
+    
+
+    def plot_topographical_peaks(
+            self,
+            sessions = None,
+            bin_width = 20,
+            delay = 0,
+            ax = None,
+            threshold = 0.1,
+            normalized = False,
+            unit_circles = True,
+            fontsize = 12,
+            N_sents = 499,
+            alpha=0.5
+            
+        ):
+        """plots topographical peaks (based on coordinates of recording sites), 
+        peak layer and corresponding correlation is worked out after taking median across 
+        all significant channesl within each session, then for each recording site color of 
+        the dot represents layer preference (peak median layer) and size (area) of the dot
+        represents correlation strength.
+        To help visualize the location of each recording site, a circle in plotted in the
+        background that indicates the periphery of skull of the subject.
+        Coordinates for c_LH have been reversed along x-axis (caudal-rostral) to map all 
+        sessions (left and right hemispheres) onto the same coordinates."""
+
+
+        if ax is None:
+            fig, ax = plt.subplots()
+        if normalized:
+            norm = 'normalized'
+            column = 'normalized_test_cc'
+        else:
+            norm = ''
+            column = 'test_cc_raw'
+
+
+        x_coordinates = []
+        y_coordinates = []
+        peak_layers = []
+        peak_median_corr = []
+
+        scale_size = 500
+        sessions_info = ''
+        if sessions is None:
+            sessions = self.get_all_sessions()
+            sessions_info = ', all sessions'
+        # num_layers = len(self.get_all_layers('200206'))
+        # num_layers = max(self.get_all_layers('200206'))
+        num_layers = 11
+
+        for session in sessions:
+            select_data = self.get_session_data(
+                session, threshold=threshold, bin_width=bin_width, delay=delay, N_sents=N_sents
+            )
+            if not select_data.empty:
+                median_across_channels = select_data.groupby('layer', as_index=False).median()
+                id = median_across_channels.idxmax()[column]
+
+                # plots 'dot' with size (area) propotional to correlations,
+                # and color as function of peak layer
+                peak_median_corr.append(median_across_channels.loc[id, column]*scale_size)
+                peak_layers.append(median_across_channels.loc[id, 'layer'])
+                c_x, c_y = session_to_coordinates[int(session)]
+                x_coordinates.append(c_x)
+                y_coordinates.append(c_y)
+
+        
+        scatt = ax.scatter(
+                    x_coordinates, y_coordinates, s=peak_median_corr, 
+                    c=peak_layers, cmap='magma', vmin=0, vmax= num_layers, 
+                )
+
+        
+        if unit_circles:         
+            # adding circles of unit area..
+            unit_areas = scale_size*np.ones(len(x_coordinates))
+            ax.scatter(
+                    x_coordinates, y_coordinates, s=unit_areas,
+                    facecolor='none', edgecolor='black', alpha=alpha,
+                )
+        
+        # formating plot and adding colorbar
+        # adding background circle
+        circle = plt.Circle((0,0),2, fill=False)
+        ax.set_aspect(1)
+        ax.add_artist(circle)
+        ax.set_xlim([-2.5,2.5])
+        ax.set_ylim([-2.5,2.5])
+        ax.set_title(f"bin_width-{bin_width}ms, delay-{delay}{sessions_info}", fontsize=fontsize)
+        ax.set_xlabel('caudal - rostral', fontsize=fontsize)
+        ax.set_ylabel('ventral - dorsal', fontsize=fontsize)
+        plt.grid(True)
+        plt.colorbar(scatt, ax=ax, label='layers')
+
+    def plot_coordinate_color_map(self, dot_size=400, fontsize=12):
+        # fontsize = 12
+        # dot_size = 400
+        cmap_2d = ColorMap2DZiegler(range_x=(-2, 2), range_y=(-2,2))
+        sessions = self.get_significant_sessions()
+        coordinates = []
+        colors = []
+        for session in sessions:
+            cxy = session_to_coordinates[int(session)]
+            coordinates.append(cxy)
+            colors.append(utils.coordinates_to_color(cmap_2d, cxy))
+
+        coordinates = np.array(coordinates)
+        fig, ax = plt.subplots()
+        circle = plt.Circle((0,0),2, fill=False)
+        ax.set_aspect(1)
+        ax.add_artist(circle)
+        ax.set_xlim([-2.5,2.5])
+        ax.set_ylim([-2.5,2.5])
+        ax.set_title(f"coordinates color map", fontsize=fontsize)
+        ax.set_xlabel('caudal - rostral', fontsize=fontsize)
+        ax.set_ylabel('ventral - dorsal', fontsize=fontsize)
+
+        # size = size_scale*np.ones(len(colors))
+        ax.scatter(coordinates[:,0], coordinates[:,1], c = colors, s=dot_size)
+
+
 
 class PCA_analysis:
     def __init__(self, modes_file_path=None) -> None:
