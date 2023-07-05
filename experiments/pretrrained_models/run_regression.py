@@ -90,7 +90,8 @@ sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_
 for s in bad_sessions:
     sessions = np.delete(sessions, np.where(sessions == s))
 
-# sessions = sessions[30:42]
+# sessions = sessions[40:]
+# sessions = sessions[25:]
 
 obj = Reg.transformer_regression(
             model_name=model_name, delay_features=delay_features, audio_zeropad=audio_zeropad
@@ -117,10 +118,13 @@ for delay in delays:
             print(f"Working with '{session}'")
             # obj = get_reg_obj(data_dir, sub)
 
-            norm = obj.get_normalizer(session, bin_width=bin_width, delay=delay)
+            norm = obj.get_normalizer(session, bin_width=bin_width, delay=delay,
+                                       n=1 # normalizer not needed, will be updated later
+                                       )
             for N_sents in dataset_sizes:
                 if delays_grid_search:
-                    delays_grid = [5, 10, 15, 20, 25, 30]
+                    # delays_grid = [-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30]
+                    delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
                     corr_dict = obj.grid_search_CV(
                             session, bin_width=bin_width, iterations=iterations,
                             num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,

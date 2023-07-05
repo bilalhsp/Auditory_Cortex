@@ -34,8 +34,6 @@ layers:
 
 
 
-
-
 - layer_name: wav2vec2.encoder.layer_norm   # this is right after the conv-pos-embedding
   layer_id: 7
   layer_type: transformer
