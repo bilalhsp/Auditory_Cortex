@@ -30,22 +30,23 @@ saved_results = '/home/ahmedb/projects/Wav2Letter/saved_results/'
 pretrained_dir = '/depot/jgmakin/data/auditory_cortex/pretrained_weights/w2l_modified/'
 checkpoint_file = 'Wav2letter-epoch=024-val_loss=0.37.ckpt'
 checkpoint = os.path.join(pretrained_dir, checkpoint_file)
-pca_obj = analysis.PCA_topography(checkpoint=checkpoint)
+pca_obj = analysis.PCA_topography()
 
 # setting paramters...
-layers = [9]
+layers = [7]
 levels = [0.9]
 corr_sign_threshold = 0.3
 threshold_factor=100
 margin=0.8
 normalized = True
+exclude_session = 200206.0
 if normalized:
     extend_name = '_norm'
 else:
     extend_name = ''
 for layer in layers:
-    for i in range(0, 3):
-        for j in range(1,4):
+    for i in range(0, 1):
+        for j in range(1,3):
             if i == j or i>j:
                 continue
             pc_ind = [i,j]
@@ -58,9 +59,29 @@ for layer in layers:
                                             normalized=normalized,
                                             margin=1.0,
                                             trim_axis=False,
-                                            threshold_factor=threshold_factor
+                                            threshold_factor=threshold_factor,
+                                            exclude_session=exclude_session
                                             )
             ax.set_title(f"PCs-{pc_ind}, layer-{layer}, all sessions")
             # plt.xlim(axis_lim[layer][i])
             # plt.ylim(axis_lim[layer][j])
-            plt.savefig(f'../../../saved_results/pcs/normalized/all_sessions_layer_{layer}_pc{pc_ind}_{extend_name}.jpg')
+            directory = '../../../saved_results/pcs/NIPS/'
+            plt.savefig(os.path.join(directory, f'all_sessions_layer_{layer}_pc{pc_ind}_{extend_name}_excluding_{exclude_session}.jpg'))
+            # fig_name = f"all_sessions_layer_{layer}_pc{pc_ind}_{extend_name}.tex"
+            # extra_axis_parameters = {
+            #     'width=\\figwidth',
+            #     'height=\\figheight',
+            #     'every x tick label/.append style={rotate=90}',
+            #     'xticklabel style={opacity=\\thisXticklabelopacity, align=center}',
+            # }
+            # tpl_save(
+            #     filepath=os.path.join(directory, f'all_sessions_layer_{layer}_pc{pc_ind}_{extend_name}.tex'),
+            #     extra_axis_parameters=extra_axis_parameters,
+            #     tex_relative_path_to_data='pngs',
+            #     extra_lines_start={
+            #         '\\providecommand{\\figwidth}{5.7in}%',
+            #         '\\providecommand{\\figheight}{2.0in}%',
+            #         '\\providecommand{\\thisXticklabelopacity}{1.0}%',
+            #     },
+            # )
+            print(f"Done for layer-{layer}, pc-{pc_ind}...!")

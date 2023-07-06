@@ -9,35 +9,42 @@ import torchaudio
 import pickle
 import matplotlib as mpl
 import auditory_cortex.helpers as helpers
+from auditory_cortex import session_to_coordinates, CMAP_2D
+# from pycolormap_2d import ColorMap2DBremm
+
+
+# def get_2d_cmap(session, clrm1 ='YlGnBu', clrm2 = 'YlOrRd'):
+    
+#     cmap1 = mpl.cm.get_cmap(clrm1)
+#     cmap2 = mpl.cm.get_cmap(clrm2)    
+#     # make a copy of session to coordinates...
+#     session_to_coordinates =  helpers.session_to_coordinates.copy()
+#     """"maps coordinates to 2d color map."""
+#     session = int(float(session))
+#     coordinates = session_to_coordinates[session]
+
+#     # mapping to 0-1 range
+#     coords_x = (coordinates[0] + 2)/4.0
+#     coords_y = (coordinates[1] + 2)/4.0
+#     c1 = cmap1(coords_x)
+#     c2 = cmap2(coords_y)
+#     # c3 = (c1[0],c2[1] ,0.5, c1[3])
+#     # c3 = ((c1[0] + c2[0])/2.0,(c1[1] + c2[1])/2.0 ,0.5, c1[3])
+#     # c3 = (c1[0],c2[1] ,0.0, c1[3])
+#     c3 = (c1[0],c2[1] ,0.0, c1[3])
+#     # c3 = cmap_2d(c1, c2)
+#     return c3
+
+def get_2d_cmap(session):
+    cmap_2d = CMAP_2D(range_x=(-2, 2), range_y=(-2, 2))
+    coordinates = session_to_coordinates[int(session)]
+    color = coordinates_to_color(cmap_2d, coordinates)
+    return color
 
 
 def coordinates_to_color(cmap_2d, coordinates):
     return cmap_2d(coordinates[0], coordinates[1])/255.0
 
-def get_2d_cmap(session, clrm1 ='YlGnBu', clrm2 = 'YlOrRd'):
-    
-    # cmap1 = mpl.cm.get_cmap(clrm1)
-    # cmap2 = mpl.cm.get_cmap(clrm2)
-    cmap1 = mpl.colormaps.get_cmap(clrm1)
-    cmap2 = mpl.colormaps.get_cmap(clrm2)
-        
-    # make a copy of session to coordinates...
-    session_to_coordinates =  helpers.session_to_coordinates.copy()
-    """"maps coordinates to 2d color map."""
-    session = int(float(session))
-    coordinates = session_to_coordinates[session]
-
-    # mapping to 0-1 range
-    coords_x = (coordinates[0] + 2)/4.0
-    coords_y = (coordinates[1] + 2)/4.0
-    c1 = cmap1(coords_x)
-    c2 = cmap2(coords_y)
-    # c3 = (c1[0],c2[1] ,0.5, c1[3])
-    # c3 = ((c1[0] + c2[0])/2.0,(c1[1] + c2[1])/2.0 ,0.5, c1[3])
-    # c3 = (c1[0],c2[1] ,0.0, c1[3])
-    c3 = (c1[0],c2[1] ,0.0, c1[3])
-    # c3 = cmap_2d(c1, c2)
-    return c3
 
 def down_sample(data, k):
     #down samples 'data' by factor 'k' along dim=0 
@@ -157,6 +164,34 @@ def write_df_to_disk(df, file_path):
     data.to_csv(file_path, index=False)
     print(f"Dataframe {action} to {file_path}.")
 
+def write_STRF(corr_dict, file_path):
+    if os.path.isfile(file_path):
+        data = pd.read_csv(file_path)
+    else:
+        data = pd.DataFrame(columns=['session','channel','bin_width',
+                                    'delay','strf_corr'])
+    session = corr_dict['session']
+    win = corr_dict['win']
+    delay = corr_dict['delay']
+    ch = np.arange(corr_dict['strf_corr'].shape[0])
+
+    df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
+                                    ch, 
+                                    np.ones_like(ch)*win, 
+                                    np.ones_like(ch)*delay,
+                                    corr_dict['strf_corr'],
+                                    ]).transpose(),
+                        columns=data.columns
+                        )
+    data = pd.concat([data,df], axis=0, ignore_index=True)
+    data.to_csv(file_path, index=False)
+    print(f"Data saved for session: '{session}',\
+    bin-width: {win}ms, delay: {delay}ms at file: '{file_path}'")
+    return data
+
+
+
+
 def write_to_disk(corr_dict, file_path, normalizer=None):
     """
     | Takes in the 'corr' dict and stores the results
@@ -169,8 +204,13 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     if os.path.isfile(file_path):
         data = pd.read_csv(file_path)
     else:
-        data = pd.DataFrame(columns=['session','layer','channel','bin_width',
-                                    'delay','train_cc_raw','test_cc_raw', 'normalizer', 'N_sents'])
+        data = pd.DataFrame(
+                columns=[
+                    'session','layer','channel','bin_width', 'delay',
+                    'train_cc_raw','test_cc_raw', 'normalizer', 'N_sents',
+                    'opt_delays'
+                    ]
+                )
     session = corr_dict['session']
     model_name = corr_dict['model']
     win = corr_dict['win']
@@ -178,18 +218,23 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     ch = np.arange(corr_dict['test_cc_raw'].shape[1])
     layers = np.arange(corr_dict['test_cc_raw'].shape[0])
     N_sents = corr_dict['N_sents']
+    layer_ids = corr_dict['layer_ids']
+    opt_delays = corr_dict['opt_delays']
     if normalizer is None:
         normalizer = np.zeros_like(ch)
+    if opt_delays is None:
+        opt_delays = np.zeros((len(layers), len(ch)))
     for layer in layers:
         df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
-                                    np.ones_like(ch)*layer,
+                                    np.ones_like(ch)*layer_ids[int(layer)],
                                     ch, 
                                     np.ones_like(ch)*win, 
                                     np.ones_like(ch)*delay,
                                     corr_dict['train_cc_raw'][layer,:],
                                     corr_dict['test_cc_raw'][layer,:],
                                     normalizer,
-                                    np.ones_like(ch)*N_sents
+                                    np.ones_like(ch)*N_sents,
+                                    opt_delays[layer,:]
                                     ]).transpose(),
                         columns=data.columns
                         )

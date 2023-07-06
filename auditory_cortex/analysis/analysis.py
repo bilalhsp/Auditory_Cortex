@@ -1,22 +1,26 @@
 import os
+import pickle
 import numpy as np
 import pandas as pd
 import scipy as scp
 import seaborn as sns
-import matplotlib.pyplot as plt
-import plotly.express as px
 import matplotlib as mpl
+import plotly.express as px
+import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import pickle
 from sklearn.decomposition import PCA
 
+
 #local 
-from auditory_cortex.analysis.config import *
+# from auditory_cortex.analysis.config import *
+import auditory_cortex.regression as Reg
 # import auditory_cortex.analysis.config as config
 import auditory_cortex.helpers as helpers
 import auditory_cortex.utils as utils
 
-from auditory_cortex import session_to_coordinates, config, results_dir
+from auditory_cortex import session_to_coordinates, CMAP_2D
+from auditory_cortex import saved_corr_dir
+# from pycolormap_2d import ColorMap2DBremm, config, results_dir
 
 
 from scipy.signal import resample
@@ -27,10 +31,14 @@ import math
 from naplib.visualization import imSTRF
 
 class STRF:
-    def __init__(self):
-        self.reg_obj = helpers.get_regression_obj(load_features=False)
-        _ = self.reg_obj.load_spikes(bin_width=10, numpy=True)
-        self.spikes = self.reg_obj.raw_spikes
+    def __init__(self, session):
+        session = str(session)
+        # self.reg_obj = helpers.get_regression_obj(load_features=False)
+        self.reg_obj = Reg.transformer_regression(model_name = 'wave2letter_modified', load_features=False)
+        # _ = self.reg_obj.load_spikes(bin_width=10, numpy=True)
+        _ = self.reg_obj.get_neural_spikes(session, bin_width=20, numpy=True)
+        # print(self.reg_obj.list_loaded_sessions())
+        self.spikes = self.reg_obj.get_dataset_object(session).raw_spikes
         self.fs = self.reg_obj.dataset.fs
 
         sents = np.arange(1,499)
@@ -106,7 +114,7 @@ class correlations:
             model = 'wave2letter_modified'
         self.model = model
         filename = f'{model}_corr_results.csv'
-        self.corr_file_path = os.path.join(results_dir, 'cross_validated_correlations', filename)
+        self.corr_file_path = os.path.join(saved_corr_dir, filename)
         
         # else:
         #     self.corr_file_path = corr_file_path
@@ -115,7 +123,7 @@ class correlations:
         self.sig_threshold = sig_threshold
 
         # loading STRF baseline
-        STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_results.csv')
+        STRF_file_path = os.path.join(saved_corr_dir, 'STRF_corr_results.csv')
         self.baseline_corr = pd.read_csv(STRF_file_path)
         self.baseline_corr['strf_corr_normalized'] = self.baseline_corr['strf_corr']/(self.baseline_corr['normalizer'].apply(np.sqrt))
         # STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_RidgeCV.npy')
@@ -578,11 +586,12 @@ class PCA_analysis:
 
 
 class PCA_topography:
-    def __init__(self, checkpoint=None) -> None:
+    def __init__(self) -> None:
         # regression object and load features.
-        self.reg_obj = helpers.get_regression_obj('200206', load_features=False,
-                    checkpoint=checkpoint)
-        self.features = {}    
+        # self.reg_obj = helpers.get_regression_obj('200206', load_features=False,
+        #             checkpoint=checkpoint)
+        self.reg_obj = Reg.transformer_regression(model_name='wave2letter_modified', load_features=False)
+        self.features = None
         self.pcs = {}       # dict for principle components for layers...
         self.pca = {}       # dict for pca objects for layers (this can be used to get pcs for single sents)
 
@@ -629,8 +638,9 @@ class PCA_topography:
         """Transforms features of the given layer onto 2d pc space
         (if not already done before) and returns the pcs.
         It also checks if features are pre-loaded, if not it loads them."""
-        if not self.features:
-            self.features = self.reg_obj.load_features(bin_width=bin_width, load_raw=True, numpy=True)
+        if self.features is None:
+            self.reg_obj.load_features(bin_width=bin_width)
+            self.features = self.reg_obj.unroll_features()
         pca = PCA(n_components=n_components)
         if layer not in self.pcs.keys():
             self.pcs[layer] = np.transpose(pca.fit_transform(self.features[layer]))
@@ -640,8 +650,10 @@ class PCA_topography:
 
     def get_features(self, layer, bin_width=20):
         """Returns features for given layer, loads first if needed."""
-        if not self.features:
-            self.features = self.reg_obj.load_features(bin_width=bin_width, load_raw=True, numpy=True)
+        if self.features is None:
+            # self.features = self.reg_obj.load_features(bin_width=bin_width, load_raw=True, numpy=True)
+            self.reg_obj.load_features(bin_width=bin_width)
+            self.features = self.reg_obj.unroll_features()
         return self.features[layer]
 
     def get_neural_spikes(self, session):
@@ -875,7 +887,7 @@ class PCA_topography:
             kde_factor = kernel_null.covariance_factor()
 
 
-            spikes = self.reg_obj.get_neural_spikes(str(int(session)))
+            spikes = self.reg_obj.get_neural_spikes(str(int(session)), numpy=True)
             weights=spikes[:,int(ch)]
             # getting spike weighted distribution...
             kernel = scp.stats.gaussian_kde(dataset=pcs, weights=weights, bw_method=kde_factor)
@@ -891,7 +903,7 @@ class PCA_topography:
             z_out = z/z_null_clipped
         else:
             if weighted:
-                spikes = self.reg_obj.get_neural_spikes(str(int(session)))
+                spikes = self.reg_obj.get_neural_spikes(str(int(session)), numpy=True)
                 weights=spikes[:,int(ch)]
             else:
                 weights=None
@@ -993,7 +1005,8 @@ class PCA_topography:
                                             comps=None,
                                             margin=0.5,
                                             trim_axis=False,
-                                            threshold_factor=100
+                                            threshold_factor=100,
+                                            exclude_session=None
                                             ):
         if comps is None:
             comps = [0,1]
@@ -1003,7 +1016,14 @@ class PCA_topography:
             fig, ax = plt.subplots(figsize=(10,10))
         # cmap = mpl.cm.get_cmap(clrm)
         sessions = self.get_significant_sessions()
+        if exclude_session is not None:
+            sessions = np.delete(sessions, np.where(sessions == exclude_session))
+
+
         N = len(sessions)
+        print(f"N is: {N}")
+        print(f"Session are:")
+        print(sessions)
         legend_elements = []
         counter = 0
         for i, session in enumerate(sessions):
@@ -1172,4 +1192,42 @@ class PCA_topography:
                 label=f'{session}',
                 ax = ax
                 )
-    
+
+    def plot_2d_colorbar(self, ax=None, n=100, add_circle=True):
+        if ax is None:
+            fig, ax = plt.subplots()
+        x_min = -2
+        x_max = 2
+        y_min = -2
+        y_max = 2
+        cmap_2d = CMAP_2D(range_x=(x_min, x_max), range_y=(y_min, y_max))
+        x_coordinates = np.linspace(x_min, x_max, n)
+        y_coordinates = np.linspace(y_min, y_max, n)
+        Y,X = np.meshgrid(x_coordinates, y_coordinates)
+        coor = np.vstack([np.ravel(X), np.ravel(Y)])
+
+        col = []
+        for i in range(coor.shape[1]):
+            # if (coor[0,i]**2 + coor[1,i]**2) > 4:
+            #     col.append((1.0, 1.0, 1.0))
+            # else:
+            #     col.append(cmap(coor[0,i], coor[1,i])/255.0)
+            # col.append(cmap(coor[0,i], coor[1,i])/255.0)
+            col.append(self.coordinates_to_color(cmap_2d, coor[:,i]))
+
+        plt.scatter(coor[0,:], coor[1,:], c=col)
+        ax.set_title("2D colormap")
+
+        if add_circle:
+            circle =plt.Circle((0.0,0.0), 2, fill=False, linewidth = 3, edgecolor='b')
+            ax.set_aspect(1)
+            ax.add_artist(circle)
+        ax.axis('off')
+        # ax.set_xlim([-2.0,2.0])
+        # ax.set_ylim([-2.0,2.0])
+
+    def coordinates_to_color(self, cmap_2d, coordinates):
+        return cmap_2d(coordinates[0], coordinates[1])/255.0
+
+        
+        
