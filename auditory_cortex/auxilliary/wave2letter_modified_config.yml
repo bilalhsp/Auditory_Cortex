@@ -1,6 +1,4 @@
-neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 saved_checkpoint: /depot/jgmakin/data/auditory_cortex/pretrained_weights/w2l_modified/Wav2letter-epoch=024-val_loss=0.37.ckpt
-
 
 
 # saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=001-val_loss=3.42.ckpt

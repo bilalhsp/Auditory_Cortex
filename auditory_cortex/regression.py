@@ -3,7 +3,7 @@ import os
 import time
 import yaml
 import torch
-import cupy as cp
+# import cupy as cp
 import numpy as np
 import pandas as pd
 from scipy import linalg, signal
@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 # local
+from auditory_cortex import config_dir, config
 import auditory_cortex.utils as utils
 from auditory_cortex import config_dir
 from auditory_cortex.dataset import Neural_Data
@@ -36,11 +37,12 @@ class transformer_regression():
         """
         """
 
-        config_file = os.path.join(config_dir, f"{model_name}_config.yml")
-        with open(config_file, 'r') as f:
-            self.config = yaml.load(f, yaml.FullLoader)
+        # config_file = os.path.join(config_dir, f"{model_name}_config.yml")
+        # with open(config_file, 'r') as f:
+        #     self.config = yaml.load(f, yaml.FullLoader)
                         
-        self.data_dir = self.config['neural_data_dir']
+        # self.data_dir = self.config['neural_data_dir']
+        self.data_dir = config['neural_data_dir']
 
         self.dataset = Neural_Data(self.data_dir, '180810')
         self.sents = np.arange(1,500)

@@ -1,7 +1,7 @@
 import os
 import yaml
 import torch
-import cupy as cp
+# import cupy as cp
 import numpy as np
 from torch import nn, Tensor
 from abc import ABC, abstractmethod
@@ -9,30 +9,28 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
-from deepspeech_pytorch.model import DeepSpeech
-import deepspeech_pytorch.loader.data_loader as data_loader
-from deepspeech_pytorch.configs.train_config import SpectConfig
+# from deepspeech_pytorch.model import DeepSpeech
+# import deepspeech_pytorch.loader.data_loader as data_loader
+# from deepspeech_pytorch.configs.train_config import SpectConfig
 
 # local
-from auditory_cortex import config_dir
+from auditory_cortex import config_dir, results_dir, aux_dir
 from wav2letter.models import Wav2LetterRF
 
 
 class FeatureExtractor():
     def __init__(self, model_name = 'wave2letter_modified'):
-        # super(FeatureExtractor, self).__init__()
+        
         self.layers = []
         self.layer_ids = []
         self.layer_types = []
         self.receptive_fields = []
         self.features_delay = []        # features delay needed to compensate for the RFs
-        # self.bin_widths = []
-        # self.offsets = []
         self.features = {}
         # self.model = model
             
         # read yaml config file
-        config_file = os.path.join(config_dir, f"{model_name}_config.yml")
+        config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
         with open(config_file, 'r') as f:
             self.config = yaml.load(f, yaml.FullLoader)
         self.num_layers = len(self.config['layers'])
@@ -42,7 +40,8 @@ class FeatureExtractor():
         
         # create feature extractor as per model_name
         if model_name == 'wave2letter_modified':
-            self.extractor = FeatureExtractorW2L(self.config['saved_checkpoint'])
+            checkpoint = os.path.join(results_dir, 'pretrained_weights', 'w2l_modified', self.config['saved_checkpoint'])
+            self.extractor = FeatureExtractorW2L(checkpoint)
         elif model_name == 'wave2vec2':
             self.extractor = FeatureExtractorW2V2()
         elif model_name == 'speech2text':
