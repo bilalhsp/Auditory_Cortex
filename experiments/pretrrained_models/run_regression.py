@@ -2,30 +2,35 @@ import os
 import pandas as pd
 import soundfile
 import yaml
-from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
-from wav2letter.models import LitWav2Letter, Wav2LetterRF
 import torchaudio
 import scipy
 import matplotlib.pyplot as plt
 import torch
 from scipy.io import wavfile
-import auditory_cortex.regression as Reg
-import auditory_cortex.utils as utils
 import numpy as np
 import pickle
 import time
 
+# local
+import auditory_cortex.regression as Reg
+import auditory_cortex.utils as utils
+from auditory_cortex import config
+
+from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
+from wav2letter.models import LitWav2Letter, Wav2LetterRF
+
 START = time.time()
 
-reg_conf = '/home/ahmedb/projects/Wav2Letter/Auditory_Cortex/conf/regression_w2l.yaml'
-with open(reg_conf, 'r') as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
+# reg_conf = '/home/ahmedb/projects/Wav2Letter/Auditory_Cortex/conf/regression_w2l.yaml'
+# with open(reg_conf, 'r') as f:
+#     config = yaml.load(f, Loader=yaml.FullLoader)
 
 
 
 data_dir = config['data_dir']
 bad_sessions = config['bad_sessions']
 results_dir = config['results_dir']
+results_dir = os.path.join(results_dir, 'cross_validated_correlations')
 delays = config['delays']
 bin_widths = config['bin_widths']
 # pretrained = config['pretrained']

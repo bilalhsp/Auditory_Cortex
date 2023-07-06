@@ -1,4 +1,3 @@
-neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 use_pca: False
 pca_comps: 50
 

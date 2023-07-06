@@ -27,6 +27,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        'numpy', 'scipy', 'matplotlib', 'pandas', 'sentencepiece', 'transformers'
+        'numpy', 'scipy', 'matplotlib', 'pandas', 'sentencepiece', 'transformers'#, 'cupy', 'seaborn', 'plotly', 'naplib', 'scikit-learn' 
     ],
 )

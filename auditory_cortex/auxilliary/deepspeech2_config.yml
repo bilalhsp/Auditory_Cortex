@@ -1,6 +1,5 @@
-neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
-saved_checkpoint: /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
 
+saved_checkpoint: /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
 use_pca: False
 
 layers:
