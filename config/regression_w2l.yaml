@@ -1,0 +1,69 @@
+neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
+#/scratch/gilbreth/ahmedb/auditory_cortex #/depot/jgmakin/data/auditory_cortex/DownerData
+sub: '200206'
+# results_dir: /depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations
+results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
+# pretrained: True
+use_cpu: False
+# pretrained_dir: /depot/jgmakin/data/auditory_cortex/pretrained_weights/w2l_modified/
+# checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
+# pretrained_correlations_file: testing_for_modified_code.csv #demain_corr.csv #w2l_corr_repeated_sents_itr.csv #'std_error_cc.csv' #'c_w2l_correlations.csv'
+# untrained_correlations_file: 'correlations_w2l_untrained.csv'
+
+# Ensure these settings before submitting every job..
+# model_name: wave2vec2
+# identifier: opt_delay
+# model_name: speech2text #
+# model_name: deepspeech2 
+# identifier: opt_delay_l2
+model_name: wave2letter_modified
+identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
+delay_features: True
+audio_zeropad: True
+delays_grid_search: True
+#### Ensure these settings before submitting every job..
+
+bad_sessions:
+- '200312'
+- '200401'
+- '191002'
+- '180619'
+- '180405'
+- '180406'
+delays_param:
+  start: 0
+  stop: 1
+  step: 10
+delays:
+# - 60
+- 0
+bin_widths:
+- 20
+dataset_sizes:
+# - 10
+- 500
+- 501
+- 5
+k_folds_validation: 2
+iterations: 1
+
+
+
+
+
+optimal_inputs_param:
+  model: wave2letter_modified
+  # model: wave2vec2
+  # model: speech2text
+  # model: whisper
+  starting_sent: 13        # 0 would mean, starting from random noise.
+  force_redo: False
+  layers: 
+  - 6
+  - 7
+  channels: 
+  - 10
+  - 32
+  - 60
+  - 62
+

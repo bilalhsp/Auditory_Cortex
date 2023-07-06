@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#SBATCH --output=./result_regression2.out
+#SBATCH --output=./result_regression.out
 
 #SBATCH	-A standby
 
@@ -11,6 +11,7 @@
 #SBATCH --time=4:00:00
 
 hostname
+NUMBA_DISABLE_INTEL_SVML=1
 echo $CUDA_VISIBLE_DEVICES
 module purge
 module load anaconda/2020.11-py38
@@ -19,3 +20,4 @@ module load conda-env/wav2letter-py3.8.5
 #module load conda-env/wav2letter_pretrained-py3.8.5
 
 python run_regression.py
+# python deepspeech2_testing.py

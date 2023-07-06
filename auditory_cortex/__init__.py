@@ -2,16 +2,23 @@
 import os
 import yaml
 import numpy as np
+from pycolormap_2d import ColorMap2DBremm, ColorMap2DZiegler
 
-# config_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
-# get parent directory of directory containing __inint__.py file (parent of parent)
-config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'conf')
 
+# select 2d color map to be used
+CMAP_2D = ColorMap2DZiegler
+
+# get parent directory of directory containing __init__.py file (parent of parent)
+aux_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
+
+
+# experiment configuration directory...!
+config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
 with open(os.path.join(config_dir, 'regression_w2l.yaml'), 'r') as f:
     config = yaml.load(f, yaml.FullLoader)
 
 results_dir = config['results_dir']
-# data_dir = manifest['_dir']
+saved_corr_dir = os.path.join(results_dir, 'cross_validated_correlations')
 
 
 
@@ -24,7 +31,6 @@ f_RH_sessions = np.array([191209, 200226, 200325, 200213, 200313, 191211, 200323
                 200312, 200219, 200401, 200318])
 c_LH_sessions = np.array([200207, 191212, 191206, 200206, 191125, 200610, 191113,
                  191002, 191115, 200205, 191219, 200617, 200212, 191121, 191210])
-
 
 
 # 2d coordinates or recording sessions...!
