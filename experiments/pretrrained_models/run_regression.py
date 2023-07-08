@@ -12,10 +12,9 @@ import pickle
 import time
 
 # local
-import auditory_cortex.regression as Reg
-import auditory_cortex.utils as utils
 from auditory_cortex import config
-
+import auditory_cortex.utils as utils
+import auditory_cortex.models as models
 from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
 from wav2letter.models import LitWav2Letter, Wav2LetterRF
 
@@ -27,7 +26,7 @@ START = time.time()
 
 
 
-data_dir = config['data_dir']
+data_dir = config['neural_data_dir']
 bad_sessions = config['bad_sessions']
 results_dir = config['results_dir']
 results_dir = os.path.join(results_dir, 'cross_validated_correlations')
@@ -98,7 +97,7 @@ for s in bad_sessions:
 # sessions = sessions[40:]
 # sessions = sessions[25:]
 
-obj = Reg.transformer_regression(
+obj = models.Regression(
             model_name=model_name, delay_features=delay_features, audio_zeropad=audio_zeropad
         )
 current_time = time.time()

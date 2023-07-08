@@ -1,4 +1,4 @@
-from auditory_cortex.regression import transformer_regression
+from auditory_cortex.models import Regression
 from auditory_cortex.ridge_regression import RidgeRegression 
 
 
@@ -28,7 +28,7 @@ output_dir = manifest['output_dir']
 # subject = '200206'
 # output_dir = '/Users/akshita/Documents/Research/Makin/Auditory_Cortex'
 
-reg = transformer_regression(data_path, subject)
+reg = Regression(data_path, subject)
 
 test_list = np.arange(450,499).tolist()
 train_val_list = np.arange(1,450)
@@ -118,7 +118,7 @@ for l in range(num_layers):
     #     f1.close()
 
 
-# from auditory_cortex.Regression import transformer_regression
+# from auditory_cortex.Regression import Regression
 
 # import json 
 # import sys
@@ -132,7 +132,7 @@ for l in range(num_layers):
 # w = 80
 
 # # print(alpha, alpha/10, alpha/10.0)
-# reg = transformer_regression('/depot/jgmakin/data/auditory_cortex/josh_data/data',sub)
+# reg = Regression('/depot/jgmakin/data/auditory_cortex/josh_data/data',sub)
 
 # # channels = np.arange(0,reg.dataset.num_channels).tolist()5
 # # alphas = [0.1, 0.2, 0.5, 0.8, ]

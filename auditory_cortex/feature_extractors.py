@@ -9,9 +9,9 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
-# from deepspeech_pytorch.model import DeepSpeech
-# import deepspeech_pytorch.loader.data_loader as data_loader
-# from deepspeech_pytorch.configs.train_config import SpectConfig
+from deepspeech_pytorch.model import DeepSpeech
+import deepspeech_pytorch.loader.data_loader as data_loader
+from deepspeech_pytorch.configs.train_config import SpectConfig
 
 # local
 from auditory_cortex import config_dir, results_dir, aux_dir
@@ -40,7 +40,7 @@ class FeatureExtractor():
         
         # create feature extractor as per model_name
         if model_name == 'wave2letter_modified':
-            checkpoint = os.path.join(results_dir, 'pretrained_weights', 'w2l_modified', self.config['saved_checkpoint'])
+            checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, self.config['saved_checkpoint'])
             self.extractor = FeatureExtractorW2L(checkpoint)
         elif model_name == 'wave2vec2':
             self.extractor = FeatureExtractorW2V2()
@@ -49,7 +49,8 @@ class FeatureExtractor():
         elif model_name == 'whisper':
             self.extractor = FeatureExtractorWhisper()
         elif model_name == 'deepspeech2':
-            self.extractor = FeatureExtractorDeepSpeech2(self.config['saved_checkpoint'])
+            checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, self.config['saved_checkpoint'])
+            self.extractor = FeatureExtractorDeepSpeech2(checkpoint)
         else:
             raise NotImplementedError(f"FeatureExtractor class does not support '{model_name}'")
 

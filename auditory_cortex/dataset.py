@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 import auditory_cortex.utils as utils
 
-class Neural_Data:
+class NeuralData:
   """Neural_dataset class loads neural data, from the directory specified at creation & 
   provides functions to retrieve 'relative/absolute' spike times, or spike counts in the durations
   whose width is specified by 'win'

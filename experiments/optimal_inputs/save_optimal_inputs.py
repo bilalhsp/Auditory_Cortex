@@ -10,7 +10,7 @@ import scipy
 import matplotlib.pyplot as plt
 import torch
 from scipy.io import wavfile
-import auditory_cortex.regression as Reg
+import auditory_cortex.models as Reg
 import auditory_cortex.utils as utils
 import numpy as np
 import pickle
