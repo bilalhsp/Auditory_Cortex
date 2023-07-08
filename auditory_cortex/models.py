@@ -3,7 +3,7 @@ import os
 import time
 import yaml
 import torch
-# import cupy as cp
+import cupy as cp
 import numpy as np
 import pandas as pd
 from scipy import linalg, signal
@@ -18,12 +18,6 @@ from auditory_cortex.dataset import NeuralData
 from auditory_cortex.feature_extractors import FeatureExtractor
 
 
-# import auditory_cortex.feature_extractors as feature_extractors
-# from auditory_cortex.feature_extractors import Feature_Extractor_S2T,Feature_Extractor_GRU,FeatureExtractorW2L
-
-# import rnn_model.speech_recognition as speech_recognition
-# import torchaudio
-# from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor,Wav2Vec2Processor, Wav2Vec2ForCTC
 
 class Regression():
     def __init__(
@@ -35,12 +29,6 @@ class Regression():
         ):
         """
         """
-
-        # config_file = os.path.join(config_dir, f"{model_name}_config.yml")
-        # with open(config_file, 'r') as f:
-        #     self.config = yaml.load(f, yaml.FullLoader)
-                        
-        # self.data_dir = self.config['neural_data_dir']
         self.data_dir = config['neural_data_dir']
 
         self.dataset = NeuralData(self.data_dir, '180810')
