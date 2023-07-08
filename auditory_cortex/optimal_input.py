@@ -10,7 +10,7 @@ from scipy import linalg, signal
 
 
 # local
-import auditory_cortex.regression as Reg
+import auditory_cortex.models as models
 import auditory_cortex.utils as utils
 
 #from sklearn.decomposition import PCA
@@ -23,7 +23,7 @@ class optimal_input():
    
     # def __init__(self, dir, subject, model, load_features = True):
 
-        self.linear_model = Reg.transformer_regression(model, load_features=load_features)
+        self.linear_model = models.Regression(model, load_features=load_features)
         self.num_layers = self.linear_model.num_layers
         self.num_channels = {}
 

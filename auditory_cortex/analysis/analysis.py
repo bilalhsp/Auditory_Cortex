@@ -13,9 +13,7 @@ from sklearn.decomposition import PCA
 
 #local 
 # from auditory_cortex.analysis.config import *
-import auditory_cortex.regression as Reg
-# import auditory_cortex.analysis.config as config
-import auditory_cortex.helpers as helpers
+import auditory_cortex.models as models
 import auditory_cortex.utils as utils
 
 from auditory_cortex import session_to_coordinates, CMAP_2D
@@ -33,8 +31,7 @@ from naplib.visualization import imSTRF
 class STRF:
     def __init__(self, session):
         session = str(session)
-        # self.reg_obj = helpers.get_regression_obj(load_features=False)
-        self.reg_obj = Reg.transformer_regression(model_name = 'wave2letter_modified', load_features=False)
+        self.reg_obj = models.Regression(model_name = 'wave2letter_modified', load_features=False)
         # _ = self.reg_obj.load_spikes(bin_width=10, numpy=True)
         _ = self.reg_obj.get_neural_spikes(session, bin_width=20, numpy=True)
         # print(self.reg_obj.list_loaded_sessions())
@@ -107,7 +104,7 @@ class STRF:
 
 
 
-class correlations:
+class Correlations:
     def __init__(self, model=None, sig_threshold=0.1) -> None:
         
         if model is None:
@@ -581,22 +578,20 @@ class PCA_analysis:
             modes_file_path = os.path.join(config.results_dir, config.pca_kde_sub_dir,
                                         config.pca_dist_modes_filename)
         self.data = pd.read_csv(modes_file_path)
-        self.corr = correlations()
+        self.corr = Correlations()
     
 
 
 class PCA_topography:
     def __init__(self) -> None:
         # regression object and load features.
-        # self.reg_obj = helpers.get_regression_obj('200206', load_features=False,
-        #             checkpoint=checkpoint)
-        self.reg_obj = Reg.transformer_regression(model_name='wave2letter_modified', load_features=False)
+        self.reg_obj = models.Regression(model_name='wave2letter_modified', load_features=False)
         self.features = None
         self.pcs = {}       # dict for principle components for layers...
         self.pca = {}       # dict for pca objects for layers (this can be used to get pcs for single sents)
 
         # correlation results object.
-        self.corr = correlations()
+        self.corr = Correlations()
         
         #saved pca_kde..
         self.kde_file_path = os.path.join(results_dir, pca_kde_sub_dir, pca_kde_data_filename)

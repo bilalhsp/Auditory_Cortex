@@ -14,7 +14,7 @@ aux_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
 
 # experiment configuration directory...!
 config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
-with open(os.path.join(config_dir, 'regression_w2l.yaml'), 'r') as f:
+with open(os.path.join(config_dir, 'regression_config.yaml'), 'r') as f:
     config = yaml.load(f, yaml.FullLoader)
 
 results_dir = config['results_dir']

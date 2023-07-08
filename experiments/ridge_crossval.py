@@ -1,4 +1,4 @@
-from auditory_cortex.regression import transformer_regression
+from auditory_cortex.regression import Regression
 from auditory_cortex.ridge_regression import RidgeRegression 
 
 
@@ -29,7 +29,7 @@ output_dir = manifest['output_dir']
 # subject = '200206'
 # output_dir = '/Users/akshita/Documents/Research/Makin/Auditory_Cortex'
 
-reg = transformer_regression(data_path, subject)
+reg = Regression(data_path, subject)
 
 test_list = np.arange(450,499).tolist()
 train_val_list = np.arange(1,450)

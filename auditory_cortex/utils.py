@@ -1,14 +1,16 @@
-import numpy as np
-# import cupy as cp
-import torch
-import torch.nn as nn
 import os
-import pandas as pd
-from scipy import linalg
-import torchaudio
+import torch
 import pickle
+import torchaudio
+
+import cupy as cp
+import numpy as np
+import pandas as pd
+import torch.nn as nn
 import matplotlib as mpl
-import auditory_cortex.helpers as helpers
+from scipy import linalg
+
+# local
 from auditory_cortex import session_to_coordinates, CMAP_2D
 # from pycolormap_2d import ColorMap2DBremm
 

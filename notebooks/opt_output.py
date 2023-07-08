@@ -12,7 +12,7 @@ from gradient_extraction.get_gradients import GetGradient
 # initialise and load pretrained models
 model = Speech2TextModel.from_pretrained("facebook/s2t-small-librispeech-asr")
 feature_extractor = Speech2TextFeatureExtractor.from_pretrained("facebook/s2t-small-librispeech-asr")
-# reg = transformer_regression(dir, subject)
+# reg = Regression(dir, subject)
 
 for param in model.parameters():
     param.requires_grad = False
