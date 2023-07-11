@@ -17,7 +17,9 @@ module purge
 module load anaconda/2020.11-py38
 module load use.own
 module load conda-env/wav2letter-py3.8.5
+# module load gcc/9.3.0
 #module load conda-env/wav2letter_pretrained-py3.8.5
+
 
 python run_regression.py
 # python deepspeech2_testing.py

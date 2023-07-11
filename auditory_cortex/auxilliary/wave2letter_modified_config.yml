@@ -48,23 +48,23 @@ layers:
   RF: 160               #(159.44 ms)
   layer_type: conv
 
-# - layer_name: conv9
-#   layer_id: 8
-#   RF: 280               #(279.44 ms)
-#   layer_type: conv
-# - layer_name: conv10
-#   layer_id: 9
-#   RF: 400               #(399.44 ms)
-#   layer_type: conv
+- layer_name: conv9
+  layer_id: 8
+  RF: 280               #(279.44 ms)
+  layer_type: conv
+- layer_name: conv10
+  layer_id: 9
+  RF: 400               #(399.44 ms)
+  layer_type: conv
 
-# - layer_name: conv11
-#   layer_id: 10
-#   RF: 520               #(519.44 ms)
-#   layer_type: conv
-# - layer_name: conv12
-#   layer_id: 11
-#   RF: 640               #(639.44 ms)
-#   layer_type: conv
+- layer_name: conv11
+  layer_id: 10
+  RF: 520               #(519.44 ms)
+  layer_type: conv
+- layer_name: conv12
+  layer_id: 11
+  RF: 640               #(639.44 ms)
+  layer_type: conv
   
 # - layer_name: conv13
 #   layer_id: 12

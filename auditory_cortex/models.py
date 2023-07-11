@@ -723,75 +723,6 @@ class Regression():
     #############################################################
 
 
-    # def simply_spikes(self, sent_s=1, sent_e=499, ch=0, delay=0, def_w=40, offset=0):
-    #     spikes ={}
-    #     for x,i in enumerate(range(sent_s,sent_e)):
-    #         spikes[x] = torch.tensor(self.dataset.retrieve_spike_counts(sent=i,win=def_w,delay=delay,early_spikes=False,
-    #                                                                     offset=offset)[ch])
-    #     spikes = torch.cat([spikes[i] for i in range(sent_e - sent_s)], dim = 0).numpy()
-    #     return spikes
-
-    # def all_channel_spikes(self, bin_width=40, delay=0, offset=0, sents = None):
-    #     if sents is None:
-    #         sents = self.sents
-    #     spikes = []
-    #     result = {}
-    #     for x,i in enumerate(sents):
-    #         spikes.append(self.dataset.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,early_spikes=False,offset=offset))
-    #     for ch in range(self.dataset.num_channels):
-    #         result[ch] = np.concatenate([spikes[i][ch] for i in range(len(spikes))], axis=0)
-    #     return result
-
-    # def extract_spikes(self, bin_width=40, delay=0, offset=0, sents = None, numpy=True):
-    #     if sents is None:
-    #         sents = self.sents
-    #     raw_spikes = {}
-    #     for x,i in enumerate(sents):
-    #         spikes = self.dataset.retrieve_spike_counts(sent=i,win=bin_width,delay=delay,
-    #                                                     early_spikes=False,offset=offset)
-    #         tmp = np.stack([spikes[ch] for ch in range(self.dataset.num_channels)], axis=1)
-    #         if not numpy:
-    #             tmp = cp.array(tmp)
-    #         mean = np.mean(tmp, axis=0)    
-    #         raw_spikes[i] = tmp #- mean
-    #     return raw_spikes
-
-    # def unroll_spikes(self, sents=None, numpy=True):
-    #     """
-    #     Unroll and concatenate time axis of extracted spikes.
-
-    #     Args:
-    #         sents (List): indices of sents.
-
-    #     Returns:
-            
-    #     """
-    #     if sents is None:
-    #         sents = self.raw_spikes.keys()
-    #     if numpy:
-    #         spikes = np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
-    #     else:
-    #         spikes = cp.concatenate([self.raw_spikes[sent] for sent in sents], axis=0)
-    #     return spikes
-
-    # def unroll_spikes(self, session, sents=mapping_set, numpy=numpy):
-
-
-    # def unroll_spikes_cp(self, sents=None):
-    #     """
-    #     Unroll and concatenate time axis of extracted spikes.
-
-    #     Args:
-    #         sents (List): indices of sents.
-
-    #     Returns:
-            
-    #     """
-    #     if sents is None:
-    #         sents = self.raw_spikes.keys()
-    #     spikes = cp.array(np.concatenate([self.raw_spikes[sent] for sent in sents], axis=0))
-    #     return spikes
-
     def get_cc_norm_layer(self, layer, win, delay=0, sents= np.arange(1,499),normalize = False, load_features=False):
         """
         | Gives correlation coefficients for given
@@ -814,25 +745,7 @@ class Regression():
             
         return train_cc_norm, val_cc_norm, test_cc_norm
 
-    # def get_feats_and_spikes(self, layer, win, delay=0, sents= np.arange(1,499), load_features=False):
-    #     """
-    #     | Gives features and spikes data for given
-    #     | 'layer' and all channels.
-    #     """
-    #     if load_features:
-    #         print("Loading model layer features now...!")
-    #         self.features = self.load_features()
 
-    #     def_w, offset = self.model_extractor.def_bin_width(layer)            
-    #     k = int(win/def_w)    # 40 is the min, bin size for 'Speech2Text' transformer model 
-    #     feats = self.features[layer]
-    #     spikes = self.all_channel_spikes(sents=sents, delay=delay, bin_width=def_w, offset=offset)
-    #     if k>1:
-    #         feats = utils.down_sample(feats, k)
-    #         for ch in range(self.dataset.num_channels):
-    #             spikes[ch] = utils.down_sample(spikes[ch],k)
-
-    #     return feats, spikes
 
     def get_cc_norm(self, layer, win, channel, delay=0, normalize = False, sents= np.arange(1,499), load_features=False):
         """
