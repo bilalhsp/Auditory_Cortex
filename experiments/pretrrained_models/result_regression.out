@@ -1,8 +1,826 @@
-gilbreth-e001.rcac.purdue.edu
+gilbreth-b006.rcac.purdue.edu
 0
 The following modules were not unloaded:
   (Use "module --force purge" to unload all):
 
   1) xalt/1.1.2
-Some weights of Wav2Vec2ForCTC were not initialized from the model checkpoint at facebook/wav2vec2-base-960h and are newly initialized: ['wav2vec2.masked_spec_embed']
-You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+INFO:fairseq.tasks.text_to_speech:Please install tensorboardX: pip install tensorboardX
+DEBUG:hydra.core.utils:Setting JobRuntime:name=UNKNOWN_NAME
+DEBUG:hydra.core.utils:Setting JobRuntime:name=utils
+DEBUG:hydra.core.utils:Setting JobRuntime:name=utils
+INFO:fairseq.models.wav2vec.wav2vec:Wav2VecModel(
+  (feature_extractor): ConvFeatureExtractionModel(
+    (conv_layers): ModuleList(
+      (0): Sequential(
+        (0): Conv1d(1, 512, kernel_size=(10,), stride=(5,), bias=False)
+        (1): Dropout(p=0.0, inplace=False)
+        (2): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (3): ReLU()
+      )
+      (1): Sequential(
+        (0): Conv1d(512, 512, kernel_size=(8,), stride=(4,), bias=False)
+        (1): Dropout(p=0.0, inplace=False)
+        (2): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (3): ReLU()
+      )
+      (2-4): 3 x Sequential(
+        (0): Conv1d(512, 512, kernel_size=(4,), stride=(2,), bias=False)
+        (1): Dropout(p=0.0, inplace=False)
+        (2): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (3): ReLU()
+      )
+      (5-6): 2 x Sequential(
+        (0): Conv1d(512, 512, kernel_size=(1,), stride=(1,), bias=False)
+        (1): Dropout(p=0.0, inplace=False)
+        (2): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (3): ReLU()
+      )
+    )
+  )
+  (feature_aggregator): ConvAggegator(
+    (conv_layers): Sequential(
+      (0): Sequential(
+        (0): ReplicationPad1d((1, 0))
+        (1): Conv1d(512, 512, kernel_size=(2,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (1): Sequential(
+        (0): ReplicationPad1d((2, 0))
+        (1): Conv1d(512, 512, kernel_size=(3,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (2): Sequential(
+        (0): ReplicationPad1d((3, 0))
+        (1): Conv1d(512, 512, kernel_size=(4,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (3): Sequential(
+        (0): ReplicationPad1d((4, 0))
+        (1): Conv1d(512, 512, kernel_size=(5,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (4): Sequential(
+        (0): ReplicationPad1d((5, 0))
+        (1): Conv1d(512, 512, kernel_size=(6,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (5): Sequential(
+        (0): ReplicationPad1d((6, 0))
+        (1): Conv1d(512, 512, kernel_size=(7,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (6): Sequential(
+        (0): ReplicationPad1d((7, 0))
+        (1): Conv1d(512, 512, kernel_size=(8,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (7): Sequential(
+        (0): ReplicationPad1d((8, 0))
+        (1): Conv1d(512, 512, kernel_size=(9,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (8): Sequential(
+        (0): ReplicationPad1d((9, 0))
+        (1): Conv1d(512, 512, kernel_size=(10,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (9): Sequential(
+        (0): ReplicationPad1d((10, 0))
+        (1): Conv1d(512, 512, kernel_size=(11,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (10): Sequential(
+        (0): ReplicationPad1d((11, 0))
+        (1): Conv1d(512, 512, kernel_size=(12,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+      (11): Sequential(
+        (0): ReplicationPad1d((12, 0))
+        (1): Conv1d(512, 512, kernel_size=(13,), stride=(1,))
+        (2): Dropout(p=0.0, inplace=False)
+        (3): Fp32GroupNorm(1, 512, eps=1e-05, affine=True)
+        (4): ReLU()
+      )
+    )
+    (residual_proj): ModuleList(
+      (0-11): 12 x None
+    )
+  )
+  (wav2vec_predictions): Wav2VecPredictionsModel(
+    (project_to_steps): ConvTranspose2d(512, 512, kernel_size=(1, 12), stride=(1, 1))
+    (dropout): Dropout(p=0.0, inplace=False)
+  )
+  (dropout_feats): Dropout(p=0.0, inplace=False)
+  (dropout_agg): Dropout(p=0.0, inplace=False)
+)
+Loading Neural data for session: 180810 ... Done.
+Creating regression obj for: 'wave2vec'
+Loading ANN features at bin-width: 20
+It takes 143.04 seconds to load features...!
+Working with '190801'
+Loading Neural data for session: 190801 ... Done.
+Loading neural spikes with delay: 0ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 6.23 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.87 sec/mapping.
+It takes (on avg.) 0.27 minutes/iteration...!
+Loading neural spikes with delay: 5ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.75 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.94 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 10ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.76 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 15ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.71 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.87 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 20ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.95 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 25ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.75 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.79 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 30ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.67 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 35ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.72 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.88 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 40ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.78 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.92 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 45ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.71 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.86 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 50ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 55ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 60ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.66 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.81 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 65ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 70ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.76 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.86 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 75ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.93 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 80ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.70 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 85ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.83 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 90ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.67 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.87 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 95ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.69 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.90 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 100ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190801
+It takes (on avg.) 3.77 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.86 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Data saved for model: 'wave2vec', session: '190801',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/results/cross_validated_correlations/wave2vec_neural_delay_only_corr_results.csv'
+Working with '190607'
+Loading Neural data for session: 190607 ... Done.
+Loading neural spikes with delay: 0ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.69 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 5ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.79 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 10ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.72 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 15ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.70 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 20ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.77 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.83 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 25ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.68 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.81 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 30ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.76 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.97 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 35ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.88 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 40ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.90 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 45ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.71 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.88 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 50ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.70 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.85 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 55ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.69 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.88 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 60ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.82 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.93 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 65ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.85 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 70ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.69 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 75ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.80 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.88 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 80ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.65 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.80 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 85ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.68 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.82 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 90ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.82 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.86 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 95ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.70 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 10.13 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 100ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 190607
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.79 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Data saved for model: 'wave2vec', session: '190607',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/results/cross_validated_correlations/wave2vec_neural_delay_only_corr_results.csv'
+Working with '191121'
+Loading Neural data for session: 191121 ... Done.
+Loading neural spikes with delay: 0ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.87 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.76 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 5ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.63 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 10ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.75 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.74 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 15ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.82 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.72 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 20ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.68 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 25ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.66 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 30ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.88 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.70 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 35ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.75 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.68 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 40ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.72 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 45ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.75 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.71 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 50ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.80 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.67 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 55ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.64 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 60ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.74 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.73 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 65ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.86 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.69 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 70ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.72 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.61 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 75ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.76 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.70 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 80ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.85 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.70 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 85ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.75 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.68 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 90ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.72 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.68 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 95ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.77 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.70 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 100ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 191121
+It takes (on avg.) 3.84 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.71 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Data saved for model: 'wave2vec', session: '191121',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/results/cross_validated_correlations/wave2vec_neural_delay_only_corr_results.csv'
+Working with '200206'
+Loading Neural data for session: 200206 ... Done.
+Loading neural spikes with delay: 0ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.83 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.90 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 5ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.66 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.85 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 10ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.78 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.90 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 15ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.70 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.83 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 20ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.81 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 25ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.69 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 30ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.84 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.90 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 35ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.69 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.88 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 40ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.83 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.87 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 45ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.70 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.81 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 50ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.81 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 55ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.72 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.83 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 60ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.79 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.85 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 65ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.71 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.82 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 70ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.85 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.91 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 75ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.68 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.77 sec/mapping.
+It takes (on avg.) 0.22 minutes/iteration...!
+Loading neural spikes with delay: 80ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.76 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.84 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 85ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.80 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 90ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 95ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.73 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.85 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Loading neural spikes with delay: 100ms
+# of iterations requested: 1, 
+                 # of lambda samples per iteration: 10
+Itr: 1:
+2_fold CV for session: 200206
+It takes (on avg.) 3.71 sec (all lmbdas). (time for 2-folds)
+It takes (on avg.) 9.89 sec/mapping.
+It takes (on avg.) 0.23 minutes/iteration...!
+Data saved for model: 'wave2vec', session: '200206',    bin-width: 20ms, delay: 0ms at file: '/depot/jgmakin/data/auditory_cortex/results/cross_validated_correlations/wave2vec_neural_delay_only_corr_results.csv'
+Took 32.74 min., for bin_widths: '[20]' and delays: '[0]'.

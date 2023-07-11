@@ -2,86 +2,86 @@ use_pca: False
 
 layers:
 
-- layer_name: wav2vec2.feature_extractor.conv_layers.0.activation   
-  layer_id: 0
-  layer_type: conv
-  RF: 0.62   # RF is in ms.
-- layer_name: wav2vec2.feature_extractor.conv_layers.1.activation   
-  layer_id: 1
-  layer_type: conv
-  RF: 1.25   # RF is in ms.
-- layer_name: wav2vec2.feature_extractor.conv_layers.2.activation   
-  layer_id: 2
-  layer_type: conv
-  RF: 2.5   # RF is in ms.
-- layer_name: wav2vec2.feature_extractor.conv_layers.3.activation   
-  layer_id: 3
-  layer_type: conv
-  RF: 5   # RF is in ms.
-- layer_name: wav2vec2.feature_extractor.conv_layers.4.activation   
-  layer_id: 4
-  layer_type: conv
-  RF: 10   # RF is in ms.
-- layer_name: wav2vec2.feature_extractor.conv_layers.5.activation   
-  layer_id: 5
-  layer_type: conv
-  RF: 15   # RF is in ms.
-- layer_name: wav2vec2.feature_extractor.conv_layers.6.activation   
-  layer_id: 6
-  layer_type: conv
-  RF: 25   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.0.activation   
+#   layer_id: 0
+#   layer_type: conv
+#   RF: 0.62   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.1.activation   
+#   layer_id: 1
+#   layer_type: conv
+#   RF: 1.25   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.2.activation   
+#   layer_id: 2
+#   layer_type: conv
+#   RF: 2.5   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.3.activation   
+#   layer_id: 3
+#   layer_type: conv
+#   RF: 5   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.4.activation   
+#   layer_id: 4
+#   layer_type: conv
+#   RF: 10   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.5.activation   
+#   layer_id: 5
+#   layer_type: conv
+#   RF: 15   # RF is in ms.
+# - layer_name: wav2vec2.feature_extractor.conv_layers.6.activation   
+#   layer_id: 6
+#   layer_type: conv
+#   RF: 25   # RF is in ms.
 
 
 
-# - layer_name: wav2vec2.encoder.layer_norm   # this is right after the conv-pos-embedding
-#   layer_id: 7
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.0.final_layer_norm
-#   layer_id: 8
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.1.final_layer_norm
-#   layer_id: 9
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.2.final_layer_norm
-#   layer_id: 10
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.3.final_layer_norm
-#   layer_id: 11
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.4.final_layer_norm
-#   layer_id: 12
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.5.final_layer_norm
-#   layer_id: 13
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.6.final_layer_norm
-#   layer_id: 14
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.7.final_layer_norm
-#   layer_id: 15
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.8.final_layer_norm
-#   layer_id: 16
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.9.final_layer_norm
-#   layer_id: 17
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.10.final_layer_norm
-#   layer_id: 18
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.11.final_layer_norm
-#   layer_id: 19
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layer_norm   # this is right after the conv-pos-embedding
+  layer_id: 7
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.0.final_layer_norm
+  layer_id: 8
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.1.final_layer_norm
+  layer_id: 9
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.2.final_layer_norm
+  layer_id: 10
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.3.final_layer_norm
+  layer_id: 11
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.4.final_layer_norm
+  layer_id: 12
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.5.final_layer_norm
+  layer_id: 13
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.6.final_layer_norm
+  layer_id: 14
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.7.final_layer_norm
+  layer_id: 15
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.8.final_layer_norm
+  layer_id: 16
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.9.final_layer_norm
+  layer_id: 17
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.10.final_layer_norm
+  layer_id: 18
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.11.final_layer_norm
+  layer_id: 19
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer

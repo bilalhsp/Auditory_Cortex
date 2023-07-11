@@ -9,7 +9,8 @@ results_dir: /depot/jgmakin/data/auditory_cortex/results/
 use_cpu: False
 
 # Ensure these settings before submitting every job..
-model_name: wave2vec2
+# model_name: wave2vec2
+# identifier: neural_delay_only_feature_extractor
 # identifier: all_opt_delays_feature_extractor
 # identifier: basic_features_extractor #basic 
 # identifier: RF_delay_features_extractor #RF_delay
@@ -20,8 +21,12 @@ model_name: wave2vec2
 # identifier: all_opt_delays_l0
 # identifier: opt_delay_l0
 # model_name: wave2letter_modified
+# identifier: neural_delay_only_l0
 
-identifier: neural_delay_only_feature_extractor
+model_name: wave2vec
+# identifier: ''
+identifier: neural_delay_only
+
 # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
 delay_features: False
 audio_zeropad: False
