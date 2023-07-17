@@ -141,7 +141,7 @@ class FeatureExtractorW2L():
         """
         input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
         input = input.unsqueeze(dim=0)
-        input.requires_grad=True
+        # input.requires_grad=True
         self.model.eval()
         out = self.model(input)
         return input
@@ -190,6 +190,26 @@ class FeatureExtractorW2V2():
         # self.model.eval()
         # out = self.model(input)
         return input
+    
+    def fwd_pass_tensor(self, aud_tensor):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (tensor): input tensor 'wav' input of shape (1, t) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        logits = self.model(aud_tensor).logits
+       
+        # # gives us translated sentence
+        # predicted_ids = torch.argmax(logits, dim=-1)
+        # # transcribe speech
+        # transcription = self.processor.batch_decode(predicted_ids)
+        return logits
 
 class FeatureExtractorS2T():
     def __init__(self):
@@ -250,5 +270,26 @@ class FeatureExtractorW2V():
         with torch.no_grad():
             z = self.model.feature_extractor(aud_tensor)
             c = self.model.feature_aggregator(z)
+        return c
+
+    def fwd_pass_tensor(self, aud_tensor):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (tensor): input tensor 'wav' input of shape (1, t) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        z = self.model.feature_extractor(aud_tensor)
+        c = self.model.feature_aggregator(z)
+       
+        # # gives us translated sentence
+        # predicted_ids = torch.argmax(logits, dim=-1)
+        # # transcribe speech
+        # transcription = self.processor.batch_decode(predicted_ids)
         return c
 

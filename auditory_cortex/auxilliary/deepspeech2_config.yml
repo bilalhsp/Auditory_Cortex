@@ -5,8 +5,6 @@ use_pca: False
 
 layers:
 
-
-
 - layer_name: conv.seq_module.2
   layer_id: 0
   layer_type: conv

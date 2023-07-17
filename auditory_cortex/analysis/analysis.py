@@ -125,6 +125,7 @@ class Correlations:
         self.baseline_corr['strf_corr_normalized'] = self.baseline_corr['strf_corr']/(self.baseline_corr['normalizer'].apply(np.sqrt))
         # STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_RidgeCV.npy')
         # self.baseline_corr = np.load(STRF_file_path)
+        self.fill_color = {'conv': 'bisque', 'rnn': 'lightgreen', 'transformer': 'lightskyblue'}
         
     def get_baseline_corr_ch(self, session, ch, bin_width=20, delay=0, column='strf_corr'):
         corr = self.baseline_corr[
@@ -154,7 +155,11 @@ class Correlations:
         return select_baseline[column]
 
     def write_back(self):
-        self.data.to_csv(self.corr_file_path)
+        self.data.to_csv(self.corr_file_path, index=False)
+    ##### TMPORARY function...to be removed 
+    def add_layer_types(self):
+        self.data['layer_type'] = 'conv'
+        self.write_back
 
     def get_significant_sessions(self, threshold = None):
         """Returns sessions with corr scores above significant threshold for at least 1 channel"""
@@ -174,17 +179,17 @@ class Correlations:
         """Return layers indices for given session."""
         return self.data[self.data['session'] == float(session)]['layer'].unique()
     
-    def get_corr_score(self, session, layer, ch, bin_width=20, delay=0, N_sents=500):
+    def get_corr_score(self, session, layer, ch, bin_width=20, delay=0, N_sents=499):
         """Return the correlation coefficient for given specs."""
         select_data = self.data[
             (self.data['session']==float(session)) & \
             (self.data['bin_width']==bin_width) & \
             (self.data['delay']==delay) & \
-            (self.data['N_sents']==N_sents) &\
+            (self.data['N_sents']>=N_sents) &\
             (self.data['layer']==layer) &\
             (self.data['channel']==ch)   
             ]
-        return select_data['test_cc_raw'].item()
+        return select_data.head(1)['test_cc_raw'].item()
     
     def get_session_corr(self, session, bin_width = 20, delay = 0, N_sents = 499):
         """Returns correlations result for the specific 'session' and given selections
@@ -285,17 +290,17 @@ class Correlations:
         # id of highest correlation in the selection..!
         id = select_data.idxmax()['test_cc_raw']
         return self.data.iloc[id]['channel']
-    def get_good_channels(self, session, layer, threshold=0.1,bin_width=20, delay=0, N_sents=500):
+    def get_good_channels(self, session, threshold=0.1,bin_width=20, delay=0, N_sents=499):
         """Return good channels for given session, layer and other selections.."""
         select_data = self.data[
             (self.data['session']==float(session)) & \
             (self.data['bin_width']==bin_width) & \
             (self.data['delay']==delay) & \
-            (self.data['N_sents']==N_sents) &\
-            (self.data['layer']==layer) &\
+            (self.data['N_sents']>=N_sents) &\
+            # (self.data['layer']==layer) &\
             (self.data['normalizer'] >= threshold)     
             ]
-        return select_data['channel'].tolist()
+        return select_data['channel'].unique().tolist()
 
     def summarize(self, session, threshold=0.0,bin_width=20, delay=0, N_sents=499,
                     col_name='test_cc_raw'):
@@ -356,7 +361,6 @@ class Correlations:
 
         if layer is not None:
             select_data = select_data[select_data['layer']==float(layer)]
-
 
         if channel is not None:
             select_data = select_data[select_data['channel']==float(channel)]
@@ -432,8 +436,16 @@ class Correlations:
         # ax1.set_title('Basic Plot')
         green_diamonds = dict(marker='D', markerfacecolor = 'g')
         red_lines = dict(color='r', linewidth=3)  
-        ax.boxplot(layer_spread.values(), positions = np.arange(1, len(layer_spread.keys())+1), labels=layer_spread.keys(),
-                    whis=[5,95], notch=True, flierprops = green_diamonds, medianprops=red_lines)
+        bplot = ax.boxplot(layer_spread.values(), positions = np.arange(1, len(layer_spread.keys())+1), labels=layer_spread.keys(),
+                    whis=[5,95], notch=True, flierprops = green_diamonds, medianprops=red_lines,
+                    patch_artist=True)
+        
+        # setting the colors of the boxes as per layer type..
+        for layer_id, box in zip(layer_ids, bplot['boxes']):
+            ids = self.data[self.data['layer']==layer_id].index
+            layer_type = self.data.loc[ids, 'layer_type'].unique().item()
+            color = self.fill_color[layer_type]
+            box.set_facecolor(color)
 
         ax.set_title(f"{self.model}, session-{session}{norm}")
         ax.set_xlabel('layer IDs')
