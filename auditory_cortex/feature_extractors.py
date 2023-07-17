@@ -6,15 +6,15 @@ import numpy as np
 from torch import nn, Tensor
 from abc import ABC, abstractmethod
 
-import fairseq
 
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
-from deepspeech_pytorch.model import DeepSpeech
-import deepspeech_pytorch.loader.data_loader as data_loader
-from deepspeech_pytorch.configs.train_config import SpectConfig
+# import fairseq
+# from deepspeech_pytorch.model import DeepSpeech
+# import deepspeech_pytorch.loader.data_loader as data_loader
+# from deepspeech_pytorch.configs.train_config import SpectConfig
 
 # local
 from auditory_cortex import config_dir, results_dir, aux_dir

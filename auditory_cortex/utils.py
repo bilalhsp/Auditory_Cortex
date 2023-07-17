@@ -1,17 +1,21 @@
 import os
-import torch
+import yaml
 import pickle
-import torchaudio
 
-import cupy as cp
+import torch
+import torchaudio
+# import cupy as cp
+import torch.nn as nn
+
 import numpy as np
 import pandas as pd
-import torch.nn as nn
+
 import matplotlib as mpl
 from scipy import linalg
 
 # local
 from auditory_cortex import session_to_coordinates, CMAP_2D
+from auditory_cortex import results_dir, aux_dir, saved_corr_dir
 # from pycolormap_2d import ColorMap2DBremm
 
 
@@ -36,6 +40,45 @@ from auditory_cortex import session_to_coordinates, CMAP_2D
 #     c3 = (c1[0],c2[1] ,0.0, c1[3])
 #     # c3 = cmap_2d(c1, c2)
 #     return c3
+
+class CorrelationUtils:
+    """Contains utility functions for correlations analysis related help.
+    """
+
+    @staticmethod
+    def add_layer_types(model_name, results_identifer):
+
+        # reading layer_types from aux config...
+        layer_types = {}
+        config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
+        with open(config_file, 'r') as f:
+            config = yaml.load(f, yaml.FullLoader)
+
+        # config['layers']
+        for layer_config in config['layers']:
+            layer_types[layer_config['layer_id']] = layer_config['layer_type']
+
+        # reading results directory...
+        if results_identifer != '':
+            model = f'{model_name}_{results_identifer}'
+        else:
+            model = model_name 
+        filename = f"{model}_corr_results.csv"
+        file_path = os.path.join(saved_corr_dir, filename)
+        data = pd.read_csv(file_path)
+        print(f"reading from {file_path}")
+
+        # remove 'Unnamed' columns
+        data = data.loc[:, ~data.columns.str.contains('Unnamed')]
+
+        # add 'layer_type' as a column
+        for layer, type in layer_types.items():
+            ids = data[data['layer']==layer].index
+            data.loc[ids, 'layer_type'] = type
+
+        data.to_csv(file_path, index=False)
+
+
 
 def get_2d_cmap(session):
     cmap_2d = CMAP_2D(range_x=(-2, 2), range_y=(-2, 2))

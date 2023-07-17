@@ -1,10 +1,10 @@
 # windows paths (for my laptop)
-# neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
-# results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
+neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
+results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
 
 # Gilbreth paths (HPC)
-neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
-results_dir: /depot/jgmakin/data/auditory_cortex/results/
+# neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+# results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
 use_cpu: False
 
