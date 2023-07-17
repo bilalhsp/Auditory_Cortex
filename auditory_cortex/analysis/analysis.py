@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
 
+from palettable.colorbrewer import qualitative
+
 
 #local 
 # from auditory_cortex.analysis.config import *
@@ -125,7 +127,14 @@ class Correlations:
         self.baseline_corr['strf_corr_normalized'] = self.baseline_corr['strf_corr']/(self.baseline_corr['normalizer'].apply(np.sqrt))
         # STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_RidgeCV.npy')
         # self.baseline_corr = np.load(STRF_file_path)
-        self.fill_color = {'conv': 'bisque', 'rnn': 'lightgreen', 'transformer': 'lightskyblue'}
+
+        # using colorbrewer (palettable) colors... 
+        colors = qualitative.Set2_8.mpl_colors
+        layer_types = self.data['layer_type'].unique()
+        self.fill_color = {}
+        for layer, color in zip(layer_types, colors):
+            self.fill_color[layer] = color
+        # self.fill_color = {'conv': Set2_3.mpl_colors[0], 'rnn': 'lightgreen', 'transformer': 'lightskyblue'}
         
     def get_baseline_corr_ch(self, session, ch, bin_width=20, delay=0, column='strf_corr'):
         corr = self.baseline_corr[
@@ -370,7 +379,7 @@ class Correlations:
 
     
     def box_plot_correlations(self, session=None, threshold=0.0,bin_width=20, delay=0, N_sents=499,
-                    normalized=False, ax=None, delta_corr=False, y_axis_lim=None):
+                    normalized=False, ax=None, delta_corr=False, y_axis_lim=None, lw=1.5):
         """Plots box and whisker graphs for each layer of the given session, 
         if no session is mentioned, then it plots the same layer-wise plots by taking together 
         significant neurons from all sessions.
@@ -395,8 +404,6 @@ class Correlations:
         
         if delta_corr:
             layer_spread = {}
-            # layer_ids = select_data['layer'].unique()
-            # channel_ids = select_data['channel'].unique()
             for layer in layer_ids:
                 differences = []
                 ids = select_data[select_data['layer']==layer].index
@@ -405,8 +412,6 @@ class Correlations:
                     ch = int(select_data.loc[id, 'channel'])
                     sess = select_data.loc[id, 'session']
                     baseline = self.get_baseline_corr_ch(sess, ch, column=strf_column)
-                    # if normalized:
-                    #     baseline = baseline / select_data.loc[id, 'normalizer']
                     differences.append(channel_corr - baseline)
 
                 layer_spread[int(layer)] = np.array(differences)
@@ -417,10 +422,6 @@ class Correlations:
                 ids = select_data[select_data['layer']==layer].index
                 layer_spread[int(layer)] = np.array(select_data.loc[ids, column]).squeeze()
 
-            # layer_ids = select_data['layer'].unique()
-            # for layer in layer_ids:
-            #     layer_spread[int(layer)] =  np.array(select_data[select_data['layer']==layer][column])
-            # # plotting the baseline...
             baseline_corr = self.get_baseline_corr_session(session, column=strf_column, threshold=threshold)
             print(f"Baseline median: {np.median(baseline_corr):.3f}")
             plt.axhline(baseline_corr.median(),
@@ -433,19 +434,30 @@ class Correlations:
                 ax.set_ylim([-0.05, y_axis_lim])
 
         # plotting function
-        # ax1.set_title('Basic Plot')
-        green_diamonds = dict(marker='D', markerfacecolor = 'g')
-        red_lines = dict(color='r', linewidth=3)  
-        bplot = ax.boxplot(layer_spread.values(), positions = np.arange(1, len(layer_spread.keys())+1), labels=layer_spread.keys(),
-                    whis=[5,95], notch=True, flierprops = green_diamonds, medianprops=red_lines,
-                    patch_artist=True)
+        median_lines = dict(color='k', linewidth=lw*2)  
+        other_lines = dict(color='k', linewidth=lw)
+        bplot = ax.boxplot(layer_spread.values(), positions = np.arange(1, len(layer_spread.keys())+1),
+                    labels=layer_spread.keys(),
+                    whis=[5,95],
+                    capprops=other_lines,
+                    whiskerprops=other_lines,
+                    medianprops=median_lines,
+                    patch_artist=True
+                    )
         
         # setting the colors of the boxes as per layer type..
-        for layer_id, box in zip(layer_ids, bplot['boxes']):
+        for layer_id, box, flier in zip(layer_ids, bplot['boxes'], bplot['fliers']):
             ids = self.data[self.data['layer']==layer_id].index
             layer_type = self.data.loc[ids, 'layer_type'].unique().item()
             color = self.fill_color[layer_type]
-            box.set_facecolor(color)
+            box.set(
+                facecolor = color,
+                linewidth=lw
+            )
+            flier.set(
+                    markeredgecolor='k',
+                    markerfacecolor=color,
+            )
 
         ax.set_title(f"{self.model}, session-{session}{norm}")
         ax.set_xlabel('layer IDs')
