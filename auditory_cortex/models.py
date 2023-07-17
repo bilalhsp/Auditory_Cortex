@@ -253,7 +253,7 @@ class Regression():
     ### Methods for the computing correlations and grid search for optimal delay.
 
     def cross_validated_regression(
-            self, session, bin_width=40, delay=0, num_folds=5, num_lmbdas=20,
+            self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=20,
             iterations=10, N_sents=500, return_dict=False, numpy=False,
             sents=None
         ):
@@ -525,6 +525,19 @@ class Regression():
             return corr_dict
         # optimal_delays = delays[np.argmin(losses, axis=0)]
         return corr_coeffs_opt_delay, opt_delays
+    
+
+    def get_betas(self, session, use_cpu=False):
+        """
+        Returns betas for all channels and layers.,
+
+        Args:
+            session (int): session ID
+        """
+        _, B, _ = self.cross_validated_regression(
+            session=session, num_lmbdas=10, iterations=1, numpy=use_cpu
+        )
+        return B
 
 
 
@@ -686,20 +699,20 @@ class Regression():
         return null_dist
 
 
-    def get_betas(self, session, use_cpu=False):
-        """
-        Returns betas for all channels of the layer,
+    # def get_betas(self, session, use_cpu=False):
+    #     """
+    #     Returns betas for all channels of the layer,
 
-        Args:
-            layer (int): index of the layer
-        """
-        features = self.unroll_features(numpy=use_cpu)
-        spikes = self.get_neural_spikes(session, numpy=use_cpu)
-        print("loading features and spikes for beta calculation in regression class...")
-        # print(type(features))
-        # print(type(spikes))
-        B = utils.reg(features, spikes)
-        return B
+    #     Args:
+    #         layer (int): index of the layer
+    #     """
+    #     features = self.unroll_features(numpy=use_cpu)
+    #     spikes = self.get_neural_spikes(session, numpy=use_cpu)
+    #     print("loading features and spikes for beta calculation in regression class...")
+    #     # print(type(features))
+    #     # print(type(spikes))
+    #     B = utils.reg(features, spikes)
+    #     return B
     
     def neural_prediction(self, sent):
         """

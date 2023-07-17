@@ -1,51 +1,61 @@
 import os
-import pandas as pd
-from PIL import Image
-import soundfile
-import yaml
-from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
-from wav2letter.models import LitWav2Letter, Wav2LetterRF
-import torchaudio
-import scipy
-import matplotlib.pyplot as plt
-import torch
-from scipy.io import wavfile
-import auditory_cortex.models as Reg
-import auditory_cortex.utils as utils
 import numpy as np
-import pickle
-import time
-from utils_jgm.tikz_pgf_helpers import tpl_save
+from scipy.io import wavfile
+from auditory_cortex import config, opt_inputs_dir
 import auditory_cortex.analysis.analysis as analysis
+from auditory_cortex.optimal_input import OptimalInput
 
 
-# results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
-# sub_dir = 'optimal_inputs'
-# saved_optimals = os.path.join(results_dir, sub_dir)
-saved_optimals = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/optimal_inputs/saved_wavefiles'
+optimal_inputs_param = config['optimal_inputs_param']
+model_name = optimal_inputs_param['model_name']
+start_sent = optimal_inputs_param['starting_sent']
+threshold = optimal_inputs_param['threshold']
+force_redo = optimal_inputs_param['force_redo']
+sessions = optimal_inputs_param['sessions']
+layers = optimal_inputs_param['layers']
+# channels = optimal_inputs_param['channels']
 
-import auditory_cortex.optimal_input as op_inp
-obj = op_inp.optimal_input('wave2letter_modified', load_features=True)
 
+opt_obj = OptimalInput(model_name, load_features=True)
+corr_obj = analysis.Correlations(model_name)
 
-corr_obj = analysis.correlations()
+if sessions is None:
+    sessions = corr_obj.get_significant_sessions(threshold=threshold)
 
-layer = 6
-ch= 30
-session = 200206
-sent=0
-threshold = 0.45
-saved_optimals = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations/optimal_inputs/saved_wavefiles'
+for session in sessions:
+    layer_channels_done = []
+    # check if the directory already exists or not.
+    sub_dir = os.path.join(opt_inputs_dir, model_name, 'wavefiles', str(int(session)))
+    if not os.path.exists(sub_dir):
+        print(f"Creating directory: {sub_dir}")
+        os.makedirs(sub_dir)
+    else:
+        filenames = os.listdir(sub_dir)
+        for filename in filenames:
+            ind = filename.rfind('.wav')
+            starting_sent = int(filename[ind-3:ind])
+            if starting_sent == start_sent:    
+                ind = filename.rfind('_corr_')
+                layer_channels_done.append(filename[ind-5:ind])
+    
+    channels = corr_obj.get_good_channels(session, threshold=threshold)
+    for layer in layers:
+        print(f"For layer-{layer}")
+        for ch in channels:
+            print(f"\t ch-{ch}", end='\t')
 
-channels = corr_obj.get_good_channels(session, layer=layer, threshold=threshold)
-for ch in channels:
-    ch = int(ch)
-    inputs, losses, basic_loss, TVloss, grads = obj.optimize(
-        session=session, layer=layer, ch=ch, starting_sent=sent,
-        )
+            if f'{layer:02.0f}_{ch:02.0f}' not in layer_channels_done or force_redo:                
+                inputs, losses, basic_loss, TVloss, grads = opt_obj.get_optimal_input(
+                        session=session, layer=layer, ch=ch, starting_sent=start_sent,
+                    )
+                corr = corr_obj.get_corr_score(session, layer, ch)
+                # saving the optimal
+                optimal = np.array(inputs[-1].squeeze())
+                filename = f"optimal_{model_name}_{session}_{layer:02.0f}_{ch:02.0f}_corr_{corr:.2f}_starting_{start_sent:03d}.wav"
+                path = os.path.join(sub_dir, filename)
+                wavfile.write(path, 16000, optimal.astype(np.float32))
+                print(f"Saved optimal wavefile for, layer: {layer}, ch: {ch}...!")
+            
+            else:
+                print(f"optimal wavefile already exists.")
 
-    # saving the optimal
-    optimal = np.array(inputs[-1].squeeze())
-    filename = os.path.join(saved_optimals, f"optimal_{layer}_{ch}_starting_{sent}.wav")
-    wavfile.write(filename, 16000, optimal.astype(np.float32))
-    print(f"Saved optimal wavefile for, layer: {layer}, ch: {ch}...!")
