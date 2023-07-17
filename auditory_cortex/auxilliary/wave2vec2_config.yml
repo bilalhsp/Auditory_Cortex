@@ -2,35 +2,34 @@ use_pca: False
 
 layers:
 
-# - layer_name: wav2vec2.feature_extractor.conv_layers.0.activation   
-#   layer_id: 0
-#   layer_type: conv
-#   RF: 0.62   # RF is in ms.
-# - layer_name: wav2vec2.feature_extractor.conv_layers.1.activation   
-#   layer_id: 1
-#   layer_type: conv
-#   RF: 1.25   # RF is in ms.
-# - layer_name: wav2vec2.feature_extractor.conv_layers.2.activation   
-#   layer_id: 2
-#   layer_type: conv
-#   RF: 2.5   # RF is in ms.
-# - layer_name: wav2vec2.feature_extractor.conv_layers.3.activation   
-#   layer_id: 3
-#   layer_type: conv
-#   RF: 5   # RF is in ms.
-# - layer_name: wav2vec2.feature_extractor.conv_layers.4.activation   
-#   layer_id: 4
-#   layer_type: conv
-#   RF: 10   # RF is in ms.
-# - layer_name: wav2vec2.feature_extractor.conv_layers.5.activation   
-#   layer_id: 5
-#   layer_type: conv
-#   RF: 15   # RF is in ms.
-# - layer_name: wav2vec2.feature_extractor.conv_layers.6.activation   
-#   layer_id: 6
-#   layer_type: conv
-#   RF: 25   # RF is in ms.
-
+- layer_name: wav2vec2.feature_extractor.conv_layers.0.activation   
+  layer_id: 0
+  layer_type: conv
+  RF: 0.62   # RF is in ms.
+- layer_name: wav2vec2.feature_extractor.conv_layers.1.activation   
+  layer_id: 1
+  layer_type: conv
+  RF: 1.25   # RF is in ms.
+- layer_name: wav2vec2.feature_extractor.conv_layers.2.activation   
+  layer_id: 2
+  layer_type: conv
+  RF: 2.5   # RF is in ms.
+- layer_name: wav2vec2.feature_extractor.conv_layers.3.activation   
+  layer_id: 3
+  layer_type: conv
+  RF: 5   # RF is in ms.
+- layer_name: wav2vec2.feature_extractor.conv_layers.4.activation   
+  layer_id: 4
+  layer_type: conv
+  RF: 10   # RF is in ms.
+- layer_name: wav2vec2.feature_extractor.conv_layers.5.activation   
+  layer_id: 5
+  layer_type: conv
+  RF: 15   # RF is in ms.
+- layer_name: wav2vec2.feature_extractor.conv_layers.6.activation   
+  layer_id: 6
+  layer_type: conv
+  RF: 25   # RF is in ms.
 
 
 - layer_name: wav2vec2.encoder.layer_norm   # this is right after the conv-pos-embedding

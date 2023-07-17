@@ -14,12 +14,12 @@ from palettable.colorbrewer import qualitative
 
 
 #local 
-# from auditory_cortex.analysis.config import *
-import auditory_cortex.models as models
+from auditory_cortex.models import Regression
 import auditory_cortex.utils as utils
 
 from auditory_cortex import session_to_coordinates, CMAP_2D
 from auditory_cortex import saved_corr_dir
+
 # from pycolormap_2d import ColorMap2DBremm, config, results_dir
 
 
@@ -33,7 +33,7 @@ from naplib.visualization import imSTRF
 class STRF:
     def __init__(self, session):
         session = str(session)
-        self.reg_obj = models.Regression(model_name = 'wave2letter_modified', load_features=False)
+        self.reg_obj = Regression(model_name = 'wave2letter_modified', load_features=False)
         # _ = self.reg_obj.load_spikes(bin_width=10, numpy=True)
         _ = self.reg_obj.get_neural_spikes(session, bin_width=20, numpy=True)
         # print(self.reg_obj.list_loaded_sessions())
@@ -130,7 +130,8 @@ class Correlations:
 
         # using colorbrewer (palettable) colors... 
         colors = qualitative.Set2_8.mpl_colors
-        layer_types = self.data['layer_type'].unique()
+        # layer_types = self.data['layer_type'].unique()
+        layer_types = ['conv', 'rnn', 'transformer']
         self.fill_color = {}
         for layer, color in zip(layer_types, colors):
             self.fill_color[layer] = color
@@ -609,7 +610,7 @@ class PCA_analysis:
 class PCA_topography:
     def __init__(self) -> None:
         # regression object and load features.
-        self.reg_obj = models.Regression(model_name='wave2letter_modified', load_features=False)
+        self.reg_obj = Regression(model_name='wave2letter_modified', load_features=False)
         self.features = None
         self.pcs = {}       # dict for principle components for layers...
         self.pca = {}       # dict for pca objects for layers (this can be used to get pcs for single sents)
