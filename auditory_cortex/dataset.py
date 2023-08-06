@@ -27,6 +27,7 @@ class NeuralData:
     self.spikes, self.trials = self.load_data(verbose=verbose)
     self.num_channels = len(self.spikes.keys())
     self.sents = np.arange(1,500)
+    self.sent_sections = {}
 
     print("Done.")
     # print(f"Data from {self.num_channels} channels loaded...!")
@@ -184,6 +185,13 @@ class NeuralData:
     bins = {}             #miliseconds
 	# round the 3rd decimal digit, before ceiling...!
     n = int(np.ceil(round(self.duration(sent)/win, 3)))
+    
+    # store boundaries of sent thirds...
+    one_third = int(n/3)
+    two_third = int(2*n/3)
+    self.sent_sections[sent] = [0, one_third, two_third, n] 
+
+
     for i in range(self.num_channels):
       tmp = np.zeros(n, dtype=np.int32) 
       j = 0
@@ -246,12 +254,13 @@ class NeuralData:
         raw_spikes[i] = np.stack([spikes[ch] for ch in range(self.num_channels)], axis=1)
     self.raw_spikes =  raw_spikes
 
-  def unroll_spikes(self, sents=None, features_delay_trim=None):
+  def unroll_spikes(self, sents=None, features_delay_trim=None, third=None):
     """
     Unroll and concatenate time axis of extracted spikes.
 
     Args:
         sents (List): indices of sents.
+        third (int) [1,2,3]: Default=None, section of sents to be retrieved.
 
     Returns:
         
@@ -263,7 +272,10 @@ class NeuralData:
        trim = 0
     else:
        trim = features_delay_trim
-    spikes = np.concatenate([self.raw_spikes[sent][trim:] for sent in sents], axis=0)
+    if third is None:
+      spikes = np.concatenate([self.raw_spikes[sent][trim:] for sent in sents], axis=0)
+    else:
+       spikes = np.concatenate([self.raw_spikes[sent][self.sent_sections[sent][third-1]:self.sent_sections[sent][third]] for sent in sents], axis=0)
     return spikes
 
   def load_spikes(self, bin_width=20, delay=0, sents=None):

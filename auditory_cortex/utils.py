@@ -4,7 +4,7 @@ import pickle
 
 import torch
 import torchaudio
-# import cupy as cp
+import cupy as cp
 import torch.nn as nn
 
 import numpy as np
@@ -12,6 +12,7 @@ import pandas as pd
 
 import matplotlib as mpl
 from scipy import linalg
+import matplotlib.pylab as plt
 
 # local
 from auditory_cortex import session_to_coordinates, CMAP_2D
@@ -41,9 +42,128 @@ from auditory_cortex import results_dir, aux_dir, saved_corr_dir
 #     # c3 = cmap_2d(c1, c2)
 #     return c3
 
-class CorrelationUtils:
-    """Contains utility functions for correlations analysis related help.
+class SyntheticInputUtils:
+    """Contains utility functions for analysis of Synthetic inputs.
     """
+    @staticmethod
+    def normalize(x):
+        """
+        ONLY USED FOR VISUALIZING THE SPECTROGRAM...!
+        Normalizes the spectrogram (obtained using kaldi transform),
+        done to match the spectrogram exactly to the Speec2Text transform
+        """
+        mean = x.mean(axis=0)
+        square_sums = (x ** 2).sum(axis=0)
+        x = np.subtract(x, mean)
+        var = square_sums / x.shape[0] - mean ** 2
+        std = np.sqrt(np.maximum(var, 1e-10))
+        x = np.divide(x, std)
+
+        return x
+    
+    @classmethod
+    def get_spectrogram(cls, waveform):
+        """Returns spectrogram for the input waveform (ndarray or tensor)"""
+        if not torch.is_tensor(waveform):
+            waveform = torch.tensor(waveform)
+        waveform = torch.atleast_2d(waveform)
+            # waveform = waveform.unsqueeze(dim=0)
+        waveform = waveform * (2 ** 15)
+        spect = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
+        spect = cls.normalize(spect)
+        return spect
+
+
+    @classmethod
+    def plot_spect(cls, waveform, cmap='viridis', ax=None):
+        """Takes in a waveform (as ndarray or tensor) and plots its 
+        spectrogram
+        """
+        waveform = waveform.squeeze()
+        if ax is None:
+            fig, ax = plt.subplots()
+        if not torch.is_tensor(waveform):
+            waveform = torch.tensor(waveform)
+        if waveform.ndim == 1:
+            waveform = waveform.unsqueeze(dim=0)
+            waveform = cls.get_spectrogram(waveform)
+        # waveform = waveform * (2 ** 15)
+        # kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
+        # kaldi = cls.normalize(kaldi)
+        x_ticks = np.arange(0, waveform.shape[0], 20)
+        data = ax.imshow(waveform.transpose(1,0), cmap=cmap, origin='lower')
+        ax.set_xticks(x_ticks, 10*x_ticks)
+        ax.set_xlabel('time (ms)')
+        ax.set_ylabel('mel filters')
+        return data, ax
+
+
+
+
+class CorrelationUtils:
+    """Contains utility functions for correlations analysis.
+    """
+
+    # @staticmethod
+    # def add_layer_types(model_name, results_identifer):
+
+    #     # reading layer_types from aux config...
+    #     layer_types = {}
+    #     config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
+    #     with open(config_file, 'r') as f:
+    #         config = yaml.load(f, yaml.FullLoader)
+
+    #     # config['layers']
+    #     for layer_config in config['layers']:
+    #         layer_types[layer_config['layer_id']] = layer_config['layer_type']
+
+    #     # reading results directory...
+    #     if results_identifer != '':
+    #         model = f'{model_name}_{results_identifer}'
+    #     else:
+    #         model = model_name 
+    #     filename = f"{model}_corr_results.csv"
+    #     file_path = os.path.join(saved_corr_dir, filename)
+    #     data = pd.read_csv(file_path)
+    #     print(f"reading from {file_path}")
+
+    #     # remove 'Unnamed' columns
+    #     data = data.loc[:, ~data.columns.str.contains('Unnamed')]
+
+    #     # add 'layer_type' as a column
+    #     for layer, type in layer_types.items():
+    #         ids = data[data['layer']==layer].index
+    #         data.loc[ids, 'layer_type'] = type
+
+    #     data.to_csv(file_path, index=False)
+    def merge_correlation_results(model_name, file_identifiers, idx):
+        """
+        Args:
+
+            model_name: Name of the pre-trained network
+            file_identifiers: List of filename identifiers 
+            idx:    id of the file identifier to use for saving the merged results
+        """
+        # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
+
+        corr_dfs = []
+        for identifier in file_identifiers:
+            filename = f"{model_name}_{identifier}_corr_results.csv"
+            file_path = os.path.join(saved_corr_dir, filename)
+
+            corr_dfs.append(pd.read_csv(file_path))
+
+            # remove the file
+            os.remove(file_path)
+
+        # save the merged results at the very first filename...
+        output_identifer = file_identifiers[idx]    
+        filename = f"{model_name}_{output_identifer}_corr_results.csv"
+        file_path = os.path.join(saved_corr_dir, filename)
+
+        data = pd.concat(corr_dfs)
+        data.to_csv(file_path, index=False)
+        print(f"Output saved at: \n {file_path}")
 
     @staticmethod
     def add_layer_types(model_name, results_identifer):
@@ -76,7 +196,35 @@ class CorrelationUtils:
             ids = data[data['layer']==layer].index
             data.loc[ids, 'layer_type'] = type
 
+        print("Writing back...!")
         data.to_csv(file_path, index=False)
+
+    @staticmethod
+    def copy_normalizer(corr_file):
+
+        filename = f'{corr_file}_corr_results.csv'
+        corr_file_path = os.path.join(saved_corr_dir, filename)
+        data1 = pd.read_csv(corr_file_path)
+        print(f"Reading file from: \n {corr_file_path}")
+        # normalizer
+        normalizer_file = 'wave2letter_modified_normalizer2_corr_results.csv'
+        norm_file_path = os.path.join(saved_corr_dir, normalizer_file)
+        data2 = pd.read_csv(norm_file_path)
+        print(f"Reading normalizers from: \n {norm_file_path}")
+
+        sessions = data1['session'].unique()
+        for session in sessions:
+            select_data = data1[data1['session']==session]
+            channels = select_data['channel'].unique()
+            for ch in channels:
+                ids = select_data[select_data['channel'] == ch].index
+
+                norm = data2[(data2['session']==session) &(data2['channel']==ch)]['normalizer'].head(1).item() 
+
+                data1.loc[ids, 'normalizer'] = norm
+        
+        data1.to_csv(corr_file_path, index=False)
+        print(f"Normalizer updated and written back to file: \n {corr_file_path}")
 
 
 

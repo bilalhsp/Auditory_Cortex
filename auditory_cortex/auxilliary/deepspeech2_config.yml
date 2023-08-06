@@ -5,15 +5,15 @@ use_pca: False
 
 layers:
 
-- layer_name: conv.seq_module.2
-  layer_id: 0
-  layer_type: conv
-  RF: 120 # ms
+# - layer_name: conv.seq_module.2
+#   layer_id: 0
+#   layer_type: conv
+#   RF: 120 # ms
 
-- layer_name: conv.seq_module.5
-  layer_id: 1
-  layer_type: conv
-  RF: 320 # ms
+# - layer_name: conv.seq_module.5
+#   layer_id: 1
+#   layer_type: conv
+#   RF: 320 # ms
 
 - layer_name: rnns.0.rnn
   layer_id: 2

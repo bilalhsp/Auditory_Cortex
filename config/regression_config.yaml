@@ -1,10 +1,10 @@
 # windows paths (for my laptop)
-neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
-results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
+# neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
+# results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
 
 # Gilbreth paths (HPC)
-# neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
-# results_dir: /depot/jgmakin/data/auditory_cortex/results/
+neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
 use_cpu: False
 
@@ -16,21 +16,26 @@ use_cpu: False
 # identifier: RF_delay_features_extractor #RF_delay
 # model_name: speech2text #
 # identifier: all_opt_delays_l0
-model_name: deepspeech2 
+# model_name: deepspeech2 
 # identifier: all_opt_delays
 # identifier: all_opt_delays_l0
 # identifier: opt_delay_l0
-# model_name: wave2letter_modified
-# identifier: neural_delay_only_l0
 
 # model_name: wave2vec
 # identifier: ''
-identifier: neural_delay_only_l0
+# identifier: neural_delay_only_l0
+
+# model_name: wave2letter_modified
+# model_name: speech2text #
+model_name: wave2vec2
+identifier: opt_neural_delay_3_third_feature_extractor
+third: 3
 
 # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
 delay_features: False
 audio_zeropad: False
 delays_grid_search: True
+
 #### Ensure these settings before submitting every job..
 
 bad_sessions:
@@ -54,8 +59,8 @@ dataset_sizes:
 - 500
 - 501
 - 5
-k_folds_validation: 2
-iterations: 1
+k_folds_validation: 5
+iterations: 3
 
 
 optimal_inputs_param:
@@ -64,17 +69,27 @@ optimal_inputs_param:
   model_name: wave2vec
   # model_name: speech2text
   # model_name: whisper
-  starting_sent: 0        # 0 would mean, starting from random noise.
-  threshold: 0.55
+  starting_sent: 12        # 0 would mean, starting from random noise.
+  # threshold: 0.55 
+  threshold: 0.25
   force_redo: False
   sessions: #None
   - 200206
-  layers: 
+  # - 180807
+  # - 180731
+  # - 191113
+  layers:
+  - 3
+  - 4
   - 5
-  - 6
+  - 6 
   - 7
   - 8
   - 9
+  # - 12
+  # - 13
+  # - 14
+  # - 15
 
 
   # channels: 

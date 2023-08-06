@@ -11,10 +11,10 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
-# import fairseq
-# from deepspeech_pytorch.model import DeepSpeech
-# import deepspeech_pytorch.loader.data_loader as data_loader
-# from deepspeech_pytorch.configs.train_config import SpectConfig
+import fairseq
+from deepspeech_pytorch.model import DeepSpeech
+import deepspeech_pytorch.loader.data_loader as data_loader
+from deepspeech_pytorch.configs.train_config import SpectConfig
 
 # local
 from auditory_cortex import config_dir, results_dir, aux_dir
@@ -43,8 +43,9 @@ class FeatureExtractor():
         
         # create feature extractor as per model_name
         if model_name == 'wave2letter_modified':
+            pretrained = self.config['pretrained']
             checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, self.config['saved_checkpoint'])
-            self.extractor = FeatureExtractorW2L(checkpoint)
+            self.extractor = FeatureExtractorW2L(checkpoint, pretrained)
         elif model_name == 'wave2vec2':
             self.extractor = FeatureExtractorW2V2()
         elif model_name == 'speech2text':
@@ -88,6 +89,15 @@ class FeatureExtractor():
                     output = output.transpose(0,1)
             self.features[layer.__name__] = output
         return fn
+    
+    def get_layer_index(self, layer_id):
+        """Returns index for the layer_id (assigned in model specific config file),
+        """
+        try: 
+            return self.layer_ids.index(layer_id)
+        except:
+            raise ValueError(f"Layer ID '{layer_id}' is not included in the network FE configuration.")
+
 
     def get_features(self, layer_index):
         '''
@@ -123,10 +133,14 @@ class FeatureExtractor():
 
 
 class FeatureExtractorW2L():
-    def __init__(self, checkpoint):		
-        self.model = Wav2LetterRF.load_from_checkpoint(checkpoint)
-        print(f"Loading from checkpoint: {checkpoint}")
+    def __init__(self, checkpoint, pretrained):
+        if pretrained:		
+            self.model = Wav2LetterRF.load_from_checkpoint(checkpoint)
+            print(f"Loading from checkpoint: {checkpoint}")
     
+        else:
+            self.model = Wav2LetterRF()
+            print(f"Creating untrained network...!")
 
     def fwd_pass(self, aud):
         """
@@ -204,11 +218,6 @@ class FeatureExtractorW2V2():
         """
         self.model.eval()
         logits = self.model(aud_tensor).logits
-       
-        # # gives us translated sentence
-        # predicted_ids = torch.argmax(logits, dim=-1)
-        # # transcribe speech
-        # transcription = self.processor.batch_decode(predicted_ids)
         return logits
 
 class FeatureExtractorS2T():
@@ -222,6 +231,24 @@ class FeatureExtractorS2T():
         self.model.eval()
         generated_ids = self.model.generate(input_features, max_new_tokens=200)
         return generated_ids
+
+    def fwd_pass_tensor(self, aud_spect):
+        """
+        Forward passes spectrogram of audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud_spect (tensor): spectrogram of input tensor, shape (1, t, 80) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        # feeding decoder the start token...!
+        decoder_input_ids = torch.tensor([[1, 1]]) * self.model.config.decoder_start_token_id
+        out = self.model(aud_spect, decoder_input_ids=decoder_input_ids)
+        return out
+
     
     
 class FeatureExtractorWhisper():
