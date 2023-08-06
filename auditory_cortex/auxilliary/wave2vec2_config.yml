@@ -32,55 +32,55 @@ layers:
   RF: 25   # RF is in ms.
 
 
-# - layer_name: wav2vec2.encoder.layer_norm   # this is right after the conv-pos-embedding
-#   layer_id: 7
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.0.final_layer_norm
-#   layer_id: 8
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.1.final_layer_norm
-#   layer_id: 9
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.2.final_layer_norm
-#   layer_id: 10
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.3.final_layer_norm
-#   layer_id: 11
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.4.final_layer_norm
-#   layer_id: 12
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.5.final_layer_norm
-#   layer_id: 13
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.6.final_layer_norm
-#   layer_id: 14
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.7.final_layer_norm
-#   layer_id: 15
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.8.final_layer_norm
-#   layer_id: 16
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.9.final_layer_norm
-#   layer_id: 17
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.10.final_layer_norm
-#   layer_id: 18
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
-# - layer_name: wav2vec2.encoder.layers.11.final_layer_norm
-#   layer_id: 19
-#   layer_type: transformer
-#   RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layer_norm   # this is right after the conv-pos-embedding
+  layer_id: 7
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.0.final_layer_norm
+  layer_id: 8
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.1.final_layer_norm
+  layer_id: 9
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.2.final_layer_norm
+  layer_id: 10
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.3.final_layer_norm
+  layer_id: 11
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.4.final_layer_norm
+  layer_id: 12
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.5.final_layer_norm
+  layer_id: 13
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.6.final_layer_norm
+  layer_id: 14
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.7.final_layer_norm
+  layer_id: 15
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.8.final_layer_norm
+  layer_id: 16
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.9.final_layer_norm
+  layer_id: 17
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.10.final_layer_norm
+  layer_id: 18
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: wav2vec2.encoder.layers.11.final_layer_norm
+  layer_id: 19
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer

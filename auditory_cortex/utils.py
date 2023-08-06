@@ -103,39 +103,6 @@ class SyntheticInputUtils:
 class CorrelationUtils:
     """Contains utility functions for correlations analysis.
     """
-
-    # @staticmethod
-    # def add_layer_types(model_name, results_identifer):
-
-    #     # reading layer_types from aux config...
-    #     layer_types = {}
-    #     config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
-    #     with open(config_file, 'r') as f:
-    #         config = yaml.load(f, yaml.FullLoader)
-
-    #     # config['layers']
-    #     for layer_config in config['layers']:
-    #         layer_types[layer_config['layer_id']] = layer_config['layer_type']
-
-    #     # reading results directory...
-    #     if results_identifer != '':
-    #         model = f'{model_name}_{results_identifer}'
-    #     else:
-    #         model = model_name 
-    #     filename = f"{model}_corr_results.csv"
-    #     file_path = os.path.join(saved_corr_dir, filename)
-    #     data = pd.read_csv(file_path)
-    #     print(f"reading from {file_path}")
-
-    #     # remove 'Unnamed' columns
-    #     data = data.loc[:, ~data.columns.str.contains('Unnamed')]
-
-    #     # add 'layer_type' as a column
-    #     for layer, type in layer_types.items():
-    #         ids = data[data['layer']==layer].index
-    #         data.loc[ids, 'layer_type'] = type
-
-    #     data.to_csv(file_path, index=False)
     def merge_correlation_results(model_name, file_identifiers, idx):
         """
         Args:
