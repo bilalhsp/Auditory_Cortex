@@ -397,7 +397,7 @@ class SyntheticInputs:
 
 
 class Correlations:
-    def __init__(self, model_name=None, sig_threshold=0.1) -> None:
+    def __init__(self, model_name=None, third=None) -> None:
         
         if model_name is None:
             model_name = 'wave2letter_modified'
@@ -409,10 +409,15 @@ class Correlations:
         #     self.corr_file_path = corr_file_path
         self.data = pd.read_csv(self.corr_file_path)
         self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
-        self.sig_threshold = sig_threshold
+        # self.sig_threshold = sig_threshold
 
         # loading STRF baseline
-        STRF_file_path = os.path.join(saved_corr_dir, 'STRF_corr_results.csv')
+        if third is None:
+            STRF_filename = 'STRF_corr_results.csv'
+        else:
+            STRF_filename = f'STRF_{third}_third_corr_results.csv'
+
+        STRF_file_path = os.path.join(saved_corr_dir, STRF_filename)
         self.baseline_corr = pd.read_csv(STRF_file_path)
         self.baseline_corr['strf_corr_normalized'] = self.baseline_corr['strf_corr']/(self.baseline_corr['normalizer'].apply(np.sqrt))
         # STRF_file_path = os.path.join(results_dir, 'cross_validated_correlations', 'STRF_corr_RidgeCV.npy')
