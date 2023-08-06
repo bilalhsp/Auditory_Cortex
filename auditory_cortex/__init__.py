@@ -61,3 +61,44 @@ session_to_coordinates = {
                         200212: [-0.43,-1.2], 191121: [0.07,-0.95], 191210: [0.8,-1.3]                         
                         
                         }
+
+subject_to_session = {
+    'c': np.concatenate([c_RH_sessions, c_LH_sessions], axis=0),
+    'b': b_RH_sessions,
+    'f': f_RH_sessions
+}
+
+session_to_subject = {}
+for k, v in subject_to_session.items():
+    for sess in v:
+        session_to_subject[sess] = k
+
+
+area_to_sessions = {
+    'core': np.array([
+            190606, 190604, 190726, 190801, 180725, 180720, 180731, 180807, #c_RH
+            191209, 200226, 200325, 200213, 200313,   #f_RH
+            200207, 191212, 191206, 200206, 191125, 200610, 191113, 191002, #c_LH
+            #b_RH (need to confirm these)
+            180405, 180719, 180808, 180627, 180814, 180810, 180613, 180724, 180730, 180717, 180406 
+                    
+                        
+                   ]),
+
+     'belt': np.array([
+            180622, 190703, 190607, 190605, 180728, 180619, 180502, #c_RH
+            191211, 200323, 200312, 200219, 200401, 200318,      #f_RH
+            191115, 200205, 191219, 200617, 200212, 191121, 191210, #c_LH
+
+                ]),            
+      'parabelt': np.array([
+          #b_RH (need to confirm these)
+          180501, 180801, 180417, 180413, 180420,
+      ]),          
+}
+
+session_to_area = {}
+for k, v in area_to_sessions.items():
+    for sess in v:
+        session_to_area[sess] = k
+

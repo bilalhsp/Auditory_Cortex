@@ -3,7 +3,7 @@ import os
 import time
 import yaml
 import torch
-# import cupy as cp
+import cupy as cp
 import numpy as np
 import pandas as pd
 from scipy import linalg, signal
@@ -56,6 +56,12 @@ class Regression():
         if load_features:
             self.load_features(delay_features=delay_features, audio_zeropad=audio_zeropad)
 
+    def get_layer_index(self, layer_id):
+        """Returns layer index for layer ID (defined in config).
+        Calls instance method of 'self.model_extractor'
+        """
+        return self.model_extractor.get_layer_index(layer_id)
+
 
     ### Methods for the loading and accessing features..
 
@@ -96,22 +102,30 @@ class Regression():
         self.sampled_features = self.resample(raw_features, bin_width, delay_features=delay_features)
         # self.features = self.unroll_features(sents = sents, numpy=numpy, return_dict=True)
 
-    def unroll_features(self, sents = None, numpy=True, return_dict=False, train_pca=False):
+    def unroll_features(self, sents = None, numpy=True, return_dict=False, train_pca=False,
+                        layers=None, third=None):
         """
         Unroll and concatenate time axis of extracted features.
 
         Args:
             sents (List of int ID's): ID's of sentences 
+            layers (list): Layer of layer indices 
+            third (int):    Default=None, section of sents to compute prediction corr.
 
         Returns:
             dict: 
         """
         if sents is None:
             sents = self.sents
+        if layers is None:
+            layers = range(self.num_layers)
         # sampled_features = self.resample(bin_width)
         feats = {}
         for j, l in enumerate(self.layers):
-            feats[j] = np.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
+            if third is None:
+                feats[j] = np.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
+            else:
+                feats[j] = np.concatenate([self.sampled_features[j][sent][self.sent_sections[sent][third-1]:self.sent_sections[sent][third]] for sent in sents], axis=0)
             if self.use_pca:
                 if train_pca:
                     self.pca[j] = PCA(n_components=self.pca_comps)
@@ -121,7 +135,7 @@ class Regression():
             if not numpy:
                 feats[j] = cp.array(feats[j])
         if not return_dict:
-            feats = np.stack([feats[i] for i in range(self.num_layers)], axis=0)
+            feats = np.stack([feats[i] for i in layers], axis=0)
         return feats
 
     def extract_features(self, audio_zeropad=False):
@@ -165,12 +179,19 @@ class Regression():
             List of dict: all layer features (resampled at required sampling_rate).
         """
         resampled_features = [{} for _ in range(len(self.layers))]
+        self.sent_sections = {}
 
         bin_width = bin_width/1000 # ms
         for sent in raw_features[0].keys():
             # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
             sent_duration = self.audio_padding_duration + self.dataset.duration(sent)
             n = int(np.ceil(round(sent_duration/bin_width, 3)))
+
+            # save boundaries of sent thirds (3 sections of each sentence..)
+            one_third = int(n/3)
+            two_third = int(2*n/3)
+            self.sent_sections[sent] = [0, one_third, two_third, n]
+
             for j, l in enumerate(self.layers):
                 tmp = signal.resample(raw_features[j][sent],n, axis=0)
                 # mean = np.mean(tmp, axis=0)
@@ -195,7 +216,7 @@ class Regression():
     ### Methods for the getting neural data (spikes)
 
     def get_neural_spikes(
-            self, session, bin_width=20, delay=0, sents=None, force_reload=False, numpy=False
+            self, session, bin_width=20, delay=0, sents=None, force_reload=False, numpy=False, third=None
         ):
         """Retrieves neural spikes for the argument session, loads spikes 
         if not already loaded or force_reload=True."""
@@ -216,7 +237,7 @@ class Regression():
         elif force_reload:
             self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
 
-        spikes = self.spike_datasets[session].unroll_spikes(sents=sents, features_delay_trim=self.features_delay_trim)
+        spikes = self.spike_datasets[session].unroll_spikes(sents=sents, features_delay_trim=self.features_delay_trim, third=third)
         if not numpy:
             spikes = cp.array(spikes)
 
@@ -255,7 +276,7 @@ class Regression():
     def cross_validated_regression(
             self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=20,
             iterations=10, N_sents=500, return_dict=False, numpy=False,
-            sents=None
+            sents=None, test_sents=None, third=None
         ):
         """
         Returns distribution of correlations for all (12) layers and all channels
@@ -270,6 +291,8 @@ class Regression():
             load_features (bool):   flag for loading features (required if features and spikes not already loaded)
             return_dict (bool):     flag to return dict (ready to save format) when true, otherewise return 
                                     distribution of correlations computed.
+
+            third (int) [1,2,3]:    Default: None, section of test sents to compute corr for.  
 
         Returns:
             corr_coeff (3d-array):  distribution of correlations for all layers and channels (if return_dict=False)
@@ -310,10 +333,16 @@ class Regression():
         for n in range(iterations): 
             print(f"Itr: {n+1}:")
             start_itr = time.time()
-            
+        
             np.random.shuffle(stimuli)
-            mapping_set = stimuli[:mapping_sents]
-            test_set = stimuli[mapping_sents:]
+            
+            if test_sents is None:
+                mapping_set = stimuli[:mapping_sents]
+                test_set = stimuli[mapping_sents:]
+            else:
+                # option to fix the test set..!
+                mapping_set = stimuli[np.isin(stimuli, test_sents, invert=True)]
+                test_set = test_sents
             
             # lmbda_loss = module.zeros(((len(lmbdas), num_channels, self.num_layers)))
             start_lmbda = time.time()
@@ -335,13 +364,11 @@ class Regression():
             for l in range(self.num_layers):
                 for ch in range(num_channels):
                     B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
-            self.B = B
+            self.B[session] = cp.asnumpy(B)
 
             # Loading test set...!
-            test_x = self.unroll_features(sents=test_set, numpy=numpy)
-            # test_x = module.stack([test_x[i] for i in range(self.num_layers)], axis=0)
-            # test_y = self.unroll_spikes(sents=test_set, numpy=numpy)
-            test_y = self.get_neural_spikes(session, sents=test_set, numpy=numpy) 
+            test_x = self.unroll_features(sents=test_set, numpy=numpy, third=third)
+            test_y = self.get_neural_spikes(session, sents=test_set, numpy=numpy, third=third) 
 
             train_pred = utils.predict(mapping_x, B)
             test_pred = utils.predict(test_x, B)
@@ -378,7 +405,7 @@ class Regression():
                     'opt_delays': None
                     }
             return corr
-        return corr_coeff, B, np.min(lmbda_loss, axis=0)
+        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set
 
 
 
@@ -470,7 +497,8 @@ class Regression():
                 num_folds=5, 
                 sents=None,
                 numpy=False,
-                return_dict=False
+                return_dict=False,
+                third=None
                 ):
         
         if delays is None:
@@ -487,10 +515,10 @@ class Regression():
             _ = self.get_neural_spikes(
                     session, bin_width=bin_width, delay=delay, force_reload=True
                 )
-            corr_coeff, _, loss = self.cross_validated_regression(
+            corr_coeff, _, loss, _ = self.cross_validated_regression(
                     session, bin_width=bin_width, delay=delay, num_folds=num_folds,
                     iterations=iterations, return_dict=False, num_lmbdas=num_lmbdas,
-                    numpy=numpy, N_sents=N_sents, sents=sents
+                    numpy=numpy, N_sents=N_sents, sents=sents, third=third
                 )
             corr_coeffs.append(corr_coeff)
             losses.append(loss)
@@ -527,17 +555,20 @@ class Regression():
         return corr_coeffs_opt_delay, opt_delays
     
 
-    def get_betas(self, session, use_cpu=False):
+    def get_betas(self, session, use_cpu=False, force_redo = False):
         """
         Returns betas for all channels and layers.,
 
         Args:
             session (int): session ID
         """
-        _, B, _ = self.cross_validated_regression(
-            session=session, num_lmbdas=10, iterations=1, numpy=use_cpu
-        )
-        return B
+        session = str(int(session))
+        if session not in self.B.keys() or force_redo:
+            _, B, *_ = self.cross_validated_regression(
+                session=session, num_lmbdas=10, iterations=1, numpy=use_cpu
+            )
+            # self.B[session] = B
+        return self.B[session]
 
 
 
@@ -714,7 +745,7 @@ class Regression():
     #     B = utils.reg(features, spikes)
     #     return B
     
-    def neural_prediction(self, sent):
+    def neural_prediction(self, session, sent):
         """
         Returns prediction for neural activity 
 
@@ -722,11 +753,12 @@ class Regression():
             sent (int): index of sentence ID 
 
         Returns:
-            ndarray : (layers, ch, time) Prdicted neural activity 
+            ndarray : (time, ch, layers) Prdicted neural activity 
         """
         features = self.unroll_features(sents=sent)
         # features = np.stack([dict_feats[i] for i in range(12)], axis=0)
-        return cp.asnumpy(utils.predict(features, self.B))
+        beta = self.get_betas(session)
+        return cp.asnumpy(utils.predict(features, beta))
 
     #########################################    ##############################
 

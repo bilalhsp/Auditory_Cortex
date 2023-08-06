@@ -145,3 +145,6 @@ wandb/
 
 # DS_Store
 .DS_Store
+
+# slurm .out files
+*.out

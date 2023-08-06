@@ -1,4 +1,6 @@
+pretrained: True
 saved_checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
+
 # /depot/jgmakin/data/auditory_cortex/results/pretrained_weights/wave2letter_modified/Wav2letter-epoch=024-val_loss=0.37.ckpt
 
 # saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=001-val_loss=3.42.ckpt
