@@ -6,6 +6,9 @@
 neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
+# device that is being used...
+hpc_cluster: True
+
 use_cpu: False
 
 # Ensure these settings before submitting every job..

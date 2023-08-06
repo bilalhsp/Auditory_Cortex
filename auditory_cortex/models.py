@@ -3,7 +3,6 @@ import os
 import time
 import yaml
 import torch
-import cupy as cp
 import numpy as np
 import pandas as pd
 from scipy import linalg, signal
@@ -17,6 +16,10 @@ import auditory_cortex.utils as utils
 from auditory_cortex.dataset import NeuralData
 from auditory_cortex.feature_extractors import FeatureExtractor
 
+# import GPU specific packages...
+from auditory_cortex import hpc_cluster
+if hpc_cluster:
+    import cupy as cp
 
 
 class Regression():

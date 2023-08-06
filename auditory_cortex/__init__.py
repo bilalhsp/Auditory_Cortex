@@ -17,6 +17,8 @@ config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
 with open(os.path.join(config_dir, 'regression_config.yaml'), 'r') as f:
     config = yaml.load(f, yaml.FullLoader)
 
+hpc_cluster = config['hpc_cluster']
+
 results_dir = config['results_dir']
 saved_corr_dir = os.path.join(results_dir, 'cross_validated_correlations')
 pretrained_dir = os.path.join(results_dir, 'pretrained_weights')

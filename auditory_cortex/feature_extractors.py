@@ -1,24 +1,26 @@
 import os
 import yaml
 import torch
-# import cupy as cp
 import numpy as np
 from torch import nn, Tensor
 from abc import ABC, abstractmethod
-
 
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 
-import fairseq
-from deepspeech_pytorch.model import DeepSpeech
-import deepspeech_pytorch.loader.data_loader as data_loader
-from deepspeech_pytorch.configs.train_config import SpectConfig
-
 # local
 from auditory_cortex import config_dir, results_dir, aux_dir
 from wav2letter.models import Wav2LetterRF
+
+# import GPU specific packages...
+from auditory_cortex import hpc_cluster
+if hpc_cluster:
+    import cupy as cp
+    import fairseq
+    from deepspeech_pytorch.model import DeepSpeech
+    import deepspeech_pytorch.loader.data_loader as data_loader
+    from deepspeech_pytorch.configs.train_config import SpectConfig
 
 
 class FeatureExtractor():

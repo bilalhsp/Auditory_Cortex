@@ -4,7 +4,7 @@ import pickle
 
 import torch
 import torchaudio
-import cupy as cp
+
 import torch.nn as nn
 
 import numpy as np
@@ -17,6 +17,12 @@ import matplotlib.pylab as plt
 # local
 from auditory_cortex import session_to_coordinates, CMAP_2D
 from auditory_cortex import results_dir, aux_dir, saved_corr_dir
+
+# import GPU specific packages...
+from auditory_cortex import hpc_cluster
+if hpc_cluster:
+    import cupy as cp
+
 # from pycolormap_2d import ColorMap2DBremm
 
 
