@@ -15,8 +15,8 @@ import time
 from auditory_cortex import config
 import auditory_cortex.utils as utils
 import auditory_cortex.models as models
-from wav2letter.datasets import Dataset, LSDataModule, DataModuleRF
-from wav2letter.models import LitWav2Letter, Wav2LetterRF
+# from wav2letter.datasets import DataModuleRF 
+# from wav2letter.models import LitWav2Letter, Wav2LetterRF
 
 START = time.time()
 
@@ -46,6 +46,8 @@ audio_zeropad = config['audio_zeropad']
 
 delays_grid_search = config['delays_grid_search']
 third = config['third']
+if not third:
+    third = None
 # # Create w2l model..
 
 
@@ -71,8 +73,11 @@ for s in bad_sessions:
     sessions = np.delete(sessions, np.where(sessions == s))
 sessions = np.sort(sessions)
 
-# sessions = sessions[:25]
-# sessions = sessions[35:]
+# sessions = sessions[:10]
+# sessions = sessions[10:20]
+# sessions = sessions[20:30]
+# sessions = sessions[30:40]
+sessions = sessions[40:]
 
 
 obj = models.Regression(
@@ -106,8 +111,8 @@ for delay in delays:
             for N_sents in dataset_sizes:
                 if delays_grid_search:
                     # delays_grid = [-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30]
-                    # delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
-                    delays_grid = [0,10,20,30,40,50,60,70]
+                    delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
+                    # delays_grid = [0,10,20,30,40,50,60,70]
                     corr_dict = obj.grid_search_CV(
                             session, bin_width=bin_width, iterations=iterations,
                             num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,

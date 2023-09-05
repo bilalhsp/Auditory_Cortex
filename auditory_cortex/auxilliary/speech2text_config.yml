@@ -3,15 +3,15 @@ pca_comps: 50
 
 layers:
 
-- layer_name: model.encoder.conv.conv_layers.0
-  layer_id: 0
-  layer_type: conv
-  RF: 60   # RF is in ms.
+# - layer_name: model.encoder.conv.conv_layers.0
+#   layer_id: 0
+#   layer_type: conv
+#   RF: 60   # RF is in ms.
 
-- layer_name: model.encoder.conv.conv_layers.1
-  layer_id: 1
-  layer_type: conv
-  RF: 140   # RF is in ms.
+# - layer_name: model.encoder.conv.conv_layers.1
+#   layer_id: 1
+#   layer_type: conv
+#   RF: 140   # RF is in ms.
 
 - layer_name: model.encoder.layers.0.final_layer_norm
   layer_id: 2
