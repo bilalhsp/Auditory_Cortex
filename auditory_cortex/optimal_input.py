@@ -24,7 +24,7 @@ class OptimalInput():
         for param in self.linear_model.model_extractor.extractor.model.parameters():
             param.requires_grad = False
 
-    def get_betas(self, session, use_cpu=False):
+    def get_betas(self, session, use_cpu=False, force_redo=False):
         """
         Returns betas for all layers and channels 
 
@@ -33,11 +33,14 @@ class OptimalInput():
         """
         # check if self.B holds result for current session,
         # if not compute B's and remove for all other sessions.
-        if session not in self.B.keys(): 
+        if session not in self.B.keys() or force_redo: 
                
             # self.B = {}
+            # print(f"Initializing with random betas...")
+            # self.B[session] = torch.randn((12,250, 64))
+            print(f"Computing betas...")
             self.B[session] = torch.tensor(
-                self.linear_model.get_betas(session, use_cpu=use_cpu),
+                self.linear_model.get_betas(session, use_cpu=use_cpu, force_redo=force_redo),
                 dtype=torch.float32
                 )
         return self.B[session]
@@ -45,7 +48,7 @@ class OptimalInput():
 
     def get_optimal_input(
             self, session, layer, ch, starting_sent=0, input_duration=1000,
-            epochs=500, lr=0.5, w1=1, w2=100, use_cpu=False
+            epochs=500, lr=0.5, w1=1, w2=100, use_cpu=False, force_redo=False
             ):
         
         session = str(int(session))
@@ -60,10 +63,12 @@ class OptimalInput():
 
         if self.model_name == 'speech2text':
             inp = SyntheticInputUtils.get_spectrogram(inp)
+        elif self.model_name == 'deepspeech2':
+            inp = self.linear_model.model_extractor.extractor.get_spectrogram(inp)
         
         inp = inp.unsqueeze(dim=0)
         inp.requires_grad = True
-        self.get_betas(session, use_cpu=use_cpu)      
+        self.get_betas(session, use_cpu=use_cpu, force_redo=force_redo)      
         opt = torch.optim.Adam([inp], lr=lr)
         loss_history = []
         inps_history = []
@@ -76,24 +81,24 @@ class OptimalInput():
             opt.zero_grad()
             pred = self.fwd_pass(inp, layer, ch, session)
             loss = -pred.mean()
-            basic_loss_history.append(loss.item())            
-            TVloss = torch.nn.functional.mse_loss(inp[:,1:], inp[:,:-1])
-            TVloss_history.append(TVloss.item())
+            # basic_loss_history.append(loss.item())            
+            # TVloss = torch.nn.functional.mse_loss(inp[:,1:], inp[:,:-1])
+            # TVloss_history.append(TVloss.item())
 
             # print(f'Loss: {loss}')
-            loss = w1*loss + w2*TVloss
+            # loss = w1*loss + w2*TVloss
             loss.backward(inputs=inp)
             ### Normalize grad by the 'global norm'
-            var, mean = torch.var_mean(inp.grad, unbiased=False)
-            inp.grad = inp.grad / (torch.sqrt(var) + 1e-8)
-            grads.append(inp.grad.clone().detach().numpy())
+            # var, mean = torch.var_mean(inp.grad, unbiased=False)
+            # inp.grad = inp.grad / (torch.sqrt(var) + 1e-8)
+            # grads.append(inp.grad.clone().detach().numpy())
             
             opt.step()
             
             ### Clip input values at -1 and 1 (after update)
-            with torch.no_grad():
-                inp[inp > 1] = 1
-                inp[inp<-1] = -1
+            # with torch.no_grad():
+            #     inp[inp > 1] = 1
+            #     inp[inp<-1] = -1
             # grads.append(np.zeros(16000))
             loss_history.append(loss.item())
             inps_history.append(inp.clone().detach())

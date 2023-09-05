@@ -2,6 +2,9 @@
 # neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
 # results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
 
+
+# srun -A standby --time=4:0:0 --nodes=1 --gpus-per-node=1 --ntasks-per-node=6 --mem=0 --pty bash
+
 # Gilbreth paths (HPC)
 neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 results_dir: /depot/jgmakin/data/auditory_cortex/results/
@@ -32,15 +35,21 @@ use_cpu: False
 # model_name: speech2text #
 # model_name: wave2vec2
 # model_name: wave2vec
-model_name: deepspeech2
-identifier: opt_neural_delay_1_third #_feature_extractor
-third: 1
+# model_name: deepspeech2
+
+
+# identifier: opt_neural_delay_2_third #_feature_extractor
+# third: None
+model_name: wave2letter_modified
+# identifier: robust1
+# identifier: normal_109
+identifier: robust_26
 
 # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
 delay_features: False
 audio_zeropad: False
 delays_grid_search: True
-
+third: False
 #### Ensure these settings before submitting every job..
 
 bad_sessions:

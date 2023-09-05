@@ -274,15 +274,39 @@ class FeatureExtractorDeepSpeech2():
         self.model = DeepSpeech.load_from_checkpoint(checkpoint_path=checkpoint)
         # self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
         # self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
-				
+	
+    def get_spectrogram(self, aud):
+        """Gives spectrogram of audio input."""
+        if torch.is_tensor(aud):
+            aud = aud.cpu().numpy()
+        return self.parser.compute_spectrogram(aud)
+
     def fwd_pass(self, aud):
         
-        spect = self.parser.compute_spectrogram(aud)
+        # spect = self.parser.compute_spectrogram(aud)
+        spect = self.get_spectrogram(aud)
         spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
 
         # length of the spect along time
         lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64)
         out = self.model(spect, lengths)
+        return out
+    
+    def fwd_pass_tensor(self, aud_spect):
+        """
+        Forward passes spectrogram of audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud_spect (tensor): spectrogram of input tensor, shape (1, t, 80) 
+        
+        Returns:
+            output (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        aud_spect = aud_spect.unsqueeze(dim=0)
+        lengths = torch.tensor([aud_spect.shape[-1]], dtype=torch.int64)
+        self.model.eval()
+        out = self.model(aud_spect, lengths)
         return out
     
 class FeatureExtractorW2V():

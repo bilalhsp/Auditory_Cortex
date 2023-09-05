@@ -102,6 +102,76 @@ class SyntheticInputUtils:
         ax.set_xlabel('time (ms)')
         ax.set_ylabel('mel filters')
         return data, ax
+    
+    @classmethod
+    def align_add_2_signals(cls, sig1, sig2):
+        """Smartly adds (averages) two signals having slight offset,
+        by using the cross-correlation to align them before adding. 
+        This might have to trim the extra lengths on one side of either 
+        signal (depending upon the offset for perfect alignment)."""
+        sig1 = sig1.squeeze()
+        sig2 = sig2.squeeze()
+        cross_corr = np.correlate(sig1, sig2, mode='same')
+        # identify the shift for peak of cross-correlation
+        if sig1.shape[0] > sig2.shape[0]:
+            peak_id = np.argmax(cross_corr) - sig2.shape[0]/2
+            sig1 = sig1[:sig2.shape[0]]
+        elif sig2.shape[0] > sig1.shape[0]:
+            peak_id = np.argmax(cross_corr) - sig1.shape[0]/2
+            sig2 = sig2[:sig1.shape[0]]
+        else:
+            cross_corr = np.correlate(sig1, sig2, mode='same')
+            peak_id = np.argmax(cross_corr) - sig1.shape[0]/2
+        peak_id = int(peak_id)
+        # align and average....
+        if peak_id > 0:
+            sig1_al = sig1[peak_id:]
+            sig2_al = sig2[:-1*peak_id]
+            # out_sig = (sig1[peak_id:] + sig2[:-1*peak_id])/2
+            # corr = np.corrcoef(sig1[peak_id:], sig2[:-1*peak_id])[0,1]
+        elif peak_id < 0:
+            sig1_al = sig1[:peak_id]
+            sig2_al = sig2[-1*peak_id:]
+            
+            # out_sig = (sig1[:peak_id] + sig2[-1*peak_id:])/2
+            
+        else:
+            sig1_al = sig1
+            sig2_al = sig2
+            
+            # out_sig = (sig1 + sig2)/2
+        
+        out_sig = (sig1_al + sig2_al)/2
+
+        fig, ax = plt.subplots(ncols=2)
+        cls.plot_spect(sig1_al, cmap='jet', ax=ax[0])
+        cls.plot_spect(sig2_al, cmap='jet', ax=ax[1])
+
+        # return the correlation of aligned signals...
+        corr = np.corrcoef(sig1_al, sig2_al)[0,1]
+                
+        return out_sig, corr
+
+
+    @classmethod
+    def align_add_signals(cls, signals_list):
+        """Takes in a list of signals, and aligns and combines them
+        pairwise, keeps doing it until only one signal is left.
+        In short, it align and add first 2, 4 , 8 or any highest 
+        possible power of 2.
+        For example, given 5 signals, it will only use first 4."""
+        while len(signals_list) > 1:
+            new_list = []
+            m = int(len(signals_list)/2)
+            for i in range(m):
+                sig1 = signals_list[2*i]
+                sig2 = signals_list[2*i + 1]
+                new_list.append(cls.align_add_2_signals(sig1, sig2)[0])
+            signals_list = new_list
+        
+        return signals_list[0]
+    
+
 
 
 
