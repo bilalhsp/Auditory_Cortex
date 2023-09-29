@@ -19,6 +19,7 @@ corr_file = model_name + '_' + results_id
 corr_obj = analysis.Correlations(model_name=corr_file)
 opt_inp = optimal_input.OptimalInput(model_name=model_name, load_features=True)
 
+   
 dirpath = os.path.join(opt_inputs_dir, model_name)
 if not os.path.exists(dirpath):
     print("Does not exist")
@@ -43,6 +44,9 @@ for session in sessions:
 
     if session not in beta_bank.keys():
         beta = opt_inp.get_betas(session)
+        
+
+
         beta_bank[session] = beta
 
         with open(filepath, 'wb') as f:

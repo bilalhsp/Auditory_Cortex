@@ -18,7 +18,7 @@ from palettable.colorbrewer import qualitative
 from auditory_cortex.models import Regression
 from auditory_cortex.optimal_input import OptimalInput
 import auditory_cortex.utils as utils
-from auditory_cortex.utils import SyntheticInputUtils
+from auditory_cortex.utils import SyntheticInputUtils, CorrelationUtils
 from auditory_cortex import session_to_coordinates, CMAP_2D, session_to_subject, session_to_area
 from auditory_cortex import saved_corr_dir, opt_inputs_dir
 # from pycolormap_2d import ColorMap2DBremm, config, results_dir
@@ -404,10 +404,21 @@ class Correlations:
         self.model = model_name
         filename = f'{model_name}_corr_results.csv'
         self.corr_file_path = os.path.join(saved_corr_dir, filename)
-        
-        # else:
-        #     self.corr_file_path = corr_file_path
+
         self.data = pd.read_csv(self.corr_file_path)
+        # check if 'test_cc_raw' not one of the columns
+        # this will be the case for STRF correlations
+        # in that case, copy 'strf_corr' to 'test_cc_raw'
+        if 'test_cc_raw' not in self.data.columns:
+            self.data['test_cc_raw'] = self.data['strf_corr']
+            print(f"'test_cc_raw added as a column..!")
+        
+        if 'normalizer' not in self.data.columns:
+            CorrelationUtils.copy_normalizer(model_name)
+            self.data = pd.read_csv(self.corr_file_path)
+        if 'N_sents' not in self.data.columns:
+            self.data['N_sents'] = np.ones(len(self.data.index))*500
+
         self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
         # self.sig_threshold = sig_threshold
 
@@ -426,7 +437,7 @@ class Correlations:
         # using colorbrewer (palettable) colors... 
         colors = qualitative.Set2_8.mpl_colors
         # layer_types = self.data['layer_type'].unique()
-        layer_types = ['conv', 'rnn', 'transformer']
+        layer_types = ['conv', 'rnn', 'transformer', 'mix']
         self.fill_color = {}
         for layer, color in zip(layer_types, colors):
             self.fill_color[layer] = color
@@ -523,10 +534,11 @@ class Correlations:
 
     def write_back(self):
         self.data.to_csv(self.corr_file_path, index=False)
+        print(f"Saved at {self.corr_file_path}")
     ##### TMPORARY function...to be removed 
-    def add_layer_types(self):
-        self.data['layer_type'] = 'conv'
-        self.write_back
+    def add_layer_types(self, other_type):
+        self.data['layer_type'] = other_type
+        self.write_back()
 
     def get_significant_sessions(self, threshold = None):
         """Returns sessions with corr scores above significant threshold for at least 1 channel"""

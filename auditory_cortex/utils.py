@@ -170,6 +170,40 @@ class SyntheticInputUtils:
             signals_list = new_list
         
         return signals_list[0]
+
+    @staticmethod
+    def cross_correlation(sig1, sig2):
+        """Computes cross-correlation both for 1D and 2D signals, 
+        for 2D case shifts across axis=0 only (taken as time axis).
+        Results in cross correlation similar to 'scipy.signal.correlate'
+        when used with mode='same', and for boundry conditions wraps the 
+        shifted signal, so we may call it as circular cross correlations. 
+        
+        Args:
+            sig1 (ndarray): having dimensions (t,) 1D case or (t, f) in 2D case
+            sig2 (ndarray): having dimensions (t,) 1D case or (t, f) in 2D case
+        
+        Returns:
+            cross_corr (list): cross-correlation at different shifts with zero-shift
+                            at the middle.
+        """
+        print(f"Computing cross-correlation using local implemenation....")
+        # making sure both the signals have equal lengths.
+        cross_corr = []
+        if sig1.shape[0] > sig2.shape[0]:
+            sig1 = sig1[:sig2.shape[0]]
+        elif sig1.shape[0] < sig2.shape[0]:
+            sig2 = sig2[:sig1.shape[0]]
+
+        # computing 2d cross-correlation (shift only along time axis (axis=0))
+        sig_length = sig1.shape[0]
+        max_neg_shift = -1*int(sig_length/2)
+        max_pos_shift = int(sig_length/2 + 0.5) # we want to round-up.
+        for shift in np.arange(max_neg_shift, max_pos_shift, 1):
+            sig2_shifted = np.concatenate([sig2[-shift:],sig2[:-shift]], axis=0)
+            cross_corr.append(np.sum(sig1*sig2_shifted))
+
+        return cross_corr
     
 
 
@@ -243,7 +277,12 @@ class CorrelationUtils:
         data.to_csv(file_path, index=False)
 
     @staticmethod
-    def copy_normalizer(corr_file):
+    def copy_normalizer(model_name, results_identifer=''):
+        # reading results directory...
+        if results_identifer != '':
+            corr_file = f'{model_name}_{results_identifer}'
+        else:
+            corr_file = model_name
 
         filename = f'{corr_file}_corr_results.csv'
         corr_file_path = os.path.join(saved_corr_dir, filename)
@@ -401,11 +440,17 @@ def write_df_to_disk(df, file_path):
     print(f"Dataframe {action} to {file_path}.")
 
 def write_STRF(corr_dict, file_path):
+
+    columns_list = ['session','channel','bin_width',
+                                'delay','strf_corr']
     if os.path.isfile(file_path):
         data = pd.read_csv(file_path)
+        # making sure there is no extra columns in the existing dataframe.
+        for column in data.columns:
+            if column not in columns_list:
+                data.drop(columns=column, inplace=True)
     else:
-        data = pd.DataFrame(columns=['session','channel','bin_width',
-                                    'delay','strf_corr'])
+        data = pd.DataFrame(columns=columns_list)
     session = corr_dict['session']
     win = corr_dict['win']
     delay = corr_dict['delay']
@@ -565,6 +610,7 @@ def cc_single_channel(y, y_hat):
     except:
         y_hat = module.expand_dims(y_hat, axis=0)
     return module.cov(y, y_hat)[0,1:] / (module.sqrt(module.var(y)*module.var(y_hat, axis=1)) + 1.0e-8)
+    
 
 # def regression_param(X, y):
 #     """
