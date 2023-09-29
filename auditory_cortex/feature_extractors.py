@@ -138,6 +138,7 @@ class FeatureExtractorW2L():
     def __init__(self, checkpoint, pretrained):
         if pretrained:		
             self.model = Wav2LetterRF.load_from_checkpoint(checkpoint)
+            # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             print(f"Loading from checkpoint: {checkpoint}")
     
         else:
@@ -155,7 +156,12 @@ class FeatureExtractorW2L():
         Returns:
             input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
         """
-        input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+        
+        input = torch.tensor(aud, dtype=torch.float32)#, device=self.device)#, requires_grad=True)
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # input = input.to(device)
+
+
         input = input.unsqueeze(dim=0)
         # input.requires_grad=True
         self.model.eval()

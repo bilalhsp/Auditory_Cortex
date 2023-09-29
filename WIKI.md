@@ -13,3 +13,7 @@ sent ID's with repeats:  [12,13,32,43,56,163,212,218,287,308]
 
     module load use.own
     module load conda-env/w2l_cortex-py3.8.5
+
+
+### Export tensorboard logs to web...
+    tensorboard dev upload --logdir=/scratch/gilbreth/ahmedb/wav2letter/modified_w2l/logs/lightning_logs/

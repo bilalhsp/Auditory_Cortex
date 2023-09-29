@@ -1,7 +1,8 @@
 pretrained: True
-# saved_checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
+saved_checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
 # saved_checkpoint: Wav2letter-epoch=032-val_loss=0.40.ckpt
-saved_checkpoint:  Wav2letter-epoch=029-val_loss=0.94.ckpt # robustified on 960 Hrs.  of Librispeech starting from 'Wav2letter-epoch=024-val_loss=0.37.ckpt' 
+# saved_checkpoint:  Wav2letter-epoch=029-val_loss=0.94.ckpt # robustified on 960 Hrs.  of Librispeech starting from 'Wav2letter-epoch=024-val_loss=0.37.ckpt' 
+# saved_checkpoint: Wav2letter-epoch=044-val_loss=0.66.ckpt # robustified (norm=5) on 960 Hrs.  of Librispeech starting from 'Wav2letter-epoch=024-val_loss=0.37.ckpt'
 # saved_checkpoint: Wav2letter-epoch=109-val_loss=0.26.ckpt
 # saved_checkpoint: Wav2letter-epoch=026-val_loss=0.98.ckpt
 

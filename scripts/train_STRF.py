@@ -5,7 +5,8 @@ import pandas as pd
 from sklearn.linear_model import RidgeCV, ElasticNetCV
 
 # local
-from auditory_cortex import STRF, utils, config, saved_corr_dir
+from auditory_cortex import strf, utils, config, saved_corr_dir
+from auditory_cortex.io_utils.io import write_model_parameters
 
 
 start_time = time.time()
@@ -17,17 +18,19 @@ bad_sessions = config['bad_sessions']
 
 tmin = 0
 tmax = 0.3
-sfreq = 100
+# sfreq = 100
+num_freqs = 128
+num_workers = 4
 
 delay = 0.0
 bin_width = 20
 num_alphas = 5
 ridge = True
-third = 3
+third = None
 
 
 if third is None:
-    csv_file_name = 'STRF_corr_results.csv'
+    csv_file_name = f'STRF_freqs{num_freqs}_corr_results.csv'
 else:
     csv_file_name = f'STRF_{third}_third_corr_results.csv'
 # CSV file to save the results at
@@ -50,12 +53,11 @@ if file_exists:
 else:
     subjects = sessions
 
-# subjects = subjects[2:]
+# subjects = subjects[30:]
 
 for session in subjects:
     print(f"Working with '{session}'")
     # obj = get_reg_obj(data_dir, sub)
-    strf = STRF.STRF(session)
 
     if ridge:
         alphas = np.logspace(-2, 5, num_alphas)
@@ -65,10 +67,17 @@ for session in subjects:
         alphas = np.logspace(-2,5, num_alphas)
         estimator = ElasticNetCV()
         # filename = 'STRF_corr_elasticNetCV'
+    strf_model = strf.STRF(
+                session,
+                estimator,
+                num_workers=num_workers, 
+                num_freqs=num_freqs,
+                tmin=tmin,
+                tmax=tmax,
+                bin_width=bin_width
+            )
 
-    strf_model, corr = strf.fit(
-        estimator, num_workers=4, tmin=tmin, tmax=tmax, sfreq=sfreq, third=third
-        )
+    corr = strf_model.fit(third=third)
 
     results_dict = {
         'win': bin_width,
@@ -77,6 +86,11 @@ for session in subjects:
         'strf_corr': corr
         }
     df = utils.write_STRF(results_dict, file_path)
+
+    # writing coefficients...
+    coeff = strf_model.get_coefficients()
+
+    write_model_parameters(strf_model.model_name, session, coeff)
 
     
 END = time.time()

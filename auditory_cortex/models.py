@@ -33,7 +33,6 @@ class Regression():
         """
         """
         self.data_dir = config['neural_data_dir']
-
         self.dataset = NeuralData(self.data_dir, '180810')
         self.sents = np.arange(1,500)
         self.spike_datasets = {}
@@ -234,11 +233,11 @@ class Regression():
             self.num_channels = {}
             self._load_dataset_session(session)
 
-            self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
+            self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
             self.num_channels[session] = self.get_dataset_object(session).num_channels
       
         elif force_reload:
-            self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
+            self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
 
         spikes = self.spike_datasets[session].unroll_spikes(sents=sents, features_delay_trim=self.features_delay_trim, third=third)
         if not numpy:
@@ -573,6 +572,10 @@ class Regression():
             # self.B[session] = B
         return self.B[session]
 
+
+
+
+        
 
 
 
