@@ -1,0 +1,128 @@
+use_pca: False
+saved_checkpoint: openai/whisper-medium
+
+layers:
+- layer_name: model.encoder.conv1
+  layer_id: 0
+  layer_type: conv
+  RF: 45 # ms
+- layer_name: model.encoder.conv2
+  layer_id: 1
+  layer_type: conv
+  RF: 65 # ms
+
+- layer_name: model.encoder.layers.0.final_layer_norm
+  layer_id: 2
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.1.final_layer_norm
+  layer_id: 3
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.2.final_layer_norm
+  layer_id: 4
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.3.final_layer_norm
+  layer_id: 5
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.4.final_layer_norm
+  layer_id: 6
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.5.final_layer_norm
+  layer_id: 7
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.6.final_layer_norm
+  layer_id: 8
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.7.final_layer_norm
+  layer_id: 9
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.8.final_layer_norm
+  layer_id: 10
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.9.final_layer_norm
+  layer_id: 11
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.10.final_layer_norm
+  layer_id: 12
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.11.final_layer_norm
+  layer_id: 13
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+
+- layer_name: model.encoder.layers.12.final_layer_norm
+  layer_id: 14
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.13.final_layer_norm
+  layer_id: 15
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.14.final_layer_norm
+  layer_id: 16
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.15.final_layer_norm
+  layer_id: 17
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.16.final_layer_norm
+  layer_id: 18
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.17.final_layer_norm
+  layer_id: 19
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.18.final_layer_norm
+  layer_id: 20
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.19.final_layer_norm
+  layer_id: 21
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.20.final_layer_norm
+  layer_id: 22
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.21.final_layer_norm
+  layer_id: 23
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.22.final_layer_norm
+  layer_id: 24
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.23.final_layer_norm
+  layer_id: 25
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+
+# decoder layers
+# - layer_name: model.decoder.layers.0.final_layer_norm
+#   layer_id: 6
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer
+# - layer_name: model.decoder.layers.1.final_layer_norm
+#   layer_id: 7
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer
+# - layer_name: model.decoder.layers.2.final_layer_norm
+#   layer_id: 8
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer
+# - layer_name: model.decoder.layers.3.final_layer_norm
+#   layer_id: 9
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer  

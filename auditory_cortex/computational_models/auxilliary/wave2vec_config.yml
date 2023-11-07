@@ -1,0 +1,87 @@
+
+
+saved_checkpoint: wav2vec_large.pt
+# /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
+use_pca: False
+
+layers:
+
+# feature_extractor
+- layer_name: feature_extractor.conv_layers.0.2
+  layer_id: 0
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_extractor.conv_layers.1.2
+  layer_id: 1
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_extractor.conv_layers.2.2
+  layer_id: 2
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_extractor.conv_layers.3.2
+  layer_id: 3
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_extractor.conv_layers.4.2
+  layer_id: 4
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_extractor.conv_layers.5.2
+  layer_id: 5
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_extractor.conv_layers.6.2
+  layer_id: 6
+  layer_type: conv
+  RF: 120 # ms
+
+# feature_aggregator
+- layer_name: feature_aggregator.conv_layers.0.3
+  layer_id: 7
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.1.3
+  layer_id: 8
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.2.3
+  layer_id: 9
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.3.3
+  layer_id: 10
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.4.3
+  layer_id: 11
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.5.3
+  layer_id: 12
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.6.3
+  layer_id: 13
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.7.3
+  layer_id: 14
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.8.3
+  layer_id: 15
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.9.3
+  layer_id: 16
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.10.3
+  layer_id: 17
+  layer_type: conv
+  RF: 120 # ms
+- layer_name: feature_aggregator.conv_layers.11.3
+  layer_id: 18
+  layer_type: conv
+  RF: 120 # ms

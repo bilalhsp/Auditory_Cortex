@@ -1,12 +1,14 @@
 # adjsut the basic logging lovel of notebook
 import logging
+
+from auditory_cortex.analyses import regression_correlations
 logging.basicConfig(level=logging.WARNING)
 
 import os
 import pickle
 import numpy as np
 from auditory_cortex import optimal_input, opt_inputs_dir
-from auditory_cortex import analysis, utils
+from auditory_cortex import utils
 
 
 threshold = 0.068
@@ -15,7 +17,7 @@ model_name = 'deepspeech2'
 # model_name = 'wave2letter_modified'
 
 # correlation object
-corr_obj = analysis.Correlations(model_name=model_name+'_'+'opt_neural_delay')
+corr_obj = regression_correlations.Correlations(model_name=model_name+'_'+'opt_neural_delay')
 opt_obj = optimal_input.OptimalInput(model_name=model_name, load_features=False)
 
 # read betas...

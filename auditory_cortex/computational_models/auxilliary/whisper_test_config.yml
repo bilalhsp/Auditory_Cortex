@@ -1,0 +1,59 @@
+use_pca: False
+saved_checkpoint: openai/whisper-base
+
+layers:
+
+- layer_name: model.encoder.layers.0.self_attn_layer_norm
+  layer_id: 2
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.0.fc2
+  layer_id: 3
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.0.final_layer_norm
+  layer_id: 4
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.1.self_attn_layer_norm
+  layer_id: 5
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.1.fc2
+  layer_id: 6
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.1.final_layer_norm
+  layer_id: 7
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+
+- layer_name: model.encoder.layers.2.self_attn_layer_norm
+  layer_id: 8
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.2.fc2
+  layer_id: 9
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+- layer_name: model.encoder.layers.2.final_layer_norm
+  layer_id: 10
+  layer_type: transformer
+  RF: 0   # RF is irrelevant for transformer layer
+# decoder layers
+# - layer_name: model.decoder.layers.0.final_layer_norm
+#   layer_id: 6
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer
+# - layer_name: model.decoder.layers.1.final_layer_norm
+#   layer_id: 7
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer
+# - layer_name: model.decoder.layers.2.final_layer_norm
+#   layer_id: 8
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer
+# - layer_name: model.decoder.layers.3.final_layer_norm
+#   layer_id: 9
+#   layer_type: transformer
+#   RF: 0   # RF is irrelevant for transformer layer  

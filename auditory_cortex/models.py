@@ -5,16 +5,18 @@ import yaml
 import torch
 import numpy as np
 import pandas as pd
-from scipy import linalg, signal
-import matplotlib.pyplot as plt
+# from scipy import linalg, signal
+# import matplotlib.pyplot as plt
 
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
 
 # local
 from auditory_cortex import config
 import auditory_cortex.utils as utils
-from auditory_cortex.dataset import NeuralData
-from auditory_cortex.feature_extractors import FeatureExtractor
+# from auditory_cortex.dataset import NeuralData
+from auditory_cortex.neural_data import NeuralData
+import auditory_cortex.dataloader as dataloader
+# from auditory_cortex.computational_models.feature_extractors import DNNFeatureExtractor
 
 # import GPU specific packages...
 from auditory_cortex import hpc_cluster
@@ -26,251 +28,397 @@ class Regression():
     def __init__(
             self,
             model_name = 'speech2text',
-            load_features = True,
+            load_features = False,
             delay_features = False,
-            audio_zeropad = False
+            audio_zeropad = False,
+            resample=True,
+            saved_checkpoint=None
         ):
         """
         """
-        self.data_dir = config['neural_data_dir']
-        self.dataset = NeuralData(self.data_dir, '180810')
-        self.sents = np.arange(1,500)
-        self.spike_datasets = {}
+        # self.data_dir = config['neural_data_dir']
+        # self.dataset = NeuralData('180810')
+        # self.sents = np.arange(1,500)
+        # self.spike_datasets = {}
 
         print(f"Creating regression obj for: '{model_name}'")
         # self.model = model
-        self.model_extractor = FeatureExtractor(model_name)
+        self.dataloader = dataloader.DataLoader()
+        # self.model_extractor = FeatureExtractor(model_name, saved_checkpoint=saved_checkpoint)
         self.model_name = model_name
-        self.layers = self.model_extractor.layers
-        self.layer_ids = self.model_extractor.layer_ids
-        self.receptive_fields = self.model_extractor.receptive_fields
+        # self.layers = self.model_extractor.layers
+        # self.layer_ids = self.model_extractor.layer_ids
+        # self.receptive_fields = self.model_extractor.receptive_fields
         self.features_delay_trim = None
         self.audio_padding_duration = 0
-        self.use_pca = self.model_extractor.use_pca
-        if self.use_pca:
-            self.pca_comps = self.model_extractor.pca_comps
-            self.pca = {}
-            self.feature_dims = self.pca_comps
+        # self.use_pca = self.model_extractor.use_pca
+        # if self.use_pca:
+        #     self.pca_comps = self.model_extractor.pca_comps
+        #     self.pca = {}
+        #     self.feature_dims = self.pca_comps
         # self.num_channels = self.dataset.num_channels
-        self.num_layers = len(self.layers)
+        # self.num_layers = len(self.layers)
         self.B = {}
 
-        if load_features:
-            self.load_features(delay_features=delay_features, audio_zeropad=audio_zeropad)
+        # if load_features:
+        #     self.load_features(delay_features=delay_features, audio_zeropad=audio_zeropad,
+        #                        resample=resample)
 
-    def get_layer_index(self, layer_id):
-        """Returns layer index for layer ID (defined in config).
-        Calls instance method of 'self.model_extractor'
-        """
-        return self.model_extractor.get_layer_index(layer_id)
+
+
 
 
     ### Methods for the loading and accessing features..
 
-    def load_features(self, bin_width=20, delay_features=False, audio_zeropad=False):
-        print(f"Loading ANN features at bin-width: {bin_width}")
-        # if sents is None:
-        #     sents = self.sents
-        if delay_features:
-            print("Features Delay requested:")
-            print("- Delaying features by half of RF for each layer")
 
-            self.layer_delays = (np.array(self.receptive_fields)/(2.0*bin_width)).astype(int)
-            self.max_layer_delay = np.max(self.layer_delays)
-            print(f"Layer-wise delays (in samples) will be: {self.layer_delays} ")
-
-            if audio_zeropad:
-                self.audio_padding_duration = (self.max_layer_delay * bin_width)/1000.0
-                # max_layer_delay = 4
-                self.audio_padding_samples = (self.max_layer_delay * bin_width)*16 # sampling rate/1000
-                
-                print(f" - spikes trimming not needed. \n\
-                    (Zero-paddading audio by {self.audio_padding_duration*1000:.0f} ms, before extracting features)")
-
-                # in case of audio-zeropadding, no need to trim the spikes
-                self.features_delay_trim = None
-
-            else:
-                print(" - Trimming spikes by max feature delay (across all layers) ")
-                self.features_delay_trim = self.max_layer_delay
-                self.audio_padding_duration = 0
-
-        elif audio_zeropad:
-            ...
-            raise AttributeError(f"Invalid arguments: Features delay must for Audio zero-padding!!!")
-        raw_features = self.extract_features(audio_zeropad=audio_zeropad)
-        if not self.use_pca:
-            self.feature_dims = raw_features[0][1].shape[1]
-        self.sampled_features = self.resample(raw_features, bin_width, delay_features=delay_features)
-        # self.features = self.unroll_features(sents = sents, numpy=numpy, return_dict=True)
-
-    def unroll_features(self, sents = None, numpy=True, return_dict=False, train_pca=False,
-                        layers=None, third=None):
+    def unroll_features(self, bin_width=20, sents = None, numpy=True,
+            return_dict=False, layer_IDs=None, third=None):
         """
         Unroll and concatenate time axis of extracted features.
 
         Args:
+            model_name: str = assigned name of DNN model of interest.
+            bin_width: int = bin width in ms.
             sents (List of int ID's): ID's of sentences 
             layers (list): Layer of layer indices 
             third (int):    Default=None, section of sents to compute prediction corr.
 
         Returns:
-            dict: 
+            dict: if return_dict=True, otherwise, return ndarray =(samples, ndim)
         """
         if sents is None:
-            sents = self.sents
-        if layers is None:
-            layers = range(self.num_layers)
-        # sampled_features = self.resample(bin_width)
+            sents = self.dataloader.metadata.sent_IDs
+        if layer_IDs is None:
+            layer_IDs = self.dataloader.get_layer_IDs(self.model_name)
+        # sampled_features = self.dataloader.get_resampled_DNN_features(self.model_name, bin_width)
         feats = {}
-        for j, l in enumerate(self.layers):
+        for layer_ID in layer_IDs:
+            layer_feats = self.dataloader.get_DNN_layer_features(
+                    self.model_name, layer_ID, bin_width=bin_width
+                    )
             if third is None:
-                feats[j] = np.concatenate([self.sampled_features[j][sent] for sent in sents], axis=0)
+                feats[layer_ID] = np.concatenate([layer_feats[sent] for sent in sents], axis=0)
+                # feats[j] = np.concatenate([sampled_features[layer_ID][sent] for sent in sents], axis=0)
             else:
-                feats[j] = np.concatenate([self.sampled_features[j][sent][self.sent_sections[sent][third-1]:self.sent_sections[sent][third]] for sent in sents], axis=0)
-            if self.use_pca:
-                if train_pca:
-                    self.pca[j] = PCA(n_components=self.pca_comps)
-                    feats[j] = self.pca[j].fit_transform(feats[j])
-                else:
-                     feats[j] = self.pca[j].transform(feats[j])
+                pass
+                # feats[layer_ID] = np.concatenate([layer_feats[sent][self.sent_sections[sent][third-1]:self.sent_sections[sent][third]] for sent in sents], axis=0)
+            # if self.use_pca:
+            #     if train_pca:
+            #         self.pca[layer_ID] = PCA(n_components=self.pca_comps)
+            #         feats[layer_ID] = self.pca[layer_ID].fit_transform(feats[layer_ID])
+            #     else:
+            #          feats[layer_ID] = self.pca[layer_ID].transform(feats[layer_ID])
             if not numpy:
-                feats[j] = cp.array(feats[j])
+                feats[layer_ID] = cp.array(feats[layer_ID])
         if not return_dict:
-            feats = np.stack([feats[i] for i in layers], axis=0)
+            feats = np.stack([feats[id] for id in layer_IDs], axis=0)
         return feats
+    
+    def get_layer_IDs(self):
+        """Retrieves layer ID for self.model_name"""
+        return self.dataloader.get_layer_IDs(self.model_name)
+    
 
-    def extract_features(self, audio_zeropad=False):
-        """
-        Returns all layer features for given 'sents'
 
-        Args:
-            sents (list, optional): List of sentence ID's to get the features for. 
 
-        Returns:
-            List of dict: List index corresponds to layer number carrying 
-                            dict of extracted features for all sentences. 
-        """
-        sents = self.sents
-        features = [{} for _ in range(self.num_layers)]
-        # self.audio_padding_duration = 0 # incase of no padding, 
 
-        for x, i in enumerate(sents):
-            if audio_zeropad:
-                audio_input = np.concatenate([
-                        np.zeros(self.audio_padding_samples),
-                        self.dataset.audio(i)
-                    ], axis=0)
-            else:
-                audio_input = self.dataset.audio(i)
+##############################################################################
+##########      Moved to dataloader...
+#############################################################################
 
-            self.model_extractor.translate(audio_input, grad = False)
-            for j in range(self.num_layers):
-                features[j][i] = self.model_extractor.get_features(j)
+    # def get_layer_index(self, layer_id):
+    #     """Returns layer index for layer ID (defined in config).
+    #     Calls instance method of 'self.model_extractor'
+    #     """
+    #     return self.model_extractor.get_layer_index(layer_id)
 
-        return features
 
-    def resample(self, raw_features, bin_width, delay_features=False):
-        """
-        resample all layer features to specific bin_width
+    # def load_features(self, bin_width=20, resample= True, delay_features=False, audio_zeropad=False):
+    #     print(f"Loading raw ANN features..")
+    #     # if sents is None:
+    #     #     sents = self.sents
+    #     if delay_features:
+    #         print("Features Delay requested:")
+    #         print("- Delaying features by half of RF for each layer")
 
-        Args:
-            bin_width (float): width of data samples in ms (1000/sampling_rate).
+    #         self.layer_delays = (np.array(self.receptive_fields)/(2.0*bin_width)).astype(int)
+    #         self.max_layer_delay = np.max(self.layer_delays)
+    #         print(f"Layer-wise delays (in samples) will be: {self.layer_delays} ")
 
-        Returns:
-            List of dict: all layer features (resampled at required sampling_rate).
-        """
-        resampled_features = [{} for _ in range(len(self.layers))]
-        self.sent_sections = {}
+    #         if audio_zeropad:
+    #             self.audio_padding_duration = (self.max_layer_delay * bin_width)/1000.0
+    #             # max_layer_delay = 4
+    #             self.audio_padding_samples = (self.max_layer_delay * bin_width)*16 # sampling rate/1000
+                
+    #             print(f" - spikes trimming not needed. \n\
+    #                 (Zero-paddading audio by {self.audio_padding_duration*1000:.0f} ms, before extracting features)")
 
-        bin_width = bin_width/1000 # ms
-        for sent in raw_features[0].keys():
-            # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
-            sent_duration = self.audio_padding_duration + self.dataset.duration(sent)
-            n = int(np.ceil(round(sent_duration/bin_width, 3)))
+    #             # in case of audio-zeropadding, no need to trim the spikes
+    #             self.features_delay_trim = None
 
-            # save boundaries of sent thirds (3 sections of each sentence..)
-            one_third = int(n/3)
-            two_third = int(2*n/3)
-            self.sent_sections[sent] = [0, one_third, two_third, n]
+    #         else:
+    #             print(" - Trimming spikes by max feature delay (across all layers) ")
+    #             self.features_delay_trim = self.max_layer_delay
+    #             self.audio_padding_duration = 0
 
-            for j, l in enumerate(self.layers):
-                tmp = signal.resample(raw_features[j][sent],n, axis=0)
-                # mean = np.mean(tmp, axis=0)
-                # resampled_features[j][sent] = tmp #- mean
-                if delay_features:
-                    seq_len = tmp.shape[0]
-                    # delay by removing last samples, and trimming the extra length at the start..
-                    tmp =   tmp[self.max_layer_delay-self.layer_delays[j] : seq_len-self.layer_delays[j]]
+    #     elif audio_zeropad:
+    #         ...
+    #         raise AttributeError(f"Invalid arguments: Features delay must for Audio zero-padding!!!")
+    #     # raw_features = self.extract_features(audio_zeropad=audio_zeropad)
+    #     raw_features = self.model_extractor.extract_features()
+    #     if not self.use_pca:
+    #         self.feature_dims = raw_features[0][1].shape[1]
+
+    #     # resample = False   # temporary change.....! 10/23/23
+    #     if resample:
+    #         self.sampled_features = self.resample(raw_features, bin_width, delay_features=delay_features)
+    #     else:
+    #         self.sampled_features = raw_features
+    #     # self.features = self.unroll_features(sents = sents, numpy=numpy, return_dict=True)
+
+
+    # def resample(self, raw_features, bin_width, delay_features=False):
+    #     """
+    #     resample all layer features to specific bin_width
+
+    #     Args:
+    #         bin_width (float): width of data samples in ms (1000/sampling_rate).
+
+    #     Returns:
+    #         List of dict: all layer features (resampled at required sampling_rate).
+    #     """
+    #     print(f"Resamping ANN features at bin-width: {bin_width}")
+    #     resampled_features = [{} for _ in range(len(self.layers))]
+    #     self.sent_sections = {}
+
+    #     bin_width = bin_width/1000 # ms
+    #     for sent in raw_features[0].keys():
+    #         # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
+    #         sent_duration = self.audio_padding_duration + self.dataset.duration(sent)
+    #         n = int(np.ceil(round(sent_duration/bin_width, 3)))
+
+    #         # save boundaries of sent thirds (3 sections of each sentence..)
+    #         one_third = int(n/3)
+    #         two_third = int(2*n/3)
+    #         self.sent_sections[sent] = [0, one_third, two_third, n]
+
+    #         for j, l in enumerate(self.layers):
+    #             # if 'whisper' in self.model_name:
+    #             #     ## whisper networks gives features for 30s long clip,
+    #             #     ## extracting only the true initial samples...
                     
-                resampled_features[j][sent] = tmp
-        return resampled_features
+    #             #     if l == 'model.encoder.conv1':
+    #             #         # sampling rate is 100 Hz for very first layer
+    #             #         # and 50 Hz for all the other layers...
+    #             #         samples = 2*n
+    #             #         tmp = raw_features[j][sent][:samples]
+    #             #         tmp = signal.resample(tmp, n, axis=0)
+    #             #     else:
+    #             #         tmp = raw_features[j][sent][:n]
+            
+    #             # else:
+    #             tmp = signal.resample(raw_features[j][sent], n, axis=0)
+    #             # mean = np.mean(tmp, axis=0)
+    #             # resampled_features[j][sent] = tmp #- mean
+    #             if delay_features:
+    #                 seq_len = tmp.shape[0]
+    #                 # delay by removing last samples, and trimming the extra length at the start..
+    #                 tmp =   tmp[self.max_layer_delay-self.layer_delays[j] : seq_len-self.layer_delays[j]]
+                    
+    #             resampled_features[j][sent] = tmp
+    #     return resampled_features
+
+    ####################################################
+    ###### neural dataset part...
+
+        # def get_neural_spikes(
+        #     self, session, bin_width=20, delay=0, sents=None, force_reload=False, numpy=False, third=None
+        # ):
+        # """Retrieves neural spikes for the argument session, loads spikes 
+        # if not already loaded or force_reload=True."""
+        # session = str(session)
+        # # check if session is already loaded, reuse it, otherwise clear all sessions to saved memory.
+        # if session not in self.list_loaded_sessions():
+        #     self.spike_datasets.clear()
+        #     gc.collect()
+        #     # de-allocation of memory ends here...
+
+        #     self.spike_datasets = {}
+        #     self.num_channels = {}
+        #     self._load_dataset_session(session)
+
+        #     self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
+        #     self.num_channels[session] = self.get_dataset_object(session).num_channels
+      
+        # elif force_reload:
+        #     self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
+
+        # spikes = self.spike_datasets[session].unroll_spikes(sents=sents, features_delay_trim=self.features_delay_trim, third=third)
+        # if not numpy:
+        #     spikes = cp.array(spikes)
+
+        # return spikes
+
+
+    #     def get_raw_neural_spikes(self, session, bin_width=20, delay=0):
+    #     """Returns neural spikes in the raw form (not unrolled)
+
+    #     Args:
+    #         session: = session ID 
+    #         bin_width: int = size of the binning window in ms.
+    #         delay: int: neural delay in ms.
+    #     Returns:
+    #         dict = dict of neural spikes with sent IDs as keys.
+    #     """
+    #     session = str(int(session))
+    #     # check if session is already loaded, reuse it, otherwise clear all sessions to saved memory.
+    #     if session not in self.list_loaded_sessions():
+    #         self.spike_datasets.clear()
+    #         gc.collect()
+    #         # de-allocation of memory ends here...
+
+    #         self.spike_datasets = {}
+    #         self.num_channels = {}
+    #         self._load_dataset_session(session)
+    #         self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
+    #         self.num_channels[session] = self.get_dataset_object(session).num_channels
+    #     return self.get_dataset_object(session).raw_spikes
+
+
+    # def list_loaded_sessions(self):
+    #     """Returns the list of sessions for which neural data has
+    #     been loaded."""
+    #     return self.spike_datasets.keys()
+    
+    # def _load_dataset_session(self, session):
+    #     """Create dataset object for the 'session'"""
+    #     self.spike_datasets[session] = NeuralData(session)
+
+    # def get_dataset_object(self, session):
+    #     """Returns spike dataset object if neural data for the input 
+    #     session has already been loaded, otherwise return False."""
+    #     try:
+    #         return self.spike_datasets[session]
+    #     except:
+    #         raise AttributeError(f"Create dataset object for session-{session} before using it.")
+
+    # def get_normalizer(self, session, sents=None, bin_width=20, delay=0, n=1000):
+    #     """Compute dist. of normalizer for correlations (repeatability of neural
+    #     spikes), and return median."""
+    #     if session not in self.list_loaded_sessions():
+    #         self._load_dataset_session(session)
+    #         _ = self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
+    #     return self.spike_datasets[session].get_normalizer(sents=sents, bin_width=bin_width, delay=delay, n=n)
+
+
+
+##############################################################################
+##########      Moved to Feature Extractor...
+#############################################################################
+
+    # def extract_features(self, audio_zeropad=False):
+    #     """
+    #     Returns all layer features for given 'sents'
+
+    #     Args:
+    #         sents (list, optional): List of sentence ID's to get the features for. 
+
+    #     Returns:
+    #         List of dict: List index corresponds to layer number carrying 
+    #                         dict of extracted features for all sentences. 
+    #     """
+    #     sents = self.sents
+    #     features = [{} for _ in range(self.num_layers)]
+    #     # self.audio_padding_duration = 0 # incase of no padding, 
+
+    #     for x, i in enumerate(sents):
+    #         if audio_zeropad:
+    #             audio_input = np.concatenate([
+    #                     np.zeros(self.audio_padding_samples),
+    #                     self.dataset.audio(i)
+    #                 ], axis=0)
+    #         else:
+    #             audio_input = self.dataset.audio(i)
+            
+    #         # needed only for Whisper...!
+    #         if 'whisper' in self.model_name:
+    #             bin_width = 20/1000.0   #20 ms for all layers except the very first...
+    #             sent_duration = self.audio_padding_duration + self.dataset.duration(i)
+    #             n = int(np.ceil(round(sent_duration/bin_width, 3)))
+
+    #         self.model_extractor.translate(audio_input, grad = False)
+    #         for j, l in enumerate(self.layers):
+    #             features[j][i] = self.model_extractor.get_features(j).cpu()
+    #             if 'whisper' in self.model_name:
+    #                 ## whisper networks gives features for 30s long clip,
+    #                 ## extracting only the true initial samples...
+    #                 if l == 'model.encoder.conv1':
+    #                     # sampling rate is 100 Hz for very first layer
+    #                     # and 50 Hz for all the other layers...
+    #                     samples = 2*n
+    #                 else:
+    #                     samples = n
+    #                 features[j][i] = features[j][i][:samples]
+         
+    #     return features
+
+
+############################################################################
+#####           Ends here...
+############################################################################
+    ### Methods for the getting neural data (spikes)
+
+
+    def unroll_spikes(self, session, bin_width=20, delay=0, sents=None,
+                numpy=False):
+        """
+        Retrieves stimulus-wise neural spikes for the specified session, unrolls
+        and concatenatess time axis of neural spikes.
+
+        Args:
+            session: int = ID of recording site (session) 
+            bin_width: int = bin width in ms.
+            delay: int = neural delay in ms.
+            sents (List of int ID's): ID's of sentences 
+            numpy: bool = Setting numpy=True would mean using CPU and not GPU.
+
+        Returns:
+            return ndarray =(samples, n_channels)
+        """
+        if sents is None:
+            sents = self.dataloader.sent_IDs
+
+        session = str(session)
+        raw_spikes = self.dataloader.get_session_spikes(session=session, bin_width=bin_width, delay=delay)
+        spikes = np.concatenate([raw_spikes[sent] for sent in sents], axis=0)
+        if not numpy:
+            spikes = cp.array(spikes)
+        return spikes
+        
+    def get_normalizer(self, session, sents=None, bin_width=20, delay=0, n=1000):
+        """Compute dist. of normalizer for correlations (repeatability of neural
+        spikes), and return median."""
+        all_repeated_trials = self.dataloader.get_neural_data_for_repeated_trials(
+            session, bin_width=bin_width, delay=delay
+            )
+        normalizer_all = Regression.inter_trial_corr(all_repeated_trials, n=n)
+        normalizer_all_med = np.median(normalizer_all, axis=0)
+        return normalizer_all_med
+
+
 
 
 
     def get_features(self, layer):
         try:
-            feats = self.features[layer]
+            layer = self.get_layer_index(layer)
+            feats = self.sampled_features[layer]
         except AttributeError:
-            raise AttributeError("Run 'load_features_and_spikes()' method before using hidden features...")
+            raise AttributeError("Run 'load_features()' method before using hidden features...")
         return feats
     
-    ### Methods for the getting neural data (spikes)
 
-    def get_neural_spikes(
-            self, session, bin_width=20, delay=0, sents=None, force_reload=False, numpy=False, third=None
-        ):
-        """Retrieves neural spikes for the argument session, loads spikes 
-        if not already loaded or force_reload=True."""
-        session = str(session)
-        # check if session is already loaded, reuse it, otherwise clear all sessions to saved memory.
-        if session not in self.list_loaded_sessions():
-            self.spike_datasets.clear()
-            gc.collect()
-            # de-allocation of memory ends here...
 
-            self.spike_datasets = {}
-            self.num_channels = {}
-            self._load_dataset_session(session)
-
-            self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
-            self.num_channels[session] = self.get_dataset_object(session).num_channels
-      
-        elif force_reload:
-            self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
-
-        spikes = self.spike_datasets[session].unroll_spikes(sents=sents, features_delay_trim=self.features_delay_trim, third=third)
-        if not numpy:
-            spikes = cp.array(spikes)
-
-        return spikes
-    
-    
-    def list_loaded_sessions(self):
-        """Returns the list of sessions for which neural data has
-        been loaded."""
-        return self.spike_datasets.keys()
-    
-    def _load_dataset_session(self, session):
-        """Create dataset object for the 'session'"""
-        self.spike_datasets[session] = NeuralData(self.data_dir, session)
-        
-
-    def get_normalizer(self, session, sents=None, bin_width=20, delay=0, n=1000):
-        """Compute dist. of normalizer and return median."""
-        if session not in self.list_loaded_sessions():
-            self._load_dataset_session(session)
-            _ = self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
-        return self.spike_datasets[session].get_normalizer(sents=sents, bin_width=bin_width, delay=delay, n=n)
-        
-
-    def get_dataset_object(self, session):
-        """Returns spike dataset object if neural data for the input 
-        session has already been loaded, otherwise return False."""
-        try:
-            return self.spike_datasets[session]
-        except:
-            raise AttributeError(f"Create dataset object for session-{session} before using it.")
 
 
     ### Methods for the computing correlations and grid search for optimal delay.
@@ -306,21 +454,26 @@ class Regression():
             module = cp
 
         if sents is None:
-            sents = self.sents
+            sents = self.dataloader.sent_IDs
         if N_sents > len(sents):
             N_sents = len(sents)
         
         # this creates a new dataset object and extracts the spikes
         session = str(session)
-        _ = self.get_neural_spikes(session, bin_width=bin_width, delay=delay)
+        # spikes = self.unroll_spikes(session, bin_width=bin_width, delay=delay)
+        num_channels = self.dataloader.get_num_channels(session)
+        # _ = self.get_neural_spikes(session, bin_width=bin_width, delay=delay)
+        # num_channels = self.spike_datasets[session].num_channels
+        layer_IDs = self.get_layer_IDs()
 
-        num_channels = self.spike_datasets[session].num_channels
-
+        # loading features for any one sent=12, to get feature_dims..
+        feature_dims = self.unroll_features(bin_width=bin_width, sents=[12]).shape[-1]
+        
         # feature_dims = self.sampled_features[0].shape[1]
         lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
-        B = module.zeros((self.num_layers, self.feature_dims, num_channels))
-        corr_coeff = np.zeros((iterations, num_channels, self.num_layers))
-        corr_coeff_train = np.zeros((iterations, num_channels,self.num_layers))
+        B = module.zeros((len(layer_IDs), feature_dims, num_channels))
+        corr_coeff = np.zeros((iterations, num_channels, len(layer_IDs)))
+        corr_coeff_train = np.zeros((iterations, num_channels, len(layer_IDs)))
         # stimuli = np.array(list(self.raw_features[0].keys()))
 
         stimuli = np.random.permutation(sents)[0:N_sents]
@@ -349,7 +502,8 @@ class Regression():
             # lmbda_loss = module.zeros(((len(lmbdas), num_channels, self.num_layers)))
             start_lmbda = time.time()
             lmbda_loss = self.k_fold_CV(
-                    session, mapping_set=mapping_set, lmbdas=lmbdas, num_folds=num_folds
+                    session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
+                    lmbdas=lmbdas, num_folds=num_folds
                 )
             
             end_lmbda = time.time()
@@ -357,26 +511,34 @@ class Regression():
             optimal_lmbdas = lmbdas[np.argmin(lmbda_loss, axis=0)]
             start_map = time.time()
             # Loading Mapping set...!
-            mapping_x = self.unroll_features(sents=mapping_set, numpy=numpy, train_pca=True)
+            mapping_x = self.unroll_features(bin_width=bin_width, sents=mapping_set, numpy=numpy)
             # mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
             # mapping_y = self.unroll_spikes(session, sents=mapping_set, numpy=numpy)
-            mapping_y = self.get_neural_spikes(session, sents=mapping_set, numpy=numpy)
+            mapping_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
+                                    sents=mapping_set, numpy=numpy)
             
+            # mapping_y = self.get_neural_spikes(session, bin_width=bin_width, sents=mapping_set, numpy=numpy)
             #computing betas
-            for l in range(self.num_layers):
+            for l in range(len(layer_IDs)):
                 for ch in range(num_channels):
                     B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
-            self.B[session] = cp.asnumpy(B)
-
-            # Loading test set...!
-            test_x = self.unroll_features(sents=test_set, numpy=numpy, third=third)
-            test_y = self.get_neural_spikes(session, sents=test_set, numpy=numpy, third=third) 
+            # self.B[session] = cp.asnumpy(self.B[session])
 
             train_pred = utils.predict(mapping_x, B)
-            test_pred = utils.predict(test_x, B)
-            
-            corr_coeff[n] = utils.cc_norm(test_y,test_pred)
             corr_coeff_train[n] = utils.cc_norm(mapping_y, train_pred)
+
+            del mapping_x
+            del mapping_y
+            gc.collect()
+
+            # Loading test set...!
+            test_x = self.unroll_features(bin_width=bin_width, sents=test_set, numpy=numpy, third=third)
+            test_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
+                                    sents=test_set, numpy=numpy)
+            # test_y = self.get_neural_spikes(session, bin_width=bin_width, sents=test_set, numpy=numpy, third=third) 
+
+            test_pred = utils.predict(test_x, B)
+            corr_coeff[n] = utils.cc_norm(test_y, test_pred)
             end_map = time.time()
             end_itr = time.time()
             time_map += end_map - start_map
@@ -393,7 +555,7 @@ class Regression():
         lmbda_loss = lmbda_loss.transpose((0,2,1))
         if return_dict:
             # deallocate the memory of Neural data for current session, this will save memory used.
-            del self.spike_datasets[session]
+            # del self.spike_datasets[session]
             # saving results in a dictionary..
             corr_coeff_train = np.median(corr_coeff_train, axis=0)
             corr = {'test_cc_raw': corr_coeff,
@@ -403,7 +565,7 @@ class Regression():
                     'session': session,
                     'model': self.model_name,
                     'N_sents': N_sents,
-                    'layer_ids': self.layer_ids,
+                    'layer_ids': layer_IDs,
                     'opt_delays': None
                     }
             return corr
@@ -411,7 +573,7 @@ class Regression():
 
 
 
-    def k_fold_CV(self, session, mapping_set, lmbdas, num_folds=5, use_cpu=False):
+    def k_fold_CV(self, session, bin_width, delay, mapping_set, lmbdas, num_folds=5, use_cpu=False):
         """Return MSE loss (avg.) for k-fold CV regression.
 
         Args:
@@ -425,13 +587,16 @@ class Regression():
             avg. MSE loss for validation set.     
         """
         print(f"{num_folds}_fold CV for session: {session}")
-        num_channels = self.spike_datasets[session].num_channels
-        lmbda_loss = np.zeros(((len(lmbdas), num_channels, self.num_layers)))
+        # num_channels = self.spike_datasets[session].num_channels
+        num_channels = self.dataloader.get_num_channels(session)
+        layer_IDs = self.get_layer_IDs()
+
+        lmbda_loss = np.zeros(((len(lmbdas), num_channels, len(layer_IDs))))
         size_of_chunk = int(len(mapping_set) / num_folds)
         # for i, lmbda in enumerate(lmbdas):
         #     loss = 0
         for r in range(num_folds):
-
+            print(f"For fold={r}: ")
             # get the sent ids for train and validation folds...
             if r<(num_folds-1):
                 val_set = mapping_set[r*size_of_chunk:(r+1)*size_of_chunk]
@@ -440,24 +605,38 @@ class Regression():
             train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
 
             # load features and spikes using the sent ids.
-            train_x = self.unroll_features(sents=train_set, numpy=use_cpu, train_pca=True)
-            train_y = self.get_neural_spikes(session, sents=train_set, numpy=use_cpu)
+            train_x = self.unroll_features(bin_width=bin_width, sents=train_set, numpy=use_cpu)
+            train_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
+                                    sents=train_set, numpy=use_cpu)
 
-            val_x = self.unroll_features(sents=val_set, numpy=use_cpu)
-            val_y = self.get_neural_spikes(session, sents=val_set, numpy=use_cpu)
+            # computing Betas for lmbdas and removing train_x, train_y to manage memory..
+            Betas = {}
+            for i, lmbda in enumerate(lmbdas):
+                Betas[i] = utils.reg(train_x, train_y, lmbda)
+            
+            del train_x
+            del train_y
+            gc.collect()
+
+            # train_y = self.get_neural_spikes(session, bin_width=bin_width, sents=train_set, numpy=use_cpu)
+
+            val_x = self.unroll_features(bin_width=bin_width, sents=val_set, numpy=use_cpu)
+            val_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
+                                    sents=val_set, numpy=use_cpu)
+
+            # val_y = self.get_neural_spikes(session, bin_width=bin_width, sents=val_set, numpy=use_cpu)
 
             # for the current fold, compute/save validation loss for each lambda.
             for i, lmbda in enumerate(lmbdas):
 
-                Beta = utils.reg(train_x, train_y, lmbda)
-                val_pred = utils.predict(val_x, Beta)
+                # Beta = utils.reg(train_x, train_y, lmbda)
+                # val_pred = utils.predict(val_x, Beta)
+                val_pred = utils.predict(val_x, Betas[i])
 
                 loss = utils.mse_loss(val_y, val_pred)
                 lmbda_loss[i] += cp.asnumpy((loss))
 
             # de-allocate train_x and train_y to reduce memroy utilization...
-            del train_x
-            del train_y
             del val_x
             del val_y
             gc.collect()
@@ -467,26 +646,30 @@ class Regression():
         return lmbda_loss
 
 
+##################################################################################
+##############          Not sure if this is being used....so commenting out..
+######################################################################################
 
-    def map_and_score(self, mapping_set, test_set, optimal_lmbdas, use_cpu=False):
-        feature_dims = self.features[0].shape[1]
-        B = cp.zeros((self.num_layers, feature_dims, self.num_channels))
-        corr_coeff = np.zeros((self.num_channels, self.num_layers))
-        mapping_x = self.unroll_features(mapping_set, numpy=use_cpu)
-        # mapping_x = np.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
-        mapping_y = self.unroll_spikes(sents=mapping_set, numpy=use_cpu)
+
+    # def map_and_score(self, bin_width, mapping_set, test_set, optimal_lmbdas, use_cpu=False):
+    #     feature_dims = self.features[0].shape[1]
+    #     B = cp.zeros((self.num_layers, feature_dims, self.num_channels))
+    #     corr_coeff = np.zeros((self.num_channels, self.num_layers))
+    #     mapping_x = self.unroll_features(bin_width=bin_width, sents=mapping_set, numpy=use_cpu)
+    #     # mapping_x = np.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
+    #     mapping_y = self.unroll_spikes(sents=mapping_set, numpy=use_cpu)
         
-        test_x = self.unroll_features(sents=test_set, numpy=use_cpu)
-        # test_x = np.stack([test_x[i] for i in range(self.num_layers)], axis=0)
-        test_y = self.unroll_spikes(sents=test_set, numpy=use_cpu) 
+    #     test_x = self.unroll_features(bin_width=bin_width, sents=test_set, numpy=use_cpu)
+    #     # test_x = np.stack([test_x[i] for i in range(self.num_layers)], axis=0)
+    #     test_y = self.unroll_spikes(sents=test_set, numpy=use_cpu) 
         
-        for l in range(self.num_layers):
-            for ch in range(self.num_channels):
-                B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
+    #     for l in range(self.num_layers):
+    #         for ch in range(self.num_channels):
+    #             B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
         
-        test_pred = utils.predict(test_x, B)
-        corr_coeff = utils.cc_norm(test_y,test_pred)
-        return corr_coeff, cp.asnumpy(B)
+    #     test_pred = utils.predict(test_x, B)
+    #     corr_coeff = utils.cc_norm(test_y,test_pred)
+    #     return corr_coeff, cp.asnumpy(B)
 
 
     def grid_search_CV(self,
@@ -514,13 +697,14 @@ class Regression():
 
             # force reload spikes at the desired delay...
             print(f"Loading neural spikes with delay: {delay}ms")
-            _ = self.get_neural_spikes(
-                    session, bin_width=bin_width, delay=delay, force_reload=True
-                )
+            # _ = self.get_neural_spikes(
+            #         session, bin_width=bin_width, delay=delay, force_reload=True
+            #     )
             corr_coeff, _, loss, _ = self.cross_validated_regression(
                     session, bin_width=bin_width, delay=delay, num_folds=num_folds,
                     iterations=iterations, return_dict=False, num_lmbdas=num_lmbdas,
-                    numpy=numpy, N_sents=N_sents, sents=sents, third=third
+                    numpy=numpy, N_sents=N_sents, sents=sents, third=third,
+                    test_sents=self.dataloader.test_sent_IDs
                 )
             corr_coeffs.append(corr_coeff)
             losses.append(loss)
@@ -528,18 +712,19 @@ class Regression():
         corr_coeffs = np.array(corr_coeffs)
         losses = np.array(losses)
         delays = np.array(delays)
-        num_channels = self.spike_datasets[session].num_channels
+        # num_channels = self.spike_datasets[session].num_channels
+        num_channels = self.dataloader.get_num_channels(session)
+        layer_IDs = self.get_layer_IDs()
 
         opt_delay_indices = np.argmin(losses, axis=0)
         opt_delays = delays[opt_delay_indices]
         corr_coeffs_opt_delay = corr_coeffs[
-                opt_delay_indices, np.arange(self.num_layers)[:, None], np.arange(num_channels)
+                opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
             ]
  
-
         if return_dict:
             # deallocate the memory of Neural data for current session, this will save memory used.
-            del self.spike_datasets[session]
+            # del self.spike_datasets[session]
             # saving results in a dictionary..
             corr_dict = {
                     'test_cc_raw': corr_coeffs_opt_delay,
@@ -549,7 +734,7 @@ class Regression():
                     'session': session,
                     'model': self.model_name,
                     'N_sents': N_sents,
-                    'layer_ids': self.layer_ids,
+                    'layer_ids': layer_IDs,
                     'opt_delays': opt_delays
                     }
             return corr_dict
@@ -571,6 +756,24 @@ class Regression():
             )
             # self.B[session] = B
         return self.B[session]
+    
+
+    @staticmethod
+    def inter_trial_corr(spikes, n=1000):
+        """Compute distribution of inter-trials correlations.
+
+        Args: 
+            spikes (ndarray): (repeats, samples/time, channels)
+
+        Returns:
+            trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
+        """
+        trials_corr = np.zeros((n, spikes.shape[2]))
+        for t in range(n):
+            trials = np.random.choice(np.arange(0,spikes.shape[0]), size=2, replace=False)
+            trials_corr[t] = utils.cc_norm(spikes[trials[0]].squeeze(), spikes[trials[1]].squeeze())
+
+        return trials_corr
 
 
 
@@ -751,7 +954,7 @@ class Regression():
     #     B = utils.reg(features, spikes)
     #     return B
     
-    def neural_prediction(self, session, sent):
+    def neural_prediction(self, session, bin_width, sent):
         """
         Returns prediction for neural activity 
 
@@ -761,7 +964,7 @@ class Regression():
         Returns:
             ndarray : (time, ch, layers) Prdicted neural activity 
         """
-        features = self.unroll_features(sents=sent)
+        features = self.unroll_features(bin_width=bin_width, sents=sent)
         # features = np.stack([dict_feats[i] for i in range(12)], axis=0)
         beta = self.get_betas(session)
         return cp.asnumpy(utils.predict(features, beta))

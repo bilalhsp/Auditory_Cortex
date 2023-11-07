@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 
 #local 
 from auditory_cortex.models import Regression
-from auditory_cortex.analysis import Correlations
+from auditory_cortex.analyses.regression_correlations import Correlations
 import auditory_cortex.utils as utils
 from auditory_cortex import results_dir, CMAP_2D
 
