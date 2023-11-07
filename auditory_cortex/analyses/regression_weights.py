@@ -7,9 +7,9 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 
 from auditory_cortex import opt_inputs_dir
 from auditory_cortex import utils
-from auditory_cortex.analysis import Correlations
-from auditory_cortex.neural_data.recording_sites import NeuralMetaData
-from auditory_cortex.neural_data.config import RecordingConfig
+from auditory_cortex.analyses.regression_correlations import Correlations
+from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
+from auditory_cortex.neural_data.recording_config import RecordingConfig
 
 class BetaAnalyzer:
     """Provides tools to analyze coefficients of linear 

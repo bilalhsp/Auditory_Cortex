@@ -9,6 +9,9 @@
 neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
+# cache dir used to cache loaded features and neural spikes..
+cache_dir: /scratch/gilbreth/ahmedb/cache
+
 # device that is being used...
 hpc_cluster: True
 
@@ -41,9 +44,18 @@ use_cpu: False
 # identifier: opt_neural_delay_2_third #_feature_extractor
 # third: None
 model_name: wave2letter_modified
+# model_name: whisper_tiny
+# model_name: whisper_small
+# model_name: whisper_base
+# model_name: whisper_medium
+
+# model_name: whisper_test
+
 # identifier: robust1
 # identifier: normal_109
-identifier: robust_26
+identifier: sampling_rate_opt_neural_delay
+# identifier: sampling_rate_opt_neural_delay_feature_extractor
+# identifier: testing_changes
 
 # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
 delay_features: False
@@ -67,14 +79,14 @@ delays:
 # - 60
 - 0
 bin_widths:
-- 20
+- 40
 dataset_sizes:
 # - 10
 - 500
 - 501
 - 5
 k_folds_validation: 5
-iterations: 3
+iterations: 1
 
 
 optimal_inputs_param:

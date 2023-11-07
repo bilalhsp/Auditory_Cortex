@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.WARNING)
 import os
 import pickle
 from auditory_cortex import optimal_input, opt_inputs_dir
-from auditory_cortex import analysis
+from auditory_cortex.analyses import regression_correlations
 
 # model_name = 'deepspeech2'
 # model_name = 'speech2text'
@@ -16,7 +16,7 @@ threshold = 0.068
 print(f"Creating objects for {model_name}")
 results_id = 'opt_neural_delay'
 corr_file = model_name + '_' + results_id
-corr_obj = analysis.Correlations(model_name=corr_file)
+corr_obj = regression_correlations.Correlations(model_name=corr_file)
 opt_inp = optimal_input.OptimalInput(model_name=model_name, load_features=True)
 
    

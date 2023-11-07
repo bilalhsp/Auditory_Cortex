@@ -4,12 +4,18 @@ import yaml
 import numpy as np
 from pycolormap_2d import ColorMap2DBremm, ColorMap2DZiegler
 
-
 # select 2d color map to be used
 CMAP_2D = ColorMap2DZiegler
 
+# candidate model names
+model_names = ['wave2letter_modified', 'wave2vec2',
+                'deepspeech2', 'speech2text', 'whisper_tiny', 
+                'whisper_base']
+
+ 
+
 # get parent directory of directory containing __init__.py file (parent of parent)
-aux_dir = os.path.join(os.path.dirname(__file__), 'auxilliary')
+aux_dir = os.path.join(os.path.dirname(__file__), 'computational_models', 'auxilliary')
 
 
 # experiment configuration directory...!
@@ -19,10 +25,15 @@ with open(os.path.join(config_dir, 'regression_config.yaml'), 'r') as f:
 
 hpc_cluster = config['hpc_cluster']
 
+neural_data_dir = config['neural_data_dir']
+
 results_dir = config['results_dir']
 saved_corr_dir = os.path.join(results_dir, 'cross_validated_correlations')
 pretrained_dir = os.path.join(results_dir, 'pretrained_weights')
 opt_inputs_dir = os.path.join(results_dir, 'optimal_inputs')
+
+# Used to cache frequently used data (e.g. features, spikes etc.)
+cache_dir = config['cache_dir']
 
 
 

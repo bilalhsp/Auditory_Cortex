@@ -1,0 +1,87 @@
+pretrained: True
+saved_checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
+# saved_checkpoint: Wav2letter-epoch=032-val_loss=0.40.ckpt
+# saved_checkpoint:  Wav2letter-epoch=029-val_loss=0.94.ckpt # robustified on 960 Hrs.  of Librispeech starting from 'Wav2letter-epoch=024-val_loss=0.37.ckpt' 
+# saved_checkpoint: Wav2letter-epoch=044-val_loss=0.66.ckpt # robustified (norm=5) on 960 Hrs.  of Librispeech starting from 'Wav2letter-epoch=024-val_loss=0.37.ckpt'
+# saved_checkpoint: Wav2letter-epoch=109-val_loss=0.26.ckpt
+# saved_checkpoint: Wav2letter-epoch=026-val_loss=0.98.ckpt
+
+# saved_checkpoint: Wav2letter-epoch=008-val_loss=0.56.ckpt
+
+# /depot/jgmakin/data/auditory_cortex/results/pretrained_weights/wave2letter_modified/Wav2letter-epoch=024-val_loss=0.37.ckpt
+
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=001-val_loss=3.42.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=002-val_loss=2.82.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=003-val_loss=1.49.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=004-val_loss=0.97.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=005-val_loss=0.75.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=006-val_loss=1.08.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=007-val_loss=0.78.ckpt
+# saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=008-val_loss=0.56.ckpt
+
+
+
+use_pca: False
+
+layers:
+- layer_name: conv1 
+  layer_id: 0
+  RF: 1.94               #(1.94 ms)
+  layer_type: conv
+- layer_name: conv2
+  layer_id: 1
+  RF: 4.44               #(4.44 ms)
+  layer_type: conv
+- layer_name: conv3
+  layer_id: 2
+  RF: 9.44               #(9.44 ms)
+  layer_type: conv
+- layer_name: conv4
+  layer_id: 3
+  RF: 19.44               #(19.44 ms)
+  layer_type: conv
+- layer_name: conv5
+  layer_id: 4
+  RF: 40               #(39.44 ms)
+  layer_type: conv
+- layer_name: conv6
+  layer_id: 5
+  RF: 80               #(79.44 ms)
+  layer_type: conv
+- layer_name: conv7
+  layer_id: 6 # 
+  RF: 120 #120 #80 #40 #20 # 120               #(119.44 ms) 20 #40 #80 #120 #160
+  layer_type: conv
+- layer_name: conv8
+  layer_id: 7
+  RF: 160               #(159.44 ms)
+  layer_type: conv
+
+- layer_name: conv9
+  layer_id: 8
+  RF: 280               #(279.44 ms)
+  layer_type: conv
+- layer_name: conv10
+  layer_id: 9
+  RF: 400               #(399.44 ms)
+  layer_type: conv
+
+- layer_name: conv11
+  layer_id: 10
+  RF: 520               #(519.44 ms)
+  layer_type: conv
+- layer_name: conv12
+  layer_id: 11
+  RF: 640               #(639.44 ms)
+  layer_type: conv
+  
+# - layer_name: conv13
+#   layer_id: 12
+#   RF: 1240               #(1239.44 ms)
+#   layer_type: conv
+# - layer_name: conv14
+  # layer_id: 13
+  # layer_type: conv
+# - layer_name: conv15
+  # layer_id: 14
+  # layer_type: conv

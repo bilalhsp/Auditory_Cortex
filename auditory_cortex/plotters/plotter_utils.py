@@ -1,12 +1,56 @@
+import os
 import colorsys
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from palettable.colorbrewer import qualitative
+
+from utils_jgm.tikz_pgf_helpers import tpl_save
 
 
 class PlotterUtils:
     """Contains utility methods for plotting.
     """
+    model_names = ['wave2letter_modified', 'wave2vec2',
+                'deepspeech2', 'speech2text', 'whisper_tiny', 
+                'whisper_base'
+            ]
+    colors = qualitative.Dark2_8.mpl_colors
+
+    @classmethod
+    def get_model_specific_color(cls, model_name):
+        """Returns model specific color"""
+        assert model_name in cls.model_names, f"model_name '{model_name}' not recognizable."
+        ind = cls.model_names.index(model_name)
+        return cls.colors[ind]
+
+    @staticmethod
+    def save_tikz(file_path):
+        """Saves tikz plot to the file_path..."""
+        # making sure the directory exists...
+        dirpath = os.path.dirname(file_path)
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+        png_dir = os.path.join(dirpath, 'pngs')
+        if not os.path.exists(png_dir):
+            os.makedirs(png_dir)
+
+        extra_axis_parameters = {
+            'width=\\figwidth',
+            'height=\\figheight',
+            'every x tick label/.append style={rotate=90}',
+            'xticklabel style={opacity=\\thisXticklabelopacity, align=center}',
+        }
+        tpl_save(
+            filepath=file_path,
+            extra_axis_parameters=extra_axis_parameters,
+            tex_relative_path_to_data='pngs',
+            extra_lines_start={
+                '\\providecommand{\\figwidth}{5.7in}%',
+                '\\providecommand{\\figheight}{2.0in}%',
+                '\\providecommand{\\thisXticklabelopacity}{1.0}%',
+            },
+        )
 
     @staticmethod
     def create_cmap_using_rgb(rgb_colors_list):

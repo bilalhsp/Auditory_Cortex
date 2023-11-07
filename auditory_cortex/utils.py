@@ -1,6 +1,7 @@
 import os
 import yaml
 import pickle
+import gc
 
 import torch
 import torchaudio
@@ -482,16 +483,17 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     | delay: float
     | file_path: path of csv file
     """
+    columns=[
+            'session','layer','channel','bin_width', 'delay',
+            'train_cc_raw','test_cc_raw', 'normalizer', 'N_sents',
+            'opt_delays'
+            ]
+
+
     if os.path.isfile(file_path):
-        data = pd.read_csv(file_path)
+        data = pd.read_csv(file_path)[columns]
     else:
-        data = pd.DataFrame(
-                columns=[
-                    'session','layer','channel','bin_width', 'delay',
-                    'train_cc_raw','test_cc_raw', 'normalizer', 'N_sents',
-                    'opt_delays'
-                    ]
-                )
+        data = pd.DataFrame(columns=columns)
     session = corr_dict['session']
     model_name = corr_dict['model']
     win = corr_dict['win']
@@ -637,10 +639,22 @@ def reg(X,y, lmbda=0):
         X = module.expand_dims(X,axis=0)
     d = X.shape[2]
     m = X.shape[1]
-    a = module.matmul(X.transpose((0,2,1)), X) + m*lmbda*module.eye(d)
-    b = module.matmul(X.transpose((0,2,1)), y)
-    B = module.linalg.solve(a,b)
-    return B.squeeze()
+    # X_t = X.transpose((0,2,1))
+
+    return module.linalg.solve(
+        module.matmul(X.transpose((0,2,1)), X) + m*lmbda*module.eye(d),
+        module.matmul(X.transpose((0,2,1)), y)
+        ).squeeze()
+    # a = module.matmul(X_t, X) + m*lmbda*module.eye(d)
+    # del X # to save memory...
+    # gc.collect()
+    # b = module.matmul(X_t, y)
+
+    # # a = module.matmul(X.transpose((0,2,1)), X) + m*lmbda*module.eye(d)
+    # # b = module.matmul(X.transpose((0,2,1)), y)
+
+    # return module.linalg.solve(a,b).squeeze()
+    # # return B.squeeze()
 
 # def reg_cp(X,y, lmbda=0):
 #     # takes in cupy arrays and uses gpu...!
@@ -719,34 +733,43 @@ def train_test_split(x,y, split=0.7):
 def mse_loss(y, y_hat):
     #check if incoming array is np or cp,
     #and decide which module to use...!
-    if type(y).__module__ == np.__name__:
-        module = np
-    else:
-        module = cp
+    # if type(y).__module__ == np.__name__:
+    #     module = np
+    # else:
+    #     module = cp
+    module = np
     if y.ndim < y_hat.ndim:
         y = module.expand_dims(y, axis=-1)
-    return (module.sum((y - y_hat)**2, axis=0))/y_hat.shape[0]
+    loss = (module.sum((y - y_hat)**2, axis=0))/y_hat.shape[0]
+    return cp.asnumpy(loss)
 
 # def mse_loss_cp(y, y_hat):
 #     if y.ndim < y_hat.ndim:
 #         y = cp.expand_dims(y, axis=-1)
 #     return (cp.sum((y - y_hat)**2, axis=0))/y_hat.shape[0]
 
-def inter_trial_corr(spikes, n=1000):
-    """Compute distribution of inter-trials correlations.
 
-    Args: 
-        spikes (ndarray): (repeats, samples/time, channels)
+#######################################################################
+######## MOVED to Regression
+# ######################################
+# def inter_trial_corr(spikes, n=1000):
+#     """Compute distribution of inter-trials correlations.
 
-    Returns:
-        trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
-    """
-    trials_corr = np.zeros((n, spikes.shape[2]))
-    for t in range(n):
-        trials = np.random.choice(np.arange(0,spikes.shape[0]), size=2, replace=False)
-        trials_corr[t] = cc_norm(spikes[trials[0]].squeeze(), spikes[trials[1]].squeeze())
+#     Args: 
+#         spikes (ndarray): (repeats, samples/time, channels)
 
-    return trials_corr
+#     Returns:
+#         trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
+#     """
+#     trials_corr = np.zeros((n, spikes.shape[2]))
+#     for t in range(n):
+#         trials = np.random.choice(np.arange(0,spikes.shape[0]), size=2, replace=False)
+#         trials_corr[t] = cc_norm(spikes[trials[0]].squeeze(), spikes[trials[1]].squeeze())
+
+#     return trials_corr
+
+#############################
+##############
 
 def normalize(x):
     # Normalize for spectrogram
