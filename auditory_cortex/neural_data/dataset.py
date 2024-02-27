@@ -30,8 +30,11 @@ class NeuralData:
     # print(self.names)
     self.spikes, self.trials = self.load_data(verbose=verbose)
     self.num_channels = len(self.spikes.keys())
-    self.sents = np.arange(1,500)
+    self.sents = np.arange(1,500)   # 499 sentences in total (1 - 499)
     self.sent_sections = {}
+    
+
+    self.ordered_sent_IDs, self.inter_stimulus_intervals, self.ordered_trial_IDs = self.get_ordered_sent_IDs_and_trial_IDs()
 
     print("Done.")
     # print(f"Data from {self.num_channels} channels loaded...!")
@@ -64,6 +67,7 @@ class NeuralData:
 
   def phoneme(self, sent=1):
     # subtracting 1 because timitStimcodes range [1,500) and sent indices range [0,499)
+    # MATLAB ID to PYTHON ID
     sent -= 1
      
     #indices where phoneme exists
@@ -113,6 +117,7 @@ class NeuralData:
     #only the outcome 'spikes' can vary, so that is the reason of not using spikes
     
     try: 
+      # np.where() returns Python index (0 onwards), add 1 to get MATLAB index (1 onwards)
       trials = (np.where(self.trials[0].timitStimcode == sent)[0]) + 1          # adding 1 to match the indexes
       return trials
     except:
@@ -182,6 +187,7 @@ class NeuralData:
 
     """
     if trial != 0:
+        # MATLAB ID to PYTHON ID
         trial -= 1
         sent = self.trials[0].timitStimcode[trial]
     win = win/1000
@@ -259,6 +265,128 @@ class NeuralData:
     # self.raw_spikes =  raw_spikes
     return raw_spikes
   
+  def get_stim_onset(self, tr):
+    """Retreives stimulus onset time for the given trial ID"""
+    # safe to look at the 0th channel
+    # These trial IDs floating around are MATLAB ID's i.e. starting from 1
+    # whenever we directly index any array, make sure to convert them to 
+    # Python indexes.
+    # MATLAB ID to PYTHON ID
+    tr -= 1
+    return self.trials[0].stimon[tr] 
+
+
+  def get_ordered_sent_IDs_and_trial_IDs(self):
+    """Returns sent ID in the ordered of stimulus presentation 
+    to the subject, and corresponding trial ID.
+
+    Returns:
+      ordered_sent_IDs (ndarray): sent ID's in the order they were presented
+      inter_stimulus_dead_intervals: dead intervals after each stimulus,
+        ith index of this list reads dead interval AFTER corresponding sent 
+        at ith index.
+      list_all_timit_trials: ordered list of timit trials.
+    """   
+    # getting the list of trials 
+    sent_to_trial = {}
+    list_all_timit_trials = []
+    for id in self.sents:
+      trials = self.get_trials(id)
+      sent_to_trial[id] = trials
+      if trials.size > 1:
+        list_all_timit_trials.extend(trials)
+      else:
+        list_all_timit_trials.append(trials[0])
+    list_all_timit_trials = np.array(list_all_timit_trials)
+    list_all_timit_trials.sort()
+
+    # getting the ordered list of sent IDs
+    ordered_sent_IDs = []
+    for tr in list_all_timit_trials:
+      for id in sent_to_trial.keys():
+        if tr in sent_to_trial[id]:
+          ordered_sent_IDs.append(id)
+    ordered_sent_IDs = np.array(ordered_sent_IDs)
+
+    inter_stimulus_dead_intervals = []
+    # corresponding dead intervals within stimuli...
+    for i, (tr, sent_ID) in enumerate(zip(list_all_timit_trials, ordered_sent_IDs)):
+      if i < ordered_sent_IDs.size - 1:
+        try:
+          inter_stimulus_dead_intervals.append(
+            # Stim_onset(next_trial) - Stim_onset(current_trial) - duration(current_trial)
+            self.get_stim_onset(tr+1) - self.get_stim_onset(tr) - self.duration(sent_ID)
+          )
+        except: raise IndexError(f"Sent: ID = {sent_ID}, i={i}")
+      else:
+        # in case we are at the last trial, just add zero dead time...
+        inter_stimulus_dead_intervals.append(0)
+        
+    inter_stimulus_dead_intervals = np.array(inter_stimulus_dead_intervals)
+
+    return ordered_sent_IDs, inter_stimulus_dead_intervals, list_all_timit_trials
+
+  
+
+  def retrieve_contextualized_spikes(self, bin_width=20, delay=0):
+    """Retrieves spikes for all sent IDs [0, 498] in order of
+    presentations, with spikes for inter-trial intervals as well.
+    
+    Args:
+        bin_width: float= in miliseconds.
+        delay: (float) = in miliseconds
+
+    Returns:
+        ndarray (bins, num_channels)
+    """
+
+    # convert to seconds
+    bin_width /= 1000 # in seconds
+    delay /= 1000 # in seconds
+
+    first_sent = self.ordered_sent_IDs[0]
+    last_sent = self.ordered_sent_IDs[498]
+
+    first_tr = self.get_trials(first_sent)[0]   # first sent presentation..
+    last_tr = self.get_trials(last_sent)[0]   # first sent presentation..
+
+    # while directly indexing array, convert MATLAB index to Python index
+    ch = 0  # extracting trial data using ch=0, it would be same for all channels
+    session_strt_time = self.trials[ch].stimon[first_tr-1] 
+    session_end_time = self.trials[ch].stimon[last_tr-1] + self.duration(last_sent) 
+    total_session_duration = session_end_time - session_strt_time
+
+
+
+    all_channel_spikes = []
+    for ch in range(self.num_channels):
+        spk_times = []
+        # np.where gives us Python index so no need to correction...
+        first_spk_ind = np.where(self.spikes[ch].trial==first_tr)[0][0]
+
+        last_spike_seq = np.where(self.spikes[ch].trial==last_tr)[0]
+        # At least one session has ZERO spikes for last trial, 
+        # so we look trial before last, until we get a trial with spikes..
+        while last_spike_seq.size < 1:
+          last_tr -= 1
+          last_spike_seq = np.where(self.spikes[ch].trial==last_tr)[0]
+        last_spk_ind = last_spike_seq[-1]
+        for spk_ind in range(first_spk_ind, last_spk_ind+1):
+            spk_times.append(self.spikes[ch].spktimes[spk_ind])
+
+        spk_times = np.array(spk_times) - session_strt_time + delay
+        time_steps = np.arange(0, total_session_duration, bin_width)
+        spk_counts, edges = np.histogram(spk_times, time_steps)
+
+        all_channel_spikes.append(spk_counts)
+
+    return np.stack(all_channel_spikes, axis=1), total_session_duration
+     
+
+
+
+
+
 ############################
 ### Moved to regression....
 #################
@@ -300,12 +428,24 @@ class NeuralData:
           sents = [12,13,32,43,56,163,212,218,287,308]
       spikes_dict = {}
       min_repeats = 500   #repetition of trials (mostly it is 11)
+      sum_spikes = False
+      if bin_width == 1000:
+        # treat this as a special case, where all samples are summed across time.
+        bin_width = 20
+        sum_spikes = True
+
       for s in sents:
           spikes_sentence = self.retrieve_spike_counts_for_all_trials(sent=s, win = bin_width, delay=delay)
           spikes_dict[s] = np.stack([spikes_sentence[ch] for ch in range(self.num_channels)], axis=-1)
           if spikes_dict[s].shape[0] < min_repeats:
               min_repeats = spikes_dict[s].shape[0] 
-      all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
+          if sum_spikes:
+             spikes_dict[s] = np.sum(spikes_dict[s], axis=1)[:,None,:]
+      if sum_spikes:
+        all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
+      else:
+        all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:-1,:] for s in sents], axis=1)
+      
       return all_repeated_trials
 
 ####################################

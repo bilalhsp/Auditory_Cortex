@@ -24,6 +24,10 @@ from auditory_cortex.io_utils.io import read_cached_features, write_cached_featu
 from auditory_cortex.io_utils.io import read_cached_spikes_session_wise
 from auditory_cortex.io_utils.io import write_cached_spikes_session_wise
 
+from auditory_cortex.io_utils.io import read_context_dependent_normalizer
+
+
+
 
 class DataLoader:
 
@@ -32,7 +36,7 @@ class DataLoader:
         # Needs to be replaced with more robust way of getting the normalizers..
         self.corr_obj = Correlations('wave2letter_modified_normalizer2')
         self.metadata = NeuralMetaData()
-        self.test_sent_IDs = [12,13,32,43,56,163,212,218,287,308]
+        self.test_sent_IDs = self.metadata.test_sent_IDs #[12,13,32,43,56,163,212,218,287,308]
         self.sent_IDs = self.metadata.sent_IDs
         self.spike_datasets = {}
         self.neural_spikes = {}
@@ -57,7 +61,7 @@ class DataLoader:
             self._create_DNN_obj(model_name=model_name)
         return self.DNN_models[model_name]
 
-    def get_raw_DNN_features(self, model_name, force_reload=False):
+    def get_raw_DNN_features(self, model_name, force_reload=False, contextualized=False):
         """Retrieves raw features for the 'model_name', starts by
         attempting to read cached features, if not found, extract
         features and also cache them, for future use.
@@ -71,14 +75,18 @@ class DataLoader:
         # self.raw_DNN_features[model_name] = read_cached_features(model_name)
         # stop saving 'raw_DNN_features' to save the memory....
         # only need to save the resampled...that I am already doing...
-        raw_DNN_features = read_cached_features(model_name)
+        raw_DNN_features = read_cached_features(model_name, contextualized=contextualized)
         if raw_DNN_features is None or force_reload:
             # self.get_DNN_obj(model_name).load_features(resample=False)
             # self.raw_DNN_features[model_name] = self.get_DNN_obj(model_name).sampled_features
 
-            raw_DNN_features = self.get_DNN_obj(model_name).extract_DNN_features()
+            if contextualized:
+                long_audio, total_duration, *_ = self.get_contextualized_stim_audio(include_repeated_trials=True)
+                raw_DNN_features = self.get_DNN_obj(model_name).extract_features_for_audio(long_audio, total_duration)
+            else:
+                raw_DNN_features = self.get_DNN_obj(model_name).extract_DNN_features()
             # cache features for future use...
-            write_cached_features(model_name, raw_DNN_features)
+            write_cached_features(model_name, raw_DNN_features, contextualized=contextualized)
         return raw_DNN_features
         
     def get_resampled_DNN_features(self, model_name, bin_width, force_reload=False):
@@ -93,8 +101,10 @@ class DataLoader:
         Returns:
             List of dict: all layer features (resampled at required sampling_rate).
         """
-
-        if bin_width not in self.DNN_feature_dict.keys() or force_reload:
+        if model_name not in self.DNN_feature_dict.keys():
+            self.DNN_feature_dict[model_name] = {}
+        model_features = self.DNN_feature_dict[model_name]
+        if bin_width not in model_features.keys() or force_reload:
             raw_features = self.get_raw_DNN_features(model_name, force_reload=force_reload)
             # num_layers = len(raw_features)
             resampled_features = {layer_id:{} for layer_id in raw_features.keys()}
@@ -111,13 +121,17 @@ class DataLoader:
                 n = int(np.ceil(round(sent_duration/bin_width_sec, 3)))
 
                 for layer_ID in layer_IDs:
-                    tmp = signal.resample(raw_features[layer_ID][sent_ID], n, axis=0)
+                    if bin_width == 1000:
+                        # treat this as a special case, and sum all samples across time...
+                        tmp = np.sum(raw_features[layer_ID][sent_ID].numpy(), axis=0)[None, :]
+                    else:
+                        tmp = signal.resample(raw_features[layer_ID][sent_ID], n, axis=0)
                     # mean = np.mean(tmp, axis=0)
                     # resampled_features[j][sent] = tmp #- mean
                         
                     resampled_features[layer_ID][sent_ID] = tmp
-            self.DNN_feature_dict[bin_width] = resampled_features
-        return self.DNN_feature_dict[bin_width]
+            self.DNN_feature_dict[model_name][bin_width] = resampled_features
+        return self.DNN_feature_dict[model_name][bin_width]
     
     def get_DNN_layer_features(self, model_name, layer_ID, bin_width=20):
         """Retrieves layer features, sampled according to bin_width,
@@ -231,12 +245,19 @@ class DataLoader:
         Args:
             session: = recording site (session) ID 
             bin_width: int = size of the binning window in ms.
+                1000 ms is treated as special case, where total number of
+                spikes for each sentence are returned.
             delay: int: neural delay in ms.
         Returns:
             dict = dict of neural spikes with sent IDs as keys."""
         session = str(int(session))
+        sum_spikes = False
         spikes_key = f"{int(session):06d}-{bin_width:04d}-{delay:04d}"
         if spikes_key not in self.neural_spikes.keys():
+            if bin_width == 1000:
+                # treat this as a special case, where all samples are summed across time.
+                bin_width = 20
+                sum_spikes = True
             session_wise_spikes = read_cached_spikes_session_wise(bin_width=bin_width, delay=delay)
             if session_wise_spikes is None or session not in session_wise_spikes.keys():
                 spikes = self._extract_session_spikes(session, bin_width=bin_width,
@@ -247,6 +268,11 @@ class DataLoader:
                 self.neural_spikes[spikes_key] = spikes
             else:
                 self.neural_spikes[spikes_key] = session_wise_spikes[session]
+
+            if sum_spikes:
+                self.neural_spikes[spikes_key] = {
+                    sent_id: np.sum(spike_signal, axis=0)[None, :] for sent_id, spike_signal in self.neural_spikes[spikes_key].items()
+                    }
         # saving num of channels for the session..
         self.num_channels[session] = next(iter(self.neural_spikes[spikes_key].values())).shape[-1]
         return self.neural_spikes[spikes_key]
@@ -287,7 +313,9 @@ class DataLoader:
         #     self.num_channels[session] = self.get_dataset_object(session).num_channels
         # return self.get_dataset_object(session).raw_spikes
 
-    def get_all_neural_spikes(self, bin_width=20, threshold=0.068, **kwargs):
+    def get_all_neural_spikes(
+            self, bin_width=20, threshold=0.068, force_redo=False, **kwargs
+        ):
         """"Retrieves cached neural spikes, for a group (core, belt or all)of
         recording sites (sessions), extract spikes if not already cached.
 
@@ -306,7 +334,7 @@ class DataLoader:
             area = 'all'
         
         spikes = read_cached_spikes(bin_width=bin_width, threshold=threshold)
-        if spikes is None or area not in spikes.keys():
+        if spikes is None or area not in spikes.keys() or force_redo:
             z_stim = self._extract_sig_neural_data(
                 threshold=threshold, bin_width=bin_width, area=area
                 )
@@ -365,11 +393,155 @@ class DataLoader:
         print("Done.")
         return z_stim
     
-    def get_neural_data_for_repeated_trials(self, session, bin_width=20, delay=0):
+    def get_neural_data_for_repeated_trials(self, session, bin_width=20, delay=0, sent_IDs: list=None):
         """Retrieves neural data only for sent-stimuli with repeated
         trials i.e. test_sent_IDs"""
-
+        if sent_IDs is None:
+            sent_IDs = self.test_sent_IDs
         return self.get_dataset_object(session=session).get_repeated_trials(
-            sents=self.test_sent_IDs, bin_width=bin_width, delay=delay)
+            sents=sent_IDs, bin_width=bin_width, delay=delay)
+    
+
+    def get_stimulus_audio_with_history(self, stim_number=12, num_previous_stimuli=9, session = '180613'):
+        """Returns long audio with previous stimuli concatenated with dead intervals in between"""
+        # stim_number = 12
+        # num_previous_stimuli = 9
+        
+        dataset = self.get_dataset_object(session)
+        ordered_sent_IDs, dead_intervals, trial_IDs = dataset.get_ordered_sent_IDs_and_trial_IDs()
+
+        initial_dead_time = 0.3 # seconds
+        sampling_rate = 16000
+
+        num_dead_samples = int(initial_dead_time*sampling_rate)
+        dead_stimulus = np.zeros(num_dead_samples)
+        # starting with dead stimulus...
+        long_audio = dead_stimulus
+        total_duration = 0.3
+        for num in range(stim_number - num_previous_stimuli, stim_number):
+            stim_id = ordered_sent_IDs[num]
+            
+            stim_audio = self.metadata.stim_audio(stim_id)
+            long_audio = np.concatenate([long_audio, stim_audio, dead_stimulus])
+
+            stim_duration = self.metadata.stim_duration(stim_id)
+            total_duration += (stim_duration+0.3)
+
+        stim_id = ordered_sent_IDs[stim_number]
+        stim_audio = self.metadata.stim_audio(stim_id)
+        long_audio = np.concatenate([long_audio, stim_audio])
+        total_duration += stim_duration
+
+        return long_audio, total_duration, ordered_sent_IDs
+    
+    def get_contextualized_stim_audio(self, include_repeated_trials=False):
+        """Get long stimulus audio, with dead intervals in between.
+
+        Args:
+            include_repeated_trials (bool): If True, include repeated trails in all the returned results
+    
+        """
+        # stim_number = 12
+        # num_previous_stimuli = 9
+        # since all sessions present stimuli in the same order,
+        # we could use any session here...
+        session = '180613'
+        dataset = self.get_dataset_object(session)
+        dead_interval = 0.3 # seconds
+        sampling_rate = dataset.fs  # 16000
+        total_num_stimuli = self.metadata.sent_IDs.size
+        if include_repeated_trials:
+            total_num_stimuli += 100
+
+        ordered_sent_IDs = dataset.ordered_sent_IDs
+
+        num_dead_samples = int(dead_interval*sampling_rate)
+        dead_stimulus = np.zeros(num_dead_samples)
+        # starting with dead stimulus...
+        long_audio = dead_stimulus
+        total_duration = dead_interval
+        for num in range(total_num_stimuli):
+            stim_id = ordered_sent_IDs[num]
+            
+            stim_audio = self.metadata.stim_audio(stim_id)
+            stim_duration = self.metadata.stim_duration(stim_id)
+            
+            if num == total_num_stimuli - 1:    # for last (499th) sentence..
+                long_audio = np.concatenate([long_audio, stim_audio])
+                total_duration += stim_duration
+            else:
+                long_audio = np.concatenate([long_audio, stim_audio, dead_stimulus])
+                total_duration += (stim_duration+dead_interval)
+
+        # audio duration before every sentence ID
+        duration_before_sent = {}
+        for i, sent in enumerate(ordered_sent_IDs[:total_num_stimuli]):
+            if i<1:
+                duration_before_sent[sent] = [dead_interval]
+            else:
+                previous_sent = ordered_sent_IDs[i-1]
+                previous_sent_duration = self.metadata.stim_duration(previous_sent)
+                tmp = duration_before_sent[previous_sent][-1] + dead_interval + previous_sent_duration
+                # note that the durations before sents are stored as lists, to accomodate sents with repititions..
+                # for previous sent, taking the most recent value, the last value in the list...
+                if sent not in duration_before_sent.keys():
+                    duration_before_sent[sent] = [tmp]
+                else:
+                    duration_before_sent[sent].append(tmp)
+
+        return long_audio, total_duration, ordered_sent_IDs, duration_before_sent
+
+    
+    def get_features_for_long_stimulus(
+            self, model_name, stim_number=12, num_previous_stimuli=9, session = '180613'
+            ):
+        """Returns features for the 'long' stimulus, returns only for last stimulus and discards the rest."""
+
+        long_audio, total_duration, ordered_sent_IDs = self.get_stimulus_audio_with_history(
+            stim_number=stim_number, num_previous_stimuli=num_previous_stimuli, session = session
+        )
+
+        features = self.get_DNN_obj(model_name).extract_features_for_audio(long_audio, total_duration)
+
+
+        return features, ordered_sent_IDs[stim_number], total_duration
+
+    def get_context_depedent_normalizer(self, model_name, bin_width=20):
+        """Read context dependent normalizer from the cached results.
+        Raises exception if results not stored.
+        
+        Args:
+            model_name: str = model name
+            bin_width: int = bin width in ms
+        """
+        return read_context_dependent_normalizer(model_name=model_name, bin_width=bin_width)
+
+
+    # def get_neural_prediction(
+    #         self, model_name, session, bin_width: int, sents: list,
+    #         layer_IDs: list=None, force_reload: bool=False
+    #     ):
+    #     """
+    #     Returns prediction for neural activity, for the specified setting. 
+
+    #     Args:
+    #         model_name: str = select model name.
+    #         session: str = session ID
+    #         bin_width: int= bin_width in ms
+    #         sents (list int): index of sentence IDs
+    #         layer_IDs: list = layer IDs to get the predictions for.
+    #         force_reload: bool = force load the network features or not.
+
+    #     Returns:
+    #         ndarray : (time, ch, layers) Prdicted neural activity 
+    #     """
+
+    #     reg_obj = self.get_DNN_obj(model_name)
+    #     predicted_spikes = reg_obj.neural_prediction(
+    #         session, bin_width=bin_width, sents=sents, layer_IDs=layer_IDs,
+    #         force_reload=force_reload
+    #         )
+    #     return predicted_spikes
+
 
 

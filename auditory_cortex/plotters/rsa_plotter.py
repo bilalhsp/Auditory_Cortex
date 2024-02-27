@@ -22,17 +22,12 @@ class RSAPlotter:
         bottom_shaded = []
         for layer_ID, layer_data in data_dict.items():
             layer_mean = np.mean(layer_data)
-            layer_SEM = np.std(layer_data)/np.sqrt(layer_data.size)
+            layer_SEM = np.std(layer_data)#/np.sqrt(layer_data.size)
             
             x_coordinates.append(layer_ID)
             means.append(layer_mean)
             top_shaded.append(layer_mean + layer_SEM)
             bottom_shaded.append(layer_mean - layer_SEM)
-
-            # medians.append(np.median(layer_data))
-            # x_coordinates.append(layer_ID)
-            # percentile_95.append(np.percentile(layer_data, 95))
-            # percentile_5.append(np.percentile(layer_data, 5))
         
         ax.plot(x_coordinates, means, color=color)
         ax.fill_between(x=x_coordinates, y1=bottom_shaded, y2=top_shaded,
@@ -42,9 +37,10 @@ class RSAPlotter:
 
 
     @staticmethod
-    def RSA_plot_layer_wise(model_name, area='core', bin_width=20, 
-                            itr=100, identifier='global', 
-                            alpha=0.2):
+    def RSA_plot_layer_wise(
+            model_name, area='core', bin_width=20, 
+            itr=100, identifier='global', alpha=0.2
+        ):
 
         rsa = RSA(model_name=model_name, identifier=identifier)
         corr_dict = rsa.get_layer_wise_corr(

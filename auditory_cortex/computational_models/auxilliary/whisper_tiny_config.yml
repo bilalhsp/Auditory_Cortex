@@ -1,11 +1,11 @@
 use_pca: False
 saved_checkpoint: openai/whisper-tiny
-
+shuffle_weights: True
 layers:
-# - layer_name: model.encoder.conv1
-#   layer_id: 0
-#   layer_type: conv
-#   RF: 45 # ms
+- layer_name: model.encoder.conv1
+  layer_id: 0
+  layer_type: conv
+  RF: 45 # ms
 - layer_name: model.encoder.conv2
   layer_id: 1
   layer_type: conv

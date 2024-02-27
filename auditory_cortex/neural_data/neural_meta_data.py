@@ -26,6 +26,12 @@ class NeuralMetaData:
         self.phn_names = self.sentences['phnnames']
         self.sentdet = self.sentences['sentdet']
         self.sent_IDs = np.arange(1,500)
+        self.test_sent_IDs = np.array([12,13,32,43,56,163,212,218,287,308])
+
+    def get_sampling_rate(self):
+        """Returns the sampling rate of the audio stimuli."""
+        return self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
+
 
     def phoneme(self, sent=1):
         # subtracting 1 because timitStimcodes range [1,500) and sent indices range [0,499)
@@ -60,6 +66,22 @@ class NeuralMetaData:
         #aft = self.sentdet[sent].befaft[1]
         duration = self.sentdet[sent].duration - (bef + aft)
         return duration
+    
+    def stim_samples(self, sent, bin_width=20):
+        """Returns the calculated number of samples for a sentence 
+        at the specified sampling rate (bin_width).
+        """
+        bin_width = bin_width/1000  #ms to seconds 
+        n_samples = int(np.ceil(round(self.stim_duration(sent)/bin_width, 3)))
+        return n_samples
+    
+    def get_total_test_duration(self):
+        """Returns combined duration (seconds) of test set stimuli."""
+        duration = 0
+        for sent in self.test_sent_IDs:
+            duration += self.stim_duration(sent)
+        return duration
+
 
     def audio_phoneme_data(self):
         audio = {}
@@ -85,13 +107,41 @@ class NeuralMetaData:
             area (str): area of auditory cortex, default=None,  
                         ('core', 'belt', 'parabelt').
         """
-        if area is None:
+        if area is None or area=='all':
             sessions = []
             for k,v in self.cfg.area_wise_sessions.items():
                 sessions.append(v)
             return np.concatenate(sessions)
         else:
             return self.cfg.area_wise_sessions[area]
+        
+    def get_sessions_for_recording_config(self, subject: str=None):
+        """Returns sessions for the 'subject', where subject refers
+        to subject+hemisphere. 
+        Args:
+            subject: str = subject+hemisphere out of
+                    ['c_RH', 'c_RH', 'b_RH', 'f_RH']. Default=None.
+                    In case of default, returns all the sessions 
+        """
+        if subject == 'c_LH':
+            sessions = self.cfg.c_LH_sessions
+        elif subject == 'c_RH':
+            sessions = self.cfg.c_RH_sessions
+        elif subject == 'b_RH':
+            sessions = self.cfg.b_RH_sessions
+        elif subject == 'f_RH':
+            sessions = self.cfg.f_RH_sessions
+        else:
+            sessions = np.concatenate([
+                    self.cfg.c_LH_sessions,
+                    self.cfg.c_RH_sessions,
+                    self.cfg.b_RH_sessions,
+                    self.cfg.f_RH_sessions
+                ])
+            
+        all_sessions = self.get_all_available_sessions().astype(int)
+        sessions = all_sessions[np.isin(all_sessions, sessions)]
+        return sessions
         
 
     def order_sessions_horizontally(self, reverse=False):

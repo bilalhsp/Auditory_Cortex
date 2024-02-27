@@ -1,11 +1,12 @@
 import os
 import time
+from auditory_cortex.computational_models import baseline
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import RidgeCV, ElasticNetCV
 
 # local
-from auditory_cortex import strf, utils, config, saved_corr_dir
+from auditory_cortex import utils, config, saved_corr_dir
 from auditory_cortex.io_utils.io import write_model_parameters
 
 
@@ -67,7 +68,7 @@ for session in subjects:
         alphas = np.logspace(-2,5, num_alphas)
         estimator = ElasticNetCV()
         # filename = 'STRF_corr_elasticNetCV'
-    strf_model = strf.STRF(
+    strf_model = baseline.STRF(
                 session,
                 estimator,
                 num_workers=num_workers, 

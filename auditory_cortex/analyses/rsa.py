@@ -136,7 +136,7 @@ class RSA:
             # mat_X = np.stack([np.mean(val, axis=0) for val in Z_stim.values()], axis=0)
         else:
             raise ValueError("Please specify 'identifier' correctly.")
-        rsa_matrix = RSA.compute_RSA(mat_X)
+        rsa_matrix = RSA.compute_RSM(mat_X)
         return rsa_matrix 
     
 ############################################################
@@ -203,7 +203,7 @@ class RSA:
         # z_stim = self.get_layer_features(layer, bin_width=bin_width)
         z_stim = self.dataloader.get_DNN_layer_features(
             self.model_name, layer_ID=layer, bin_width=bin_width)
-        print(f"Computing RSA for layer-{layer} or {self.model_name} ")
+        print(f"Computing RDM for layer-{layer} of {self.model_name} ")
         matrix = RSA.compute_similarity_matrix(
             z_stim, identifier=self.identifier, **kwargs
             )
@@ -292,7 +292,7 @@ class RSA:
     #     return z_stim
 
     
-    def compute_neural_RDM(self, bin_width=20, **kwargs):
+    def compute_neural_RDM(self, bin_width=20, threshold=0.061, **kwargs):
         """Computes representational similarity matrix for neural data from 
         area (kwarg) specified.
 
@@ -308,7 +308,10 @@ class RSA:
         print(f"Computing Neural RSA matrix...")
         # z_stim = self.get_sig_neural_data(bin_width=bin_width, **kwargs)
         # z_stim = self.get_neural_spikes(bin_width=bin_width, **kwargs)
-        z_stim = self.dataloader.get_all_neural_spikes(bin_width=bin_width, **kwargs)
+        z_stim = self.dataloader.get_all_neural_spikes(
+            bin_width=bin_width, threshold=threshold,
+            **kwargs
+            )
         matrix = RSA.compute_similarity_matrix(
             z_stim, identifier=self.identifier, **kwargs
             )
@@ -375,7 +378,7 @@ class RSA:
         #     )
         
         # return corr_dict
-        corr_dict = read_cached_RDM_correlations(self.model_name, area, bin_width)
+        corr_dict = read_cached_RDM_correlations(self.model_name, self.identifier, area, bin_width)
         if corr_dict is None or force_redo:
             neural_rdm = self.get_RDM(area, neural=True, bin_width=bin_width,
                                             verbose=verbose)
@@ -398,11 +401,13 @@ class RSA:
                                             spearman_rank=spearman_rank)
 
 
-            write_cached_RDM_correlations(corr_dict, self.model_name, area, bin_width)
+            write_cached_RDM_correlations(corr_dict, self.model_name, self.identifier, area, bin_width)
         return corr_dict
     
-    def get_RDM(self, key, neural=False, force_redo=False, bin_width=20,
-                       verbose=True):
+    def get_RDM(
+            self, key, neural=False, force_redo=False,
+            bin_width=20, verbose=True
+        ):
         """Retrieves, computes or force-recomputes RSA matrix. If RSA matrix 
         does not already exist at the disk location, or 'force_redo=True, computes
         RSA matrix for the given setting. Otherwise simply retrieves the matrix.
@@ -426,8 +431,10 @@ class RSA:
         if rsa_dict is None or key not in rsa_dict.keys() or force_redo:
             if neural:
                 print(f"For area-{key}")
-                matrix = self.compute_neural_RDM(area=key,
-                            bin_width=bin_width, clip=True)
+                matrix = self.compute_neural_RDM(
+                    bin_width=bin_width, threshold=0.061,
+                    area=key, clip=True
+                )
             else:
                 key = int(key)
                 matrix = self.compute_layer_RDM(layer=key, bin_width=bin_width, clip=True)
@@ -459,7 +466,16 @@ class RSA:
 
 ###################################################################
     @staticmethod
-    def compute_RSA(matrix_X):
+    def compute_RSM(matrix_X):
+        """Computes Representational Similarity matrix (RSM).
+        
+        Args:
+            matrix_X: ndarray = (num_stim, num_samples) 
+                where num_samples = time x channels.
+        
+        Returns:
+            (num_stim x num_stim) matrix of correlations..
+        """
         means = np.mean(matrix_X, axis=1)
         matrix_X = matrix_X - means[:,None]
         cov_X = np.matmul(matrix_X, matrix_X.T)
@@ -474,11 +490,17 @@ class RSA:
     def get_matrix_with_global_min_seq_len(z_stim):
         # X is dict of 2d arrays (t, num_features)
         min_samples = 1000
-        for val in z_stim.values():
+        demean_z_stim = {}
+        for sent_ID, val in z_stim.items():
             if val.shape[0]<min_samples:
                 min_samples = val.shape[0]
+            # demean sequence for every channel...
+            demean_z_stim[sent_ID] = val -  np.mean(val, axis=0)[None,:]
+            # val = val -  np.mean(val, axis=0)[None,:]
+
         # print(min_samples)
-        matrix_X = np.stack([val[:min_samples].flatten() for val in z_stim.values()], axis=0)
+        # matrix_X = np.stack([val[:min_samples].flatten() for val in z_stim.values()], axis=0)
+        matrix_X = np.stack([val[:min_samples].flatten() for val in demean_z_stim.values()], axis=0)
         return matrix_X
     
     @staticmethod

@@ -2,8 +2,10 @@ import os
 import colorsys
 import numpy as np
 import matplotlib as mpl
+import seaborn as sns
 import matplotlib.pyplot as plt
 from palettable.colorbrewer import qualitative
+from auditory_cortex import results_dir
 
 from utils_jgm.tikz_pgf_helpers import tpl_save
 
@@ -11,18 +13,120 @@ from utils_jgm.tikz_pgf_helpers import tpl_save
 class PlotterUtils:
     """Contains utility methods for plotting.
     """
-    model_names = ['wave2letter_modified', 'wave2vec2',
-                'deepspeech2', 'speech2text', 'whisper_tiny', 
-                'whisper_base'
-            ]
+    model_names = [
+        'deepspeech2', 'speech2text',
+        'wave2letter_modified',
+        'whisper_tiny', 'whisper_base',
+        'wave2vec2',
+        # 'whisper_small'
+        
+        ]
     colors = qualitative.Dark2_8.mpl_colors
+
+    color_adjustments = {
+            'wave2vec2': (-0.2, 0.3),
+            'whisper_tiny': (-0.2, 0.3),
+            'whisper_base': (-0.2, 0.3),
+        }
 
     @classmethod
     def get_model_specific_color(cls, model_name):
         """Returns model specific color"""
-        assert model_name in cls.model_names, f"model_name '{model_name}' not recognizable."
-        ind = cls.model_names.index(model_name)
-        return cls.colors[ind]
+        if model_name in cls.model_names:
+            ind = cls.model_names.index(model_name)
+            return cls.colors[ind]
+        else:
+            print(f"model_name '{model_name}' not recognizable!!!")
+            return cls.colors[-1]
+        
+    @classmethod
+    def get_model_specific_cmap(cls, model_name):
+        """Retruns colormap specific to model_name, for heatmaps,
+        it makes sure each colormap is around model specific color.
+        
+        """
+        if model_name == 'speech2text':
+            # this color is very close to the color of this model.
+            model_color = "Oranges"
+            cmap = sns.color_palette(model_color, as_cmap=True)
+        elif model_name == 'deepspeech2':
+            # this color is very close to the color of this model.
+            model_color = "Greens"
+            cmap = sns.color_palette(model_color, as_cmap=True)
+        elif model_name == 'wave2letter_modified':
+            # this color is very close to the color of this model.
+            model_color = "Purples"
+            cmap = sns.color_palette(model_color, as_cmap=True)
+        elif model_name == 'wave2vec2':
+            color = PlotterUtils.get_model_specific_color(model_name)
+            # change color to make it more darker...
+            hsv_color = mpl.colors.rgb_to_hsv(color)
+            # adjust value...
+            i = 2
+            hsv_color[i] = hsv_color[i] - 0.2
+            i = 1
+            hsv_color[i] = hsv_color[i] + 0.3
+            hsv_color = np.clip(hsv_color, 0, 1)
+            color = mpl.colors.hsv_to_rgb(hsv_color)
+            cmap = sns.light_palette(color, as_cmap=True)
+
+        elif model_name == 'whisper_tiny':
+            color = PlotterUtils.get_model_specific_color(model_name)
+            # change color to make it more darker...
+            hsv_color = mpl.colors.rgb_to_hsv(color)
+            # adjust value...
+            i = 2
+            hsv_color[i] = hsv_color[i] - 0.2
+            i = 1
+            hsv_color[i] = hsv_color[i] + 0.3
+            hsv_color = np.clip(hsv_color, 0, 1)
+            color = mpl.colors.hsv_to_rgb(hsv_color)
+            cmap = sns.light_palette(color, as_cmap=True)
+
+        elif model_name == 'whisper_base':
+            color = PlotterUtils.get_model_specific_color(model_name)
+            # change color to make it more darker...
+            hsv_color = mpl.colors.rgb_to_hsv(color)
+            # adjust value...
+            i = 2
+            hsv_color[i] = hsv_color[i] - 0.25
+            i = 1
+            hsv_color[i] = hsv_color[i] + 0.3
+            hsv_color = np.clip(hsv_color, 0, 1)
+            color = mpl.colors.hsv_to_rgb(hsv_color)
+            cmap = sns.light_palette(color, as_cmap=True)
+
+        else:
+            # for baseline...
+            color = PlotterUtils.get_model_specific_color(model_name)
+            cmap = sns.light_palette(color, as_cmap=True)
+
+        return cmap
+    
+    @staticmethod
+    def plot_spectrogram(
+            spect, cmap=None
+        ):
+        """Plots spectrogram"""
+        if cmap is None:
+            cmap = 'viridis'
+        plt.imshow(spect, origin='lower', interpolation=None,
+           cmap=cmap)
+
+        bin_width = 10
+        xticks_step_ms = 400
+        xticks_step_samples = int(xticks_step_ms/bin_width)
+        total_bins = spect.shape[1]
+        xticks = np.arange(0, total_bins, xticks_step_samples)
+
+        # xticks = np.array([0, 40, 80, 120])
+        yticks = np.array([0, 20, 40, 60 ])
+
+        plt.xticks(xticks, bin_width*xticks)
+        plt.yticks(yticks, yticks)
+        plt.xlabel('time (ms)')
+        plt.ylabel('mel filters')
+        plt.title("Spectrogram for audio")
 
     @staticmethod
     def save_tikz(file_path):
@@ -38,7 +142,7 @@ class PlotterUtils:
         extra_axis_parameters = {
             'width=\\figwidth',
             'height=\\figheight',
-            'every x tick label/.append style={rotate=90}',
+            'every x tick label/.append style={rotate=0}',
             'xticklabel style={opacity=\\thisXticklabelopacity, align=center}',
         }
         tpl_save(

@@ -46,7 +46,8 @@ def compute_and_save_regression(args):
     # model_name = config['model_name']
     model_name = args.model_name
 
-    identifier = config['identifier']
+    # identifier = config['identifier']
+    identifier = args.identifier
     delay_features = config['delay_features']
     audio_zeropad = config['audio_zeropad']
 
@@ -119,18 +120,19 @@ def compute_and_save_regression(args):
                 for N_sents in dataset_sizes:
                     if delays_grid_search:
                         # delays_grid = [-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30]
-                        delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
-                        # delays_grid = [0,10,20,30,40,50,60,70]
+                        # delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
+                        delays_grid = [0,10,20,30,40,50,60,70,80,90,100] # for high bin_widths..
+                        # delays_grid = [0] # Only for 1000 bin_width
                         corr_dict = obj.grid_search_CV(
                                 session, bin_width=bin_width, iterations=iterations,
                                 num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
-                                numpy=use_cpu, delays=delays_grid, third=third
+                                numpy=use_cpu, delays=delays_grid, third=third, layer_IDs=args.layer_IDs
                             )
                     else:
                         corr_dict = obj.cross_validated_regression(
                                 session, bin_width=bin_width, delay=delay, iterations=iterations,
                                 num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
-                                numpy=use_cpu,third=third
+                                numpy=use_cpu,third=third, layer_IDs=args.layer_IDs
                             )
                     df = utils.write_to_disk(corr_dict, file_path, normalizer=norm)
 
@@ -161,7 +163,18 @@ def get_parser():
     parser.add_argument(
         '-b','--bin_widths', dest='bin_widths', nargs='+', type= int, action='store', default=[20],
         # choices=[],
-        help="Choose bin_width for RSA of neural data."
+        help="Specify list of bin_widths."
+    )
+    parser.add_argument(
+        '-l','--layers', dest='layer_IDs', nargs='+', type=float, action='store', default=None,
+        # choices=[],
+        help="Specify list of layer IDs."
+    )
+    parser.add_argument(
+        '-i','--identifier', dest='identifier', type= str, action='store',
+        default='sampling_rate_opt_neural_delay',
+        # choices=[],
+        help="Specify identifier for saved results."
     )
 
     return parser

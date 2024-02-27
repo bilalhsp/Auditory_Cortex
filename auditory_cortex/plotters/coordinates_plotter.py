@@ -1,5 +1,8 @@
+import os
 import matplotlib.pyplot as plt
 
+from auditory_cortex import results_dir
+from auditory_cortex.plotters.plotter_utils import PlotterUtils
 from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
 from auditory_cortex.neural_data.recording_config import RecordingConfig
 
@@ -19,8 +22,12 @@ class CoordinatesPlotter:
         circle = plt.Circle((0,0),2, fill=False)
         ax.set_aspect(1)
         ax.add_artist(circle)
-        ax.set_xlim([-2.0,2.0])
-        ax.set_ylim([-2.0,2.0])
+        ax.set_xlim([-2.5, 2.5])
+        ax.set_ylim([-2.5, 2.5])
+        ax.set_xticks([-2, -1, 0 , 1, 2], [-10, -5, 0, 5, 10], rotation=0)
+        ax.set_yticks([-2, -1, 0 , 1, 2], [-10, -5, 0, 5, 10])
+        # ax.set_xticks([-2, 0 , 2], [-10, 0, 10], rotation=0)
+        # ax.set_yticks([-2, 0 , 2], [-10, 0, 10])
         plt.grid(grid)
         return ax
     
@@ -75,35 +82,67 @@ class CoordinatesPlotter:
 
 
 
-    def scatter_sessions(self, sessions_list, **kwargs):
+    def scatter_sessions_for_recording_config(
+            self, subject=None, annotate=False, save_tikz=False, 
+            **kwargs
+        ):
         """Makes a scatter plot of session coordinates, labelled 
         with session ID. Helps convey the locations of recording
         sites (sessions).
         
         Args:
-            sessions_list: list = list of sessions to be included 
-                in the scatter plot.
+            subject: str = subject+hemisphere out of
+                    ['c_RH', 'c_RH', 'b_RH', 'f_RH']. Default=None.
+                    In case of default, plots all the sessions 
+            
         """
+        assert subject in ['c_LH', 'c_RH', 'b_RH', 'f_RH'], "Invalid recorind configuration."
+
         if 'ax' in kwargs:
             ax = kwargs.pop('ax')
         else:   fig, ax = plt.subplots()
 
         ax = self.plot_background(ax)
+        sessions_list = self.m_data.get_sessions_for_recording_config(subject)
 
         x_coordinates = []
         y_coordinates = []
         labels = []
+        colors = []
         for session in sessions_list:
             session = int(session)
             cx, cy = self._get_session_coordinates(session)
             x_coordinates.append(cx)
             y_coordinates.append(cy)
             labels.append(session)
-            
-            ax.annotate(session, (cx-0.2, cy+0.05))
+            if session == 200206:
+                color = 'tab:orange'
+            else:
+                color = 'tab:blue'
 
-        ax.scatter(x_coordinates, y_coordinates)
-        ax.set_title("Coordinates of recording sites")
+            colors.append(color)
+            
+            if annotate:
+                ax.annotate(session, (cx-0.2, cy+0.05))
+
+        # if subject == 'c_LH':
+        #     xlabel = 'rostral - caudal (mm)'
+        # else:
+        #     xlabel = 'caudal - rostral (mm)'
+
+        # c_LH have been rotated...
+        xlabel = 'caudal - rostral (mm)'
+        ylabel = 'ventral - dorsal (mm)'
+
+        ax.scatter(x_coordinates, y_coordinates, c=colors)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(f"{subject}")
+
+        if save_tikz:
+            filepath = os.path.join(results_dir, 'tikz_plots', f"recording_sites_{subject}.tex")
+            PlotterUtils.save_tikz(filepath)
+
         return ax
 
 
