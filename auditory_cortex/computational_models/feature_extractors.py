@@ -96,6 +96,12 @@ class DNNFeatureExtractor():
 
 
 
+        shuffle_weights = self.config['shuffle_weights']
+        if shuffle_weights:
+            # self.shuffle_weights()
+            layers = self.reset_model_parameters()
+            # self.randomly_reinitialize_weights()
+
         #############################################################
         ###########      Need to clean this part            #########
         ###########          Ending here....!               #########
@@ -159,7 +165,43 @@ class DNNFeatureExtractor():
             with torch.no_grad():
                 input = self.extractor.fwd_pass(aud)
         return input
-    
+
+    def reset_model_parameters(self):
+        """Reset weights of all the layers of the model.
+        """
+        print(f"Randomly 'resetting' the network parameters...")
+        layer_modules = []
+        named_modules = dict([*self.extractor.model.named_modules()])
+        for name, layer in named_modules.items():
+            if hasattr(layer, 'reset_parameters'):
+                # print(f"{layer.__name__}")
+                layer.reset_parameters()
+                layer_modules.append(layer)
+        return layer_modules
+
+            # if len(param.size()) > 1: #check if param is a weight tensor
+
+    def shuffle_weights(self):
+        """Shuffle weights of all the layers of the model.
+        """
+        print(f"Randomly 'shuffling' the network parameters...")
+        for param in self.extractor.model.parameters():
+
+            # flatten the parameter tensor and apply a random permutation...
+            flattened_param = param.data.view(-1)
+            shuffled_param = flattened_param[np.random.permutation(flattened_param.size(0))]
+
+            # Reshape the shuffled_param back to original shape
+            param.data = shuffled_param.view(param.size())
+
+    def randomly_reinitialize_weights(self):
+        """Randomly initialize weights of all the layers of the model.
+        """
+        print(f"Initializing 'random weights' the network parameters...")
+        with torch.no_grad():
+            for param in self.extractor.model.parameters():
+                param.data = torch.randn_like(param)
+                
     #############################################################
     ###########      Moved from Regression to here      #########
     ###########          Starts here....!               #########
@@ -200,7 +242,42 @@ class DNNFeatureExtractor():
                         feature_samples = sent_samples
                     features[layer_ID][sent_ID] = features[layer_ID][sent_ID][:feature_samples]
         return features
+    
+    def extract_features_for_audio(self, audio_input, sent_duration):
+        """Extracts features for given audio input.
 
+        Args:
+            audio_input (ndarray): (num_samples,) audio stimulus as np array.
+            sent_duration (float): duration of audio input in sec.
+
+        Returns:
+            Dict of features, with layer ID being the keys.
+
+        """
+        print(f"Extracting features for duration: {sent_duration} sec")
+        features = {}
+        # needed only for Whisper...!
+        if 'whisper' in self.model_name:
+            bin_width = 20/1000.0   #20 ms for all layers except the very first...
+            # sent_duration = feature_extractor.metadata.stim_duration(sent_ID)
+            sent_samples = int(np.ceil(round(sent_duration/bin_width, 3)))
+
+        self.translate(audio_input, grad = False)
+        for layer_ID in self.layer_IDs:
+            features[layer_ID] = self.get_features(layer_ID).cpu()
+            if 'whisper' in self.model_name:
+                ## whisper networks gives features for 30s long clip,
+                ## extracting only the true initial samples...
+                layer_name = self.get_layer_name(layer_ID)
+                if layer_name == 'model.encoder.conv1':
+                    # sampling rate is 100 Hz for very first layer
+                    # and 50 Hz for all the other layers...
+                    feature_samples = 2*sent_samples
+                else:
+                    feature_samples = sent_samples
+                # features[layer_ID] = features[layer_ID][:feature_samples]
+                # features[layer_ID] = features[layer_ID][-feature_samples:]
+        return features
 
     #############################################################
     ###########      Moved from Regression to here      #########
@@ -242,7 +319,7 @@ class FeatureExtractorW2L():
         # input.requires_grad=True
         self.model.eval()
         out = self.model(input)
-        return input
+        return out
     
     def fwd_pass_tensor(self, aud):
         """
@@ -287,7 +364,7 @@ class FeatureExtractorW2V2():
         # input.requires_grad=True
         # self.model.eval()
         # out = self.model(input)
-        return input
+        return logits
     
     def fwd_pass_tensor(self, aud_tensor):
         """
@@ -303,6 +380,14 @@ class FeatureExtractorW2V2():
         self.model.eval()
         logits = self.model(aud_tensor).logits
         return logits
+
+    def transcribe(self, aud):
+        """Transcribes speech audio."""
+        logits = self.fwd_pass(aud)
+        indexes = torch.argmax(logits, dim=-1)
+        return self.processor.batch_decode(indexes)
+        # self.processor.decode()
+
 
 class FeatureExtractorS2T():
     def __init__(self):
@@ -348,6 +433,11 @@ class FeatureExtractorWhisper():
         generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
             # transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return generated_ids
+    
+    def transcribe(self, audio):
+        """Transcribes speech audio"""
+        predicted_ids = self.fwd_pass(audio)
+        return self.processor.batch_decode(predicted_ids, skip_special_tokens=True)
     
 class FeatureExtractorDeepSpeech2():
     def __init__(self, checkpoint):

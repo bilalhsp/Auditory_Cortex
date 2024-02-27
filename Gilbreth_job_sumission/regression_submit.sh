@@ -3,13 +3,13 @@
 #SBATCH --output=./result_regression_ds2.out
 
 #SBATCH	-A standby
-#SBATCH --constraint=F|G|I|K
+# --constraint=F|G|I|K
 
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=6
 #SBATCH --mem=0
-#SBATCH --time=4:0:00
+#SBATCH --time=3:15:00
 
 hostname
 NUMBA_DISABLE_INTEL_SVML=1

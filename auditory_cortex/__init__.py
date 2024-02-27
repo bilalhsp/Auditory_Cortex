@@ -36,7 +36,7 @@ opt_inputs_dir = os.path.join(results_dir, 'optimal_inputs')
 cache_dir = config['cache_dir']
 
 
-
+bad_sessions = config['bad_sessions']
 # session ID's per subject and hemisphere
 c_RH_sessions = np.array([190606, 190604, 190726, 190801, 180725, 180720, 180731,
                  180807, 180622, 190703, 190607, 190605, 180728, 180619, 180502])

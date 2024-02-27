@@ -1,4 +1,5 @@
 import os
+import yaml
 import pickle
 import numpy as np
 import pandas as pd
@@ -17,8 +18,10 @@ from palettable.colorbrewer import qualitative
 import auditory_cortex.utils as utils
 from auditory_cortex.utils import CorrelationUtils
 from auditory_cortex.neural_data import NeuralMetaData
+from auditory_cortex.neural_data.normalizer import Normalizer
 from auditory_cortex import session_to_coordinates, CMAP_2D, session_to_subject, session_to_area
-from auditory_cortex import saved_corr_dir
+from auditory_cortex import saved_corr_dir, aux_dir
+from auditory_cortex.io_utils import io
 # from pycolormap_2d import ColorMap2DBremm, config, results_dir
 
 
@@ -27,11 +30,10 @@ from auditory_cortex import saved_corr_dir
 # from naplib.visualization import imSTRF
 
 
-        
-
-
 class Correlations:
-    def __init__(self, model_name=None, third=None) -> None:
+    def __init__(
+            self, model_name=None, third=None, normalizer_filename=None
+        ) -> None:
         
         if model_name is None:
             model_name = 'wave2letter_modified'
@@ -39,6 +41,8 @@ class Correlations:
         filename = f'{model_name}_corr_results.csv'
         self.corr_file_path = os.path.join(saved_corr_dir, filename)
         self.metadata = NeuralMetaData()
+        self.norm_obj = Normalizer(normalizer_filename)
+
 
         self.data = pd.read_csv(self.corr_file_path)
         # check if 'test_cc_raw' not one of the columns
@@ -49,12 +53,14 @@ class Correlations:
             print(f"'test_cc_raw added as a column..!")
         
         if 'normalizer' not in self.data.columns:
-            CorrelationUtils.copy_normalizer(model_name)
-            self.data = pd.read_csv(self.corr_file_path)
+            self.data.loc[:, 'normalizer'] = np.nan
+            self.set_normalizers()
+            # CorrelationUtils.copy_normalizer(model_name)
+            # self.data = pd.read_csv(self.corr_file_path)
         if 'N_sents' not in self.data.columns:
             self.data['N_sents'] = np.ones(len(self.data.index))*500
 
-        self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
+        # self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
         # self.sig_threshold = sig_threshold
 
         # loading STRF baseline
@@ -143,6 +149,8 @@ class Correlations:
             ][column].head(1).item()
         return corr
     
+        
+    
     def get_baseline_corr_session(
             self, sessions=None, bin_width=20, delay=0, column='strf_corr', threshold=None,
             normalized=True):
@@ -168,23 +176,26 @@ class Correlations:
                         (select_baseline['session']==float(session))
                     ])
             select_baseline = pd.concat(session_baselines)    
-
-
         return select_baseline[column]
+    
+    def get_filepath(self):
+        """Returns abs path of corr result file."""
+        return self.corr_file_path
 
     def write_back(self):
         self.data.to_csv(self.corr_file_path, index=False)
         print(f"Saved at {self.corr_file_path}")
-    ##### TMPORARY function...to be removed 
-    def add_layer_types(self, other_type):
-        self.data['layer_type'] = other_type
-        self.write_back()
+    # ##### TMPORARY function...to be removed 
+    # def add_layer_types(self, other_type):
+    #     self.data['layer_type'] = other_type
+    #     self.write_back()
 
-    def get_significant_sessions(self, threshold = None):
+    def get_significant_sessions(self, threshold = None, bin_width=20):
         """Returns sessions with corr scores above significant threshold for at least 1 channel"""
         if threshold is not None:
             # threshold = self.sig_threshold
-            sig_data = self.data[self.data['normalizer'] >= threshold]
+            sig_data = self.get_selected_data(bin_width=bin_width, threshold=threshold)
+            # sig_data = self.data[self.data['normalizer'] >= threshold]
         else:
             sig_data = self.data
         return sig_data['session'].unique()
@@ -364,7 +375,7 @@ class Correlations:
     
 
     def get_selected_data(
-                self, sessions=None, bin_width=None, delay=None, threshold=None,
+                self, sessions: list=None, bin_width=None, delay=None, threshold=None,
                 N_sents=499, layer=None, channel=None
         ):
         """Retrieves selected data based on provided arguments. 
@@ -507,44 +518,93 @@ class Correlations:
     
         return ax, layer_spread
     
+# ------------------  Retrieve data for analysis ----------------#
 
-    def get_corr_all_bin_widths_for_layer(self, neural_area=None, layer=6, delay=0, 
-        N_sents=499, threshold = 0.068, normalized=True):
+    def get_normalizer_threshold(self, bin_width=20, poisson_normalizer=True):
+        """Retrieves significance threshold from the NULL distribution
+        of normalizer.
+        """
+        threshold_dict = io.read_normalizer_threshold(
+            bin_width=bin_width, poisson_normalizer=poisson_normalizer
+            )
+        if threshold_dict is None or bin_width not in threshold_dict.keys():
+            if poisson_normalizer:
+                threshold = self.norm_obj.compute_normalizer_threshold_using_poisson(bin_width=bin_width)[0]
+            else:
+                threshold = self.norm_obj.compute_normalizer_threshold(bin_width=bin_width)[0]
+
+            io.write_normalizer_threshold(
+                bin_width=bin_width, poisson_normalizer=poisson_normalizer,
+                thresholds=threshold
+            )
+            return threshold
+        else:
+            return threshold_dict[bin_width]
+
+
+    def get_corr_all_bin_widths_for_layer(
+            self, neural_area=None, layer=6, delay=0, N_sents=499, 
+            poisson_normalizer=True, normalized=True
+        ):
         """Retrieves correlations for all layers, but ONLY the specified bin_width."""
-        assert neural_area in ['core', 'belt'], print(f"Unknown neural area '{neural_area}' specified.")
+        assert neural_area in ['core', 'belt', 'all'], print(f"Unknown neural area '{neural_area}' specified.")
         if normalized:
             column = 'normalized_test_cc'
         else:
             column = 'test_cc_raw'
 
         area_sessions = self.metadata.get_all_sessions(neural_area)
-        select_data = self.get_selected_data(
-            sessions=area_sessions, 
-            layer=layer,
-            delay=delay,
-            threshold=threshold,
-            N_sents=N_sents
-        )
 
         dist_spread = {}   
-        bin_widths = select_data['bin_width'].unique()
+        bin_widths = np.sort(self.data['bin_width'].unique())
         for bin_width in bin_widths:
-            ids = select_data[select_data['bin_width']==bin_width].index
-            dist_spread[int(bin_width)] = np.array(select_data.loc[ids, column]).squeeze()
+            bw_threshold = self.get_normalizer_threshold(
+                bin_width=bin_width, poisson_normalizer=poisson_normalizer
+            )
+            # if poisson_normalizer:
+            #     bw_threshold = self.norm_obj.compute_normalizer_threshold_using_poisson(bin_width=bin_width)[0]
+            # else:
+            #     bw_threshold = self.norm_obj.compute_normalizer_threshold(bin_width=bin_width)[0]
+            select_data = self.get_selected_data(
+                sessions=area_sessions,
+                bin_width=bin_width, 
+                layer=layer,
+                delay=delay,
+                threshold=bw_threshold,
+                N_sents=N_sents
+            )
+            # ids = select_data[select_data['bin_width']==bin_width].index
+            dist_spread[int(bin_width)] = np.array(select_data[column]).squeeze()
+
+
+        # select_data = self.get_selected_data(
+        #     sessions=area_sessions, 
+        #     layer=layer,
+        #     delay=delay,
+        #     threshold=threshold,
+        #     N_sents=N_sents
+        # )
+
+        # dist_spread = {}   
+        # bin_widths = select_data['bin_width'].unique()
+        # for bin_width in bin_widths:
+        #     ids = select_data[select_data['bin_width']==bin_width].index
+        #     dist_spread[int(bin_width)] = np.array(select_data.loc[ids, column]).squeeze()
         # sort the result based on keys...
         dist_spread = dict(sorted(dist_spread.items(), key=lambda item: item[0]))
         return dist_spread
     
+# ------------------  corr distributions of all layers  ----------------#
+    
     def get_corr_all_layers_for_bin_width(self, neural_area=None, bin_width=20, delay=0, 
         N_sents=499, threshold = 0.068, normalized=True):
         """Retrieves correlations for all layers, but ONLY the specified bin_width."""
-        assert neural_area in ['core', 'belt'], print(f"Unknown neural area '{neural_area}' specified.")
+        assert neural_area in ['core', 'belt', 'parabelt', 'all'], print(f"Unknown neural area '{neural_area}' specified.")
 
         if normalized:
             column = 'normalized_test_cc'
         else:
             column = 'test_cc_raw'
-
 
         area_sessions = self.metadata.get_all_sessions(neural_area)
         select_data = self.get_selected_data(
@@ -563,6 +623,255 @@ class Correlations:
         # sort the result based on keys...
         layer_spread = dict(sorted(layer_spread.items(), key=lambda item: item[0]))
         return layer_spread
+    
+
+# ------------------  corr KDE for all layers  ----------------#
+
+    def get_KDE_all_layers_for_bin_width(
+            self, neural_area='core', bin_width=20, delay=0,
+            snippet_width = 100, num_hist_bins = 1000, 
+            normalized=True, poisson_normalizer=True
+        ):
+    
+
+
+        bw_threshold = self.get_normalizer_threshold(
+                        bin_width=bin_width, poisson_normalizer=poisson_normalizer
+                        )
+
+        data_dist = self.get_corr_all_layers_for_bin_width(
+                neural_area=neural_area, bin_width=bin_width,
+                delay=delay, threshold=bw_threshold,
+                normalized=normalized
+            )
+
+        points = np.linspace(0,1,num_hist_bins)
+        density = True
+        vect_ones = np.ones(snippet_width)[None,:]
+        num_layers = len(data_dist.keys())
+        hist_combined = np.ones((num_hist_bins, num_layers*snippet_width))
+        for layer_id in data_dist.keys():
+            data = data_dist[layer_id]
+            kde_obj = scp.stats.gaussian_kde(data)
+        
+            layer_hist = kde_obj(points)
+            layer_hist /= np.sum(layer_hist)
+
+            # replicating layer_hist 'snippet_width' times...
+            hist_snippet = layer_hist[:, None] @ vect_ones
+            hist_combined[:, layer_id*snippet_width:(layer_id+1)*snippet_width] = hist_snippet
+    
+        ytick_labels = np.linspace(0,1,5)
+        yticks = ytick_labels*num_hist_bins
+
+        x_tick_labels = np.array(list(data_dist.keys()))
+        x_ticks = (x_tick_labels)*snippet_width + snippet_width//2
+
+        return hist_combined, (x_ticks, x_tick_labels), (yticks, ytick_labels)
+    
+    def get_KDE_for_baseline(
+            self, area, bin_width, delay=0,
+            normalized=True, poisson_normalizer = True 
+        ):
+        """Get KDE for baseline data."""
+        bw_threshold = self.get_normalizer_threshold(
+                bin_width=bin_width, poisson_normalizer=poisson_normalizer
+                )
+
+        # plot baseline...
+        area_sessions = self.metadata.get_all_sessions(area)
+        baseline_dist = self.get_baseline_corr_session(
+            sessions= area_sessions,bin_width=bin_width, delay=delay,
+                    threshold=bw_threshold, normalized=normalized)
+
+        data_dist = {0: baseline_dist}
+
+        return self.get_KDE_from_dist(data_dist)
+
+
+    def get_KDE_from_dist(
+            self, data_dist, 
+            snippet_width = 100, num_hist_bins = 1000, 
+        ):
+        """Coverts dist of data points into KDE distribution, 
+        ready to be plotted.
+        """
+        points = np.linspace(0,1,num_hist_bins)
+        density = True
+        vect_ones = np.ones(snippet_width)[None,:]
+        num_layers = len(data_dist.keys())
+        hist_combined = np.ones((num_hist_bins, num_layers*snippet_width))
+        for layer_id in data_dist.keys():
+            data = data_dist[layer_id]
+            kde_obj = scp.stats.gaussian_kde(data)
+        
+            layer_hist = kde_obj(points)
+            layer_hist /= np.sum(layer_hist)
+
+            # replicating layer_hist 'snippet_width' times...
+            hist_snippet = layer_hist[:, None] @ vect_ones
+            hist_combined[:, layer_id*snippet_width:(layer_id+1)*snippet_width] = hist_snippet
+    
+        ytick_labels = np.linspace(0,1,5)
+        yticks = ytick_labels*num_hist_bins
+
+        x_tick_labels = np.array(list(data_dist.keys()))
+        x_ticks = (x_tick_labels)*snippet_width + snippet_width//2
+
+        return hist_combined, (x_ticks, x_tick_labels), (yticks, ytick_labels)
+
+
+
+    
+
+    def get_layer_dist_with_peak_median(
+            self, bin_width, neural_area='all', delay=0,
+            normalized=True, poisson_normalizer=True
+            
+        ):
+        """Returns the corr distribution, at specific bin width,
+        for the layer with peak median.
+        """
+        bw_threshold = self.get_normalizer_threshold(
+                bin_width=bin_width, poisson_normalizer=poisson_normalizer
+                )
+
+        corr_dict = self.get_corr_all_layers_for_bin_width(
+                neural_area=neural_area, bin_width=bin_width,
+                delay=delay, threshold=bw_threshold,
+                normalized=normalized
+            )
+
+        # pick the peak layer..
+        layer_medians = {np.median(v):k for k,v in corr_dict.items()}
+        peak_median = max(layer_medians)
+        peak_layer = layer_medians[peak_median]
+        print(f"At bin_width: {bin_width}, layer with peak median is: {peak_layer}")
+        return corr_dict[peak_layer]
+    
+
+    def get_baseline_corr_for_area(
+            self, neural_area='core',bin_width=20, delay=0,
+            threshold=0.068, normalized=True
+        ):
+        """Retrieves baseline correlations for all sig. sessions."""
+        area_sessions = self.metadata.get_all_sessions(neural_area)
+
+        corr_dist = self.get_baseline_corr_session(
+            sessions=area_sessions, bin_width=bin_width, delay=delay,
+            threshold=threshold, normalized=normalized
+        )
+        return corr_dist
+        
+
+# ------------------  copy normalizer for all bin-widths ----------------#
+    def set_normalizers(self, bin_widths: list=None):
+        """Set normalizers (repeatability correlations) from the saved results.
+        """
+        if bin_widths is None:
+            bin_widths = self.data['bin_width'].unique()
+        for bin_width in bin_widths:
+            select_data = self.get_selected_data(bin_width=bin_width)
+            sessions = select_data['session'].unique()
+            delays = select_data['delay'].unique()
+            for session in sessions:
+                for delay in delays:
+                    select_data = self.get_selected_data(
+                        sessions=[session], bin_width=bin_width, delay=delay
+                    )
+                    channels = select_data['channel'].unique()
+                    selected_normalizers = self.norm_obj.get_normalizer_for_session(
+                        session=session, bin_width=bin_width, delay=delay
+                        )
+                    for ch in channels:
+                        ids = select_data[select_data['channel']==ch].index
+                        ch_normalizer = selected_normalizers[
+                                selected_normalizers['channel']==ch
+                            ]['normalizer'].head(1).item()
+                        self.data.loc[ids, 'normalizer'] = ch_normalizer #/0.82   # adjusting for context..
+
+        self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
+        print(f"Normalizers updated FOR CONTEXT AS WELL, writing back now...")
+        self.write_back()
+
+
+# ------------------    static methods     ----------------#
+    @staticmethod
+    def merge_correlation_results(model_name, file_identifiers, idx):
+        """
+        Args:
+
+            model_name: Name of the pre-trained network
+            file_identifiers: List of filename identifiers 
+            idx:    id of the file identifier to use for saving the merged results
+        """
+        # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
+
+        corr_dfs = []
+        for identifier in file_identifiers:
+            filename = f"{model_name}_{identifier}_corr_results.csv"
+            file_path = os.path.join(saved_corr_dir, filename)
+
+            corr_dfs.append(pd.read_csv(file_path))
+
+        # save the merged results at the very first filename...
+        output_identifer = file_identifiers[idx]    
+        filename = f"{model_name}_{output_identifer}_corr_results.csv"
+        file_path = os.path.join(saved_corr_dir, filename)
+
+        data = pd.concat(corr_dfs)
+        data.to_csv(file_path, index=False)
+        print(f"Output saved at: \n {file_path}")
+
+        # once all the files have been merged, remove the files..
+        for identifier in file_identifiers:
+            if identifier != output_identifer:
+                filename = f"{model_name}_{identifier}_corr_results.csv"
+                file_path = os.path.join(saved_corr_dir, filename)
+                # remove the file
+                os.remove(file_path)
+
+
+    @staticmethod
+    def add_layer_types(model_name, results_identifer):
+
+        # reading layer_types from aux config...
+        layer_types = {}
+        config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
+        with open(config_file, 'r') as f:
+            config = yaml.load(f, yaml.FullLoader)
+
+        # config['layers']
+        for layer_config in config['layers']:
+            layer_types[layer_config['layer_id']] = layer_config['layer_type']
+
+        # reading results directory...
+        if results_identifer != '':
+            model = f'{model_name}_{results_identifer}'
+        else:
+            model = model_name 
+        filename = f"{model}_corr_results.csv"
+        file_path = os.path.join(saved_corr_dir, filename)
+        data = pd.read_csv(file_path)
+        print(f"reading from {file_path}")
+
+        # remove 'Unnamed' columns
+        data = data.loc[:, ~data.columns.str.contains('Unnamed')]
+
+        # add 'layer_type' as a column
+        for layer, type in layer_types.items():
+            ids = data[data['layer']==layer].index
+            data.loc[ids, 'layer_type'] = type
+
+        print("Writing back...!")
+        data.to_csv(file_path, index=False)
+
+
+
+
+
+
+
 
 
 

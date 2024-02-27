@@ -7,6 +7,9 @@
 
 # Gilbreth paths (HPC)
 neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+
+
+# neural_data_dir: /depot/jgmakin/data/auditory_cortex/DownerData/
 results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
 # cache dir used to cache loaded features and neural spikes..
@@ -53,8 +56,8 @@ model_name: wave2letter_modified
 
 # identifier: robust1
 # identifier: normal_109
-identifier: sampling_rate_opt_neural_delay
-# identifier: sampling_rate_opt_neural_delay_feature_extractor
+# identifier: sampling_rate_opt_neural_delay
+identifier: sampling_rate_opt_neural_delay_feature_extractor
 # identifier: testing_changes
 
 # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
@@ -71,6 +74,20 @@ bad_sessions:
 - '180619'
 - '180405'
 - '180406'
+- '180725'  # this row (included) onwards added 01/24/24 (getting errors for inter-stimulus dead intervals)
+- '191212'
+- '200226'
+- '200610'
+- '200325'
+- '191002'
+- '180619'  # belt sessions here on..
+- '200323'
+- '200312'
+- '190607'  # SPECIAL case: doesn't give any error, but has different distribution of dead intervals..
+- '180801'  # PB sessions here on...
+- '180417'
+- '200617'
+- '200401'
 delays_param:
   start: 0
   stop: 1

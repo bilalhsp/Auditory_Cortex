@@ -3,6 +3,70 @@ import pickle
 from auditory_cortex import opt_inputs_dir, results_dir, cache_dir
 
 
+def read_reg_corr():
+    """Reads the saved regression correlation results, 
+    at 20ms bin width.
+    Results are saved as dictionary of dictionaries,
+    organized as follows:
+        'deepspeech2:   
+                'core':
+                    0: ndarray
+                    1: ndarray
+                    .
+                'belt':
+                    0: ndarray
+                    1: ndarray
+
+
+    """
+    path_dir = os.path.join(results_dir, 'Reg')
+    filename = f'reg_correlations_normalized_20ms.pkl'    
+    file_path = os.path.join(path_dir, filename)
+    
+    if os.path.exists(file_path):
+        print(f"Reading from file: {file_path}")
+        with open(file_path, 'rb') as F: 
+            reg_results = pickle.load(F)
+        return reg_results
+    else:
+        print(f"Results not found.")
+        return None
+def write_reg_corr(model_name, results_dict):
+    """writes the regression correlation results, 
+    at 20ms bin width.
+    Results are saved as dictionary of dictionaries,
+    organized as follows:
+        'deepspeech2:   
+                'core':
+                    0: ndarray
+                    1: ndarray
+                    .
+                'belt':
+                    0: ndarray
+                    1: ndarray
+
+
+    """
+    path_dir = os.path.join(results_dir, 'Reg')
+    
+    if not os.path.exists(path_dir):
+        os.makedirs(path_dir)
+        print(f"Directory path created: {path_dir}")
+
+    filename = f'reg_correlations_normalized_20ms.pkl'    
+    file_path = os.path.join(path_dir, filename)
+    
+    exisiting_results = read_reg_corr()
+    if exisiting_results is None:
+        exisiting_results = {}
+
+    # save/update results for model_name
+    exisiting_results[model_name] = results_dict
+    with open(file_path, 'wb') as F: 
+        pickle.dump(exisiting_results, F)
+    print(f"Results saved for {model_name} at path: \n {file_path}.")
+
+
 
 def write_model_parameters(
         model_name, session, coefficents):
@@ -131,20 +195,25 @@ def delete_saved_RDM(model_name, identifier, bin_width):
         print(f"File does not exist.")
 
 
-def read_cached_features(model_name):
+def read_cached_features(model_name, contextualized=False):
     """Retrieves cached features from the cache_dir, returns None if 
     features not cached already. 
 
     Args:
         model_name: str specifying model name, possible choices are
             ['wave2letter_modified', 'wave2vec2', 'speech2text',
-            'deepspeech2', 'whiper_tiny', 'whisper_base']
+            'deepspeech2', 'whiper_tiny', 'whisper_base', 'whisper_small']
     """
     model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
-            'deepspeech2', 'whisper_tiny', 'whisper_base']
+            'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small']
     assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
     
-    file_name = f"{model_name}_raw_features.pkl"
+    if contextualized:
+        print(f"Reading contextualized features...")
+        file_name = f"{model_name}_raw_features_contextualized.pkl"
+    else:
+        file_name = f"{model_name}_raw_features.pkl"
+        
     file_path = os.path.join(cache_dir, model_name, file_name)
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F:
@@ -153,20 +222,25 @@ def read_cached_features(model_name):
     else:
         return None
 
-def write_cached_features(model_name, features, verbose=True):
+def write_cached_features(model_name, features, verbose=True, contextualized=False):
     """Writes features to the cache_dir,
 
     Args:
         model_name: str specifying model name, possible choices are
             ['wave2letter_modified', 'wave2vec2', 'speech2text',
-            'deepspeech2', 'whiper_tiny', 'whisper_base']
+            'deepspeech2', 'whiper_tiny', 'whisper_base', 'whisper_small']
         features: list = features for each layers as a list of dictionaries 
     """
     model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
-            'deepspeech2', 'whisper_tiny', 'whisper_base']
+            'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small']
     assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
     
-    file_name = f"{model_name}_raw_features.pkl"
+    if contextualized:
+        print(f"writing contextualized features...")
+        file_name = f"{model_name}_raw_features_contextualized.pkl"
+    else:
+        file_name = f"{model_name}_raw_features.pkl"
+    # file_name = f"{model_name}_raw_features.pkl"
     file_path = os.path.join(cache_dir, model_name, file_name)
     # make sure directory structure is in place...
     if not os.path.exists(os.path.dirname(file_path)):
@@ -213,7 +287,7 @@ def write_cached_spikes(spikes, bin_width=20, area='all', threshold=0.068, verbo
     if not os.path.exists(os.path.dirname(file_path)):
         os.makedirs(os.path.dirname(file_path))
 
-    cached_spikes = read_cached_spikes(bin_width=bin_width)
+    cached_spikes = read_cached_spikes(bin_width=bin_width, threshold=threshold)
     if cached_spikes is None:
         cached_spikes = {}
 
@@ -272,7 +346,7 @@ def write_cached_spikes_session_wise(spikes, session, bin_width=20,
 
 
 
-def read_cached_RDM_correlations(model_name, area, bin_width):
+def read_cached_RDM_correlations(model_name, identifier, area, bin_width):
     """Retrieves cached RDM correlations (layer-wise) from the cache_dir,
     returns None if not cached already. 
 
@@ -280,8 +354,11 @@ def read_cached_RDM_correlations(model_name, area, bin_width):
         model_name: str specifying model name, possible choices are
             ['wave2letter_modified', 'wave2vec2', 'speech2text',
             'deepspeech2', 'whiper_tiny', 'whisper_base']
+        identifier: str specifying time alignment operation..
+            ['', 'global','average']
     """
-    file_name = f"RDM_correlations_{model_name}_{area}_{bin_width}ms.pkl"
+    assert identifier in ['', 'global','average'], print(f"Please specify right identifier..")
+    file_name = f"RDM_correlations_{model_name}_{identifier}_{area}_{bin_width}ms.pkl"
     file_path = os.path.join(cache_dir, model_name, file_name)
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F:
@@ -290,7 +367,7 @@ def read_cached_RDM_correlations(model_name, area, bin_width):
     else:
         return None
 
-def write_cached_RDM_correlations(corr_dict, model_name, area, bin_width):
+def write_cached_RDM_correlations(corr_dict, model_name, identifier, area, bin_width):
     """Save RDM correlations (layer-wise) to the cache_dir,
     returns None if not cached already. 
 
@@ -302,8 +379,8 @@ def write_cached_RDM_correlations(corr_dict, model_name, area, bin_width):
     model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
             'deepspeech2', 'whisper_tiny', 'whisper_base']
     assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
-    
-    file_name = f"RDM_correlations_{model_name}_{area}_{bin_width}ms.pkl"
+    assert identifier in ['', 'global','average'], print(f"Please specify right identifier..")
+    file_name = f"RDM_correlations_{model_name}_{identifier}_{area}_{bin_width}ms.pkl"
     file_path = os.path.join(cache_dir, model_name, file_name)
 
     if not os.path.exists(os.path.dirname(file_path)):
@@ -314,13 +391,133 @@ def write_cached_RDM_correlations(corr_dict, model_name, area, bin_width):
         pickle.dump(corr_dict, F)
     print(f"RSA corr_dict saved to file: {file_path}")
 
-
-
-
-
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F:
             features = pickle.load(F)
         return features
     else:
         return None
+    
+
+def read_normalizer_threshold(bin_width=20, poisson_normalizer=True):
+    """Retrieves cached normalizer thresholds from the cache_dir,
+    at specified bin_width.
+
+    Args:
+        bin_width: int = bin_width in ms
+        poisson_normalizer: bool = specified method used for computing 
+            normalizer threshold.
+    """
+    if poisson_normalizer:
+        method = 'poisson'
+    else:
+        method = 'gaussian'
+
+    file_name = f"normalizer_thresholds_{method}.pkl"
+    file_path = os.path.join(cache_dir, 'normalizer', file_name)
+    
+    if os.path.exists(file_path):
+        
+        with open(file_path, 'rb') as F:
+            normalizers_dict = pickle.load(F)
+            print(f"Reading exisiting normalizer thresholds...")
+        return normalizers_dict
+    return None
+
+def write_normalizer_threshold(
+        bin_width, poisson_normalizer, thresholds
+    ):
+    """Writes  normalizer thresholds to the cache_dir,
+    at specified bin_width.
+
+    Args:
+        bin_width: int = bin_width in ms
+        poisson_normalizer: bool = specified method used for computing 
+            normalizer threshold.
+        thresholds: ndarray =  result to be cached 
+    """
+    if poisson_normalizer:
+        method = 'poisson'
+    else:
+        method = 'gaussian'
+
+    file_name = f"normalizer_thresholds_{method}.pkl"
+    file_path = os.path.join(cache_dir, 'normalizer', file_name)
+
+    if not os.path.exists(os.path.dirname(file_path)):
+        os.makedirs(os.path.dirname(file_path))
+
+    # read existing...
+    existing_threshold = read_normalizer_threshold(
+        bin_width=bin_width, poisson_normalizer=poisson_normalizer
+        )
+    if existing_threshold is None:
+        existing_threshold = {}
+    existing_threshold[bin_width] = thresholds
+
+    print(f"Writing normalizers to the cache...")
+    # writing back..
+    with open(file_path, 'wb') as F:
+        pickle.dump(existing_threshold, F)
+
+
+
+def read_context_dependent_normalizer(model_name, bin_width=20):
+    """Reads cached context dependent variance of the correlations normalizer.
+    Computed using contextful features of ANN, and using the features 
+    corresponding to the repeated senteces.
+
+    Args:
+        model_name: str: model used for computing context variance
+        bin_width: int = bin_width in ms
+    """
+
+    file_name = f"context_dependent_variance_{model_name}_{bin_width}.pkl"
+    file_path = os.path.join(cache_dir, 'normalizer', file_name)
+    
+    if os.path.exists(file_path):
+        
+        with open(file_path, 'rb') as F:
+            normalizers_dict = pickle.load(F)
+            print(f"Reading exisiting context normalizer ...")
+        return normalizers_dict
+    return None
+
+
+
+def write_context_dependent_normalizer(
+        model_name, context_normalizer, bin_width=20
+    ):
+    """Writes context dependent variance of the correlations normalizer.
+    Computed using contextful features of ANN, and using the features 
+    corresponding to the repeated senteces.
+
+    Args:
+        model_name: str: model used for computing context variance
+        bin_width: int = bin_width in ms
+        context_normalizer: dict = normalizers for different layers (keys)
+    """
+
+    file_name = f"context_dependent_variance_{model_name}_{bin_width}.pkl"
+    file_path = os.path.join(cache_dir, 'normalizer', file_name)
+
+    if not os.path.exists(os.path.dirname(file_path)):
+        os.makedirs(os.path.dirname(file_path))
+
+    # read existing...
+    existing_context_normalizers = read_context_dependent_normalizer(
+        model_name=model_name, bin_width=bin_width
+        )
+    if existing_context_normalizers is None:
+        existing_context_normalizers = {}
+    for layer, normalizer in context_normalizer.items():
+        existing_context_normalizers[layer] = normalizer
+
+    print(f"Writing context normalizers to the cache for {model_name} at {bin_width} ms...")
+    # writing back..
+    with open(file_path, 'wb') as F:
+        pickle.dump(existing_context_normalizers, F)
+
+    print(f"Done.")
+
+
