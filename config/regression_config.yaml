@@ -1,22 +1,21 @@
 # windows paths (for my laptop)
-# neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
-# results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
+neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
+results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
 
 
 # srun -A standby --time=4:0:0 --nodes=1 --gpus-per-node=1 --ntasks-per-node=6 --mem=0 --pty bash
 
-# Gilbreth paths (HPC)
-neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+# # Gilbreth paths (HPC)
+# neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 
-
-# neural_data_dir: /depot/jgmakin/data/auditory_cortex/DownerData/
-results_dir: /depot/jgmakin/data/auditory_cortex/results/
+# # neural_data_dir: /depot/jgmakin/data/auditory_cortex/DownerData/
+# results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
 # cache dir used to cache loaded features and neural spikes..
 cache_dir: /scratch/gilbreth/ahmedb/cache
 
 # device that is being used...
-hpc_cluster: True
+hpc_cluster: False
 
 use_cpu: False
 

@@ -155,6 +155,7 @@ class PlotterUtils:
                 '\\providecommand{\\thisXticklabelopacity}{1.0}%',
             },
         )
+        print(f"result saved at: {file_path}")
 
     @staticmethod
     def create_cmap_using_rgb(rgb_colors_list):
