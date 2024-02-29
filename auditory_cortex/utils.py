@@ -538,7 +538,9 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
     #and decide which module to use...!
     if type(y).__module__ == np.__name__:
         module = np
+        cupy_return = False
     else:
+        cupy_return = True
         module = cp
     # if 'normalize' = True, use signal power as factor otherwise use normalize CC formula i.e. 'un-normalized'
     try:
@@ -551,7 +553,11 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
     corr_coeff = module.zeros(y_hat.shape[1:])
     for ch in range(n_channels):
         corr_coeff[ch] = cc_single_channel(y[:,ch],y_hat[:,ch])
-    return cp.asnumpy(corr_coeff)
+
+    if cupy_return:
+        return cp.asnumpy(corr_coeff)
+    else:
+        return corr_coeff
 
 # def cc_norm_cp(y, y_hat, sp=1, normalize=False):
 #     """

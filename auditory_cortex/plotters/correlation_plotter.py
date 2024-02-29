@@ -291,12 +291,25 @@ class RegPlotter:
         model_name, area='core', bin_width=20, delay=0, alpha=0.1,
         save_tikz=True, normalized=True,
         # identifier='_bins_corrected_100',
-        pos_sig_ind = 0.95, p_threshold = 0.01,
-        plot_baseline=False, keep_yticks = False,
-        display_inter_quartile_range=False,
-        keep_xticks = False,
-        untrained_identifier='_weights_shuffled',
+        pos_sig_ind = 0.93, p_threshold = 0.01,
+        plot_baseline=False, 
+        display_inter_quartile_range=True,
+        keep_xticks = True,
+        keep_yticks = True,
+        untrained_identifier='reset_weights',
+        plot_difference=False,
         ):
+
+        # select appropraite results identifier...
+        if 'randn' in untrained_identifier:
+                tikz_indicator = 'randn'
+                untrained_identifier = '_randn_weights'
+        elif 'reset' in untrained_identifier:
+                tikz_indicator = 'reset'
+                untrained_identifier = '_reset_weights'
+        elif 'shuffle' in untrained_identifier:
+                tikz_indicator = 'shuffled'
+                untrained_identifier = '_weights_shuffled'
 
         # trained_network...
         identifier='_bins_corrected_100'
@@ -313,7 +326,6 @@ class RegPlotter:
         # weights shuffled ...
         # identifier='_weights_shuffled'
         corr_obj_shuffled = Correlations(model_name+untrained_identifier)
-
         data_dist_shuffled = corr_obj_shuffled.get_corr_all_layers_for_bin_width(
                 neural_area=area, bin_width=bin_width,
                 delay=delay, threshold=threshold,
@@ -328,53 +340,77 @@ class RegPlotter:
         
         # plot trained network results...
         color = PlotterUtils.get_model_specific_color(model_name)
-        ax=RegPlotter.plot_line_with_shaded_region(
-            data_dict=data_dist_trained, color=color, alpha=alpha,
-            display_inter_quartile_range=display_inter_quartile_range,
-            display_dotted_lines=False,
-            )
-        # plot shuffled network results...
-        ax=RegPlotter.plot_line_with_shaded_region(
-            data_dict=data_dist_shuffled, color='k', alpha=alpha, ax=ax,
-            display_inter_quartile_range=display_inter_quartile_range,
-            display_dotted_lines=False,
-            )
-        
-        # signigicance over 'shuffled' results...
-        RegPlotter.indicate_statistical_significance(
-            data_dist_trained,
-            data_dist_shuffled,
-            ax=ax, p = p_threshold, fontsize=15,
-            offset_y=pos_sig_ind,
-            color = 'k'
-            )
-        
-        # simply repeating baseline dist for all layers to allow for comparison....
-        baseline_dist_all_layer = {key: baseline_dist.values for key in data_dist_trained.keys()}
-        baseline_color = PlotterUtils.get_model_specific_color('baseline')
-        # signigicance over 'baseline' results...
-        RegPlotter.indicate_statistical_significance(
-            data_dist_trained,
-            baseline_dist_all_layer,
-            ax=ax, p = p_threshold, fontsize=15,
-            offset_y=pos_sig_ind - 0.1,
-            color = baseline_color
-            )
+        if plot_difference:
+            # get difference of trained and shuffled distributions..
+            data_dist_diff = {}
+            for (k, trained), (_, shuffled) in zip(data_dist_trained.items(), data_dist_shuffled.items()):
+
+                diff = trained - shuffled
+                data_dist_diff[k] = diff
+
+            # plotting the diff distribution...
+            ax=RegPlotter.plot_line_with_shaded_region(
+                data_dict=data_dist_diff, color=color, alpha=alpha,
+                display_inter_quartile_range=display_inter_quartile_range,
+                display_dotted_lines=True,
+                )
+            plt.ylabel(f"$\\Delta \\rho$")
+            # plt.ylim([0.0, 1.0])
+            post_script = 'diff-'
 
 
-        # plot baseline...
-        if plot_baseline:
-            RegPlotter.plot_line_with_shaded_region(data_dict=baseline_dist_all_layer,
-                        color=baseline_color, alpha=alpha, ax = ax,
-                        display_dotted_lines=False,
-                        display_inter_quartile_range=False
-                        )
+        else:
+            # plotting individual distributions...
+            ax=RegPlotter.plot_line_with_shaded_region(
+                data_dict=data_dist_trained, color=color, alpha=alpha,
+                display_inter_quartile_range=display_inter_quartile_range,
+                display_dotted_lines=False,
+                )
+            # plot shuffled network results...
+            ax=RegPlotter.plot_line_with_shaded_region(
+                data_dict=data_dist_shuffled, color='k', alpha=alpha, ax=ax,
+                display_inter_quartile_range=display_inter_quartile_range,
+                display_dotted_lines=False,
+                )
+            
+            # signigicance over 'shuffled' results...
+            RegPlotter.indicate_statistical_significance(
+                data_dist_trained,
+                data_dist_shuffled,
+                ax=ax, p = p_threshold, fontsize=15,
+                offset_y=pos_sig_ind,
+                color = 'k'
+                )
+            
+            # simply repeating baseline dist for all layers to allow for comparison....
+            baseline_dist_all_layer = {key: baseline_dist.values for key in data_dist_trained.keys()}
+            baseline_color = PlotterUtils.get_model_specific_color('baseline')
+            # signigicance over 'baseline' results...
+            RegPlotter.indicate_statistical_significance(
+                data_dist_trained,
+                baseline_dist_all_layer,
+                ax=ax, p = p_threshold, fontsize=15,
+                offset_y=pos_sig_ind - 0.1,
+                color = baseline_color
+                )
+
+            # plot baseline...
+            if plot_baseline:
+                RegPlotter.plot_line_with_shaded_region(data_dict=baseline_dist_all_layer,
+                            color=baseline_color, alpha=alpha, ax = ax,
+                            display_dotted_lines=False,
+                            display_inter_quartile_range=False
+                            )
+                
+            post_script = ''
+
+
+            plt.ylabel(f"$\\rho$")
+            plt.ylim([0.0, 1.0])
 
         ## formatting the plot...
         plt.title(f"{model_name}")
         plt.xlabel(f"Layer IDs")
-        plt.ylabel(f"$\\rho$")
-        plt.ylim([0.0, 1.0])
 
         # get rid of the bounding boxes...
         ax.spines['top'].set_visible(False)
@@ -389,7 +425,11 @@ class RegPlotter:
             ax.set_xticks([])
 
         if save_tikz:
-            filepath = os.path.join(results_dir, 'tikz_plots', f"Reg-trained-shuffled-{area}-{model_name}.tex")
+            filepath = os.path.join(
+                results_dir,
+                'tikz_plots',
+                f"Reg-trained-{post_script}{tikz_indicator}-{area}-{model_name}.tex"
+                )
             PlotterUtils.save_tikz(filepath)
 
         return data_dist_trained, data_dist_shuffled, baseline_dist
@@ -402,8 +442,8 @@ class RegPlotter:
             identifier='_bins_corrected_100',
             pos_sig_ind = 0.95, p_threshold = 0.01,
             plot_baseline=False,
-            keep_yticks = False,
-            keep_xticks = False
+            keep_yticks = True,
+            keep_xticks = True
 
         ):
         """Histogram of baseline dist. corresponding to 

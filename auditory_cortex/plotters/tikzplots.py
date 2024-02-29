@@ -29,17 +29,28 @@ def save_regression_correlations_all_networks():
 
 
 def plot_trained_vs_shuffled_network_results(
+        untrained_identifier='_weights_shuffled',
+        plot_difference=False,
         bin_width=20,
         alpha=0.1,
         save_tikz=True,
         pos_sig_ind=0.93,
         keep_yticks=True,
         keep_xticks=True,
-        plot_baseline=True,
-        display_inter_quartile_range=False,
-        untrained_identifier='_weights_shuffled',
+        plot_baseline=False,
+        display_inter_quartile_range=True,
+        
     ):
-    """Plots and saves line plots for all networks, specified neural area.
+    """Plots and saves line plots for all networks, having correlation results
+    of trained network (plotted in the network specific color) and for network with 
+    shuffled/re-initialized weights (plotted in black color). 
+
+    Args:
+        untrained_identifier: str = identify shuffled/re-initialized, 
+            choose from ['weights_shuffled', 'randn_weights', 'reset_weights']
+        plot_difference: bool = plots dist of 'train - untrained' if True
+        display_inter_quartile_range: bool = display shaded regions of dist
+        plot_baseline: bool = 
     """
     areas = ['all'] #['core', 'belt']
     model_names = PlotterUtils.model_names
@@ -56,7 +67,8 @@ def plot_trained_vs_shuffled_network_results(
                 keep_xticks=keep_xticks,
                 plot_baseline=plot_baseline,
                 display_inter_quartile_range=display_inter_quartile_range,
-                untrained_identifier=untrained_identifier
+                untrained_identifier=untrained_identifier,
+                plot_difference=plot_difference
                 )
 
     
