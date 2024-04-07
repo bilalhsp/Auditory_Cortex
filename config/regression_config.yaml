@@ -1,21 +1,21 @@
-# windows paths (for my laptop)
-neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
-results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
+# # windows paths (for my laptop)
+# neural_data_dir: C:\Users\ahmedb\projects\auditory_cortex\neural_data_dir #/scratch/gilbreth/ahmedb/auditory_cortex
+# results_dir: C:\Users\ahmedb\projects\auditory_cortex\results_dir
 
 
 # srun -A standby --time=4:0:0 --nodes=1 --gpus-per-node=1 --ntasks-per-node=6 --mem=0 --pty bash
 
-# # Gilbreth paths (HPC)
-# neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
+# Gilbreth paths (HPC)
+neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex
 
-# # neural_data_dir: /depot/jgmakin/data/auditory_cortex/DownerData/
-# results_dir: /depot/jgmakin/data/auditory_cortex/results/
+# neural_data_dir: /depot/jgmakin/data/auditory_cortex/DownerData/
+results_dir: /depot/jgmakin/data/auditory_cortex/results/
 
 # cache dir used to cache loaded features and neural spikes..
 cache_dir: /scratch/gilbreth/ahmedb/cache
 
 # device that is being used...
-hpc_cluster: False
+hpc_cluster: True
 
 use_cpu: False
 
@@ -62,8 +62,9 @@ identifier: sampling_rate_opt_neural_delay_feature_extractor
 # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
 delay_features: False
 audio_zeropad: False
-delays_grid_search: True
 third: False
+delays_grid_search: True
+
 #### Ensure these settings before submitting every job..
 
 bad_sessions:
@@ -101,7 +102,7 @@ dataset_sizes:
 - 500
 - 501
 - 5
-k_folds_validation: 5
+k_folds_validation: 3
 iterations: 1
 
 

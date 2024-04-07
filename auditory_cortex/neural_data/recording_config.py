@@ -52,31 +52,98 @@ class RecordingConfig:
         'b': b_RH_sessions,
         'f': f_RH_sessions
     }
+
+
+    ### ref. Josh's email dated: March 07, 2024
     area_wise_sessions = {
         'core': np.array([
-                    190606, 190604, 190726, 190801, 180725, 180720, 180731, 180807, #c_RH
-                    191209, 200226, 200325, 200213, 200313,   #f_RH
-                    200207, 191212, 191206, 200206, 191125, 200610, 191113, 191002, #c_LH
-                    #b_RH (need to confirm these)
-                    180405, 180719, 180808, 180627, 180814, 180810, 180724, 
-                    
-                    # moved to parabelt, based on comments in .m file on box..
-                    # 180406, 180717, 180613, 180730,                  
-                ]),
+                # ref. Josh's email...
+                # A1
+                180627, 180719, 180810, 180814, 
+                180720, 180731, 190604, 190606, 190726, 190801,
+                191209, 200226, 200313,
+                191113, 191125, 191206, 200206, 200207, 200610,
+                
+                180808, #moved to core..based on coordinates plot (josh was unsure)
+                
+                # R
+                180807, 
+                200213, 200325,
+                191002, 191212, 
+
+                180501  # not assigned by Josh, moved here based on coordinates plot..
+            ]),
 
         'belt': np.array([
-                    180622, 190703, 190607, 190605,  180619, 180502, #c_RH
-                    191211, 200323, 200312,       #f_RH
-                    191115, 200205, 191219,     #c_LH
-                    # moved to parabelt, based on comments in .m file on box..
-                    # 191210, 191121, 200617, 200212, 200219, 200401, 180728,
-                    # 200318,
-                ]),            
+                # CL
+                # 180808, moved to core..based on coordinates plot (josh was unsure)
+                180405,  # close to recordings assigned to A1 (core)
+                191219,
+
+                #ML
+                180613, 
+                190703, 180725, 
+                200219, 200312, 191115, 200205,
+
+                # AL
+                # 180717, 180730, # moved to parabelt..based on coordinates plot (josh was unsure)
+                180406, 
+                180622,
+                191211, 200323,
+
+                180413, 180420, # not assigned by Josh, moved here based on coordinates plot..
+
+                # unassigned
+                # 180619, #c_RH
+
+            ]),            
         'parabelt': np.array([
-                # moved to parabelt, based on comments in .m file on box..
-                180406, 191210, 191121, 200617, 180717, 200212, 200219, 200401,
-                180613, 180730, 180728, 200318,
-                #b_RH (need to confirm these)
-                180501, 180801, 180417, 180413, 180420,
+                #CPB
+                180724, 
+                200318, 200401,
+                191121, 200617,
+
+                #RPB
+                180629, #(previously not found)
+                180502, 180728, 190605, 190607,
+                191210,
+
+                180717, 180730, # moved to parabelt..based on coordinates plot (josh was unsure)
+
+                # unassigned
+                # ,
+                # , 180801, 180417,  
+                
+                200212
             ]),          
     }
+
+    # ### Earlier area assignments (reading off the M-file)
+    # area_wise_sessions = {
+    #     'core': np.array([
+    #             190606, 190604, 190726, 190801, 180725, 180720, 180731, 180807, #c_RH
+    #             191209, 200226, 200325, 200213, 200313,   #f_RH
+    #             200207, 191212, 191206, 200206, 191125, 200610, 191113, 191002, #c_LH
+    #             #b_RH (need to confirm these)
+    #             180405, 180719, 180808, 180627, 180814, 180810, 180724, 
+                
+    #             # moved to parabelt, based on comments in .m file on box..
+    #             # 180406, 180717, 180613, 180730,                  
+    #         ]),
+
+    #     'belt': np.array([
+    #             180622, 190703, 190607, 190605,  180619, 180502, #c_RH
+    #             191211, 200323, 200312,       #f_RH
+    #             191115, 200205, 191219,     #c_LH
+    #             # moved to parabelt, based on comments in .m file on box..
+    #             # 191210, 191121, 200617, 200212, 200219, 200401, 180728,
+    #             # 200318,
+    #         ]),            
+    #     'parabelt': np.array([
+    #             # moved to parabelt, based on comments in .m file on box..
+    #             180406, 191210, 191121, 200617, 180717, 200212, 200219, 200401,
+    #             180613, 180730, 180728, 200318,
+    #             #b_RH (need to confirm these)
+    #             180501, 180801, 180417, 180413, 180420,
+    #         ]),          
+    # }

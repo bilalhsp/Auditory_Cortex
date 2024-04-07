@@ -11,10 +11,16 @@ def cache_features(args):
 
     dataloader = DataLoader()
     i = args.ind
+    shuffled = args.shuffled
     model_name = PlotterUtils.model_names[i]
+    # model_names = [
+    #     'deepspeech2', 'speech2text', 'wave2letter_modified',
+    #     'whisper_tiny', 'whisper_base', 'wave2vec2',
+    #     ]
     print(f"Model: {model_name}")
-    raw_features = dataloader.get_raw_DNN_features(model_name, force_reload=True,
-                                                   contextualized=args.contextualized)
+    raw_features = dataloader.get_raw_DNN_features(
+        model_name, force_reload=True, contextualized=args.contextualized, shuffled=shuffled
+        )
 
     print(f"Done...!")
 
@@ -37,6 +43,11 @@ def get_parser():
     parser.add_argument(
         '-c','--contextualized', dest='contextualized', action='store_true', default=False,
         help="Choose the type of features to extract."
+    )
+    parser.add_argument(
+        '-s','--shuffle', dest='shuffled', action='store_true', default=False,
+        # choices=[],
+        help="Specify if shuffled network to be used."
     )
 
     return parser

@@ -17,7 +17,7 @@ from wav2letter.models import Wav2LetterRF
 # import GPU specific packages...
 from auditory_cortex import hpc_cluster
 if hpc_cluster:
-    import cupy as cp
+    # import cupy as cp
     import fairseq
     from deepspeech_pytorch.model import DeepSpeech
     import deepspeech_pytorch.loader.data_loader as data_loader
@@ -26,7 +26,8 @@ if hpc_cluster:
 
 class DNNFeatureExtractor():
     def __init__(self, model_name = 'wave2letter_modified',
-                saved_checkpoint=None):
+                saved_checkpoint=None,
+                shuffled=False):
         
         self.metadata = NeuralMetaData()
         self.model_name = model_name
@@ -37,6 +38,7 @@ class DNNFeatureExtractor():
         self.receptive_fields = []
         self.features_delay = []        # features delay needed to compensate for the RFs
         self.features = {}
+        self.shuffled = shuffled
         # self.model = model
 
 
@@ -53,6 +55,9 @@ class DNNFeatureExtractor():
         self.use_pca = self.config['use_pca']
         if self.use_pca:
             self.pca_comps = self.config['pca_comps']
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"Model on device: {self.device}")
         
         # create feature extractor as per model_name
         if model_name == 'wave2letter_modified':
@@ -60,18 +65,18 @@ class DNNFeatureExtractor():
                 saved_checkpoint = self.config['saved_checkpoint']
             pretrained = self.config['pretrained']
             checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, saved_checkpoint)
-            self.extractor = FeatureExtractorW2L(checkpoint, pretrained)
+            self.extractor = FeatureExtractorW2L(checkpoint, pretrained, self.device)
         elif model_name == 'wave2vec2':
-            self.extractor = FeatureExtractorW2V2()
+            self.extractor = FeatureExtractorW2V2(self.device)
         elif model_name == 'speech2text':
-            self.extractor = FeatureExtractorS2T()
+            self.extractor = FeatureExtractorS2T(self.device)
         elif 'whisper' in model_name:
             if saved_checkpoint is None:
                 saved_checkpoint = self.config['saved_checkpoint']
-            self.extractor = FeatureExtractorWhisper(saved_checkpoint)
+            self.extractor = FeatureExtractorWhisper(saved_checkpoint, self.device)
         elif model_name == 'deepspeech2':
             checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, self.config['saved_checkpoint'])
-            self.extractor = FeatureExtractorDeepSpeech2(checkpoint)
+            self.extractor = FeatureExtractorDeepSpeech2(checkpoint, self.device)
         elif model_name == 'wave2vec':
             checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, self.config['saved_checkpoint'])
             self.extractor = FeatureExtractorW2V(checkpoint)
@@ -94,19 +99,30 @@ class DNNFeatureExtractor():
             layer.__name__ = layer_name
             layer.register_forward_hook(self.create_hooks())
 
+        
+        # using text normalizer of whisper_tiny to compute WER..
+        processor = AutoProcessor.from_pretrained('openai/whisper-tiny')
+        self.label_normalizer = processor.tokenizer._normalize
 
-
-        shuffle_weights = self.config['shuffle_weights']
-        if shuffle_weights:
+        # self.shuffled = self.config['shuffle_weights']
+        if self.shuffled:
             # self.shuffle_weights()
             layers = self.reset_model_parameters()
-            # self.randomly_reinitialize_weights()
+            # self.randomly_reinitialize_weights(uniform=True)
 
         #############################################################
         ###########      Need to clean this part            #########
         ###########          Ending here....!               #########
         #############################################################
-            
+    def get_labels_normalizer(self):
+        """Normalizes or formats the labels the same way as the predictions.."""
+        return self.label_normalizer
+        
+        # if 'whisper' in self.model_name:
+        #     return self.extractor.processor.tokenizer._normalize
+        # else:
+        #     return None
+
     def create_hooks(self):
         def fn(layer, _, output):
             if 'rnn' in layer.__name__:
@@ -148,10 +164,10 @@ class DNNFeatureExtractor():
         '''
         layer_name = self.get_layer_name(layer_ID)
         if 'rnn' in layer_name:
-           return self.features[layer_name]
+           return self.features[layer_name].cpu()
         #    return self.features[layer].data[:,1024:] # only using fwd features (first half of concatenatation)
         else:
-            return self.features[layer_name]
+            return self.features[layer_name].cpu()
 
     def def_bin_width(self, layer):
         def_w = self.bin_widths[layer]
@@ -170,14 +186,14 @@ class DNNFeatureExtractor():
         """Reset weights of all the layers of the model.
         """
         print(f"Randomly 'resetting' the network parameters...")
-        layer_modules = []
+        layer_names = []
         named_modules = dict([*self.extractor.model.named_modules()])
         for name, layer in named_modules.items():
             if hasattr(layer, 'reset_parameters'):
                 # print(f"{layer.__name__}")
                 layer.reset_parameters()
-                layer_modules.append(layer)
-        return layer_modules
+                layer_names.append(name)
+        return layer_names
 
             # if len(param.size()) > 1: #check if param is a weight tensor
 
@@ -194,13 +210,16 @@ class DNNFeatureExtractor():
             # Reshape the shuffled_param back to original shape
             param.data = shuffled_param.view(param.size())
 
-    def randomly_reinitialize_weights(self):
+    def randomly_reinitialize_weights(self, uniform=False):
         """Randomly initialize weights of all the layers of the model.
         """
         print(f"Initializing 'random weights' the network parameters...")
         with torch.no_grad():
             for param in self.extractor.model.parameters():
-                param.data = torch.randn_like(param)
+                if uniform:
+                    param.data = torch.rand_like(param)
+                else:
+                    param.data = torch.randn_like(param)
                 
     #############################################################
     ###########      Moved from Regression to here      #########
@@ -229,7 +248,7 @@ class DNNFeatureExtractor():
 
             self.translate(audio_input, grad = False)
             for layer_ID in self.layer_IDs:
-                features[layer_ID][sent_ID] = self.get_features(layer_ID).cpu()
+                features[layer_ID][sent_ID] = self.get_features(layer_ID)
                 if 'whisper' in self.model_name:
                     ## whisper networks gives features for 30s long clip,
                     ## extracting only the true initial samples...
@@ -278,7 +297,13 @@ class DNNFeatureExtractor():
                 # features[layer_ID] = features[layer_ID][:feature_samples]
                 # features[layer_ID] = features[layer_ID][-feature_samples:]
         return features
+    
 
+    def batch_predictions(self, audio_batch):
+        """Returns prediction for the batch of audio tensors."""
+        # audio_batch = audio_batch.to(self.device)
+        return self.extractor.batch_predictions(audio_batch, self.label_normalizer)
+        
     #############################################################
     ###########      Moved from Regression to here      #########
     ###########          Ends here....!               #########
@@ -287,15 +312,15 @@ class DNNFeatureExtractor():
 
 
 class FeatureExtractorW2L():
-    def __init__(self, checkpoint, pretrained):
+    def __init__(self, checkpoint, pretrained, device):
         if pretrained:		
             self.model = Wav2LetterRF.load_from_checkpoint(checkpoint)
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             print(f"Loading from checkpoint: {checkpoint}")
     
         else:
             self.model = Wav2LetterRF()
             print(f"Creating untrained network...!")
+        self.device = device
         self.model = self.model.to(self.device)
 
     def fwd_pass(self, aud):
@@ -313,8 +338,6 @@ class FeatureExtractorW2L():
         input = torch.tensor(aud, dtype=torch.float32, device=self.device)#, requires_grad=True)
         # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # input = input.to(device)
-
-
         input = input.unsqueeze(dim=0)
         # input.requires_grad=True
         self.model.eval()
@@ -335,11 +358,25 @@ class FeatureExtractorW2L():
         self.model.eval()
         out = self.model(aud)
         return input
+    
+
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            # audio, _, target_lens = batch
+            for audio in audio_batch:
+                audio = audio.to(self.device)
+                predictions.append(label_normalizer(self.model.decode(audio)[0]))# 
+        return predictions
 
 class FeatureExtractorW2V2():
-    def __init__(self):
+    def __init__(self, device):
         self.processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
         self.model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+        self.device = device
+        self.model = self.model.to(self.device)
         # self.model = model 
         ########################## NEED TO MAKE THIS CONSISTENT>>>##################
     def fwd_pass(self, aud):
@@ -357,6 +394,7 @@ class FeatureExtractorW2V2():
         input_values = self.processor(input, sampling_rate=16000, return_tensors="pt", padding="longest").input_values  # Batch size 1
         self.model.eval()
         # with torch.no_grad():
+        input_values = input_values.to(self.device)
         logits = self.model(input_values).logits
 
         # input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
@@ -388,16 +426,32 @@ class FeatureExtractorW2V2():
         return self.processor.batch_decode(indexes)
         # self.processor.decode()
 
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            # audio, _, target_lens = batch
+            for audio in audio_batch:
+                audio = audio.to(self.device)
+                indexes = torch.argmax(self.model(audio).logits, dim=-1)
+                predictions.append(label_normalizer(self.processor.batch_decode(indexes)[0]))# 
+        return predictions
 
 class FeatureExtractorS2T():
-    def __init__(self):
+    def __init__(self, device):
         self.model = Speech2TextForConditionalGeneration.from_pretrained("facebook/s2t-large-librispeech-asr")
         self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
-                
+        
+        self.device = device
+        self.model = self.model.to(self.device)
+
+
     def fwd_pass(self, aud):
         input_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
         # with torch.no_grad():
         self.model.eval()
+        input_features = input_features.to(self.device)
         generated_ids = self.model.generate(input_features, max_new_tokens=200)
         return generated_ids
 
@@ -417,19 +471,37 @@ class FeatureExtractorS2T():
         decoder_input_ids = torch.tensor([[1, 1]]) * self.model.config.decoder_start_token_id
         out = self.model(aud_spect, decoder_input_ids=decoder_input_ids)
         return out
+    
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            # audio, _, target_lens = batch
+            for audio in audio_batch:
+                input_features = self.processor(audio.squeeze(), sampling_rate=16000, return_tensors="pt").input_features
+                input_features = input_features.to(self.device)
+                predicted_ids = self.model.generate(input_features)
+                pred = label_normalizer(self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0])
+                predictions.append(pred)
+                
+        return predictions
 
     
     
 class FeatureExtractorWhisper():
-    def __init__(self, saved_checkpoint):
+    def __init__(self, saved_checkpoint, device):
         self.processor = AutoProcessor.from_pretrained(saved_checkpoint)
         self.model = WhisperForConditionalGeneration.from_pretrained(saved_checkpoint)
+        self.device = device
+        self.model = self.model.to(self.device)
         print(f"Loaded network from {saved_checkpoint}")	
 
     def fwd_pass(self, aud):
         input_features = self.processor(aud, sampling_rate=16000, return_tensors="pt").input_features
         # with torch.no_grad():
         self.model.eval()
+        input_features = input_features.to(self.device)
         generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
             # transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return generated_ids
@@ -439,12 +511,29 @@ class FeatureExtractorWhisper():
         predicted_ids = self.fwd_pass(audio)
         return self.processor.batch_decode(predicted_ids, skip_special_tokens=True)
     
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            # audio, _, target_lens = batch
+            for audio in audio_batch:
+                input_features = self.processor(audio.squeeze(), sampling_rate=16000, return_tensors="pt").input_features
+                input_features = input_features.to(self.device)
+                predicted_ids = self.model.generate(input_features)
+                transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
+                predictions.append(self.processor.tokenizer._normalize(transcription))
+
+        return predictions
+    
 class FeatureExtractorDeepSpeech2():
-    def __init__(self, checkpoint):
+    def __init__(self, checkpoint, device):
 
         audio_config = SpectConfig()
         self.parser = data_loader.AudioParser(audio_config, normalize=True)
         self.model = DeepSpeech.load_from_checkpoint(checkpoint_path=checkpoint)
+        self.device = device
+        self.model = self.model.to(self.device)
         # self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
         # self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
 	
@@ -461,7 +550,8 @@ class FeatureExtractorDeepSpeech2():
         spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
 
         # length of the spect along time
-        lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64)
+        lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64, device=self.device)
+        spect = spect.to(self.device)
         out = self.model(spect, lengths)
         return out
     
@@ -481,6 +571,29 @@ class FeatureExtractorDeepSpeech2():
         self.model.eval()
         out = self.model(aud_spect, lengths)
         return out
+    
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            # audio, _, target_lens = batch
+            for audio in audio_batch:
+                spect = self.get_spectrogram(audio.squeeze())
+                spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
+                spect = spect.to(self.device)
+
+                # length of the spect along time
+                lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64,
+                    device=self.device)
+                
+                out = self.model(spect, lengths)
+
+                output, output_sizes, *_ = out
+                decoded_output, _ = self.model.evaluation_decoder.decode(output, output_sizes)
+                predictions.append(label_normalizer(decoded_output[0][0]))
+
+        return predictions
     
 class FeatureExtractorW2V():
     def __init__(self, checkpoint):

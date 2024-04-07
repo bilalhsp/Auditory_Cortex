@@ -1,6 +1,162 @@
 import os
+import numpy as np
+import pandas as pd
 import pickle
 from auditory_cortex import opt_inputs_dir, results_dir, cache_dir
+
+def read_cached_glm_parameters(model_name, session, bin_width=20, shuffled=False):
+    """Reads parameters of GLM alongthwith neural spikes and natural parameters 
+    model_name, returns a dictionary.
+    """
+    session = int(session)
+    # layer_ID = int(layer_ID)
+    if shuffled:
+        path_dir = os.path.join(cache_dir, 'glm', f'{model_name}', 'shuffled')
+    else:
+        path_dir = os.path.join(cache_dir, 'glm', f'{model_name}')
+    filename = f'{model_name}_sess_{session}_glm_parameters_{bin_width}ms.pkl'   
+    file_path = os.path.join(path_dir, filename)
+    
+    if os.path.exists(file_path):
+        print(f"Reading from file: {file_path}")
+        with open(file_path, 'rb') as F: 
+            reg_results = pickle.load(F)
+        return reg_results
+    else:
+        print(f"Results not found.")
+        return None
+
+def cache_glm_parameters(model_name, layer_ID, session,
+        neural_spikes, glm_coefficients, natural_param, bin_width=20,
+        shuffled=False
+        ):
+    """writes the lmbdas, separate file for every model..
+    """
+    session = int(session)
+    layer_ID = int(layer_ID)
+    if shuffled:
+        path_dir = os.path.join(cache_dir, 'glm', f'{model_name}', 'shuffled')
+    else:
+        path_dir = os.path.join(cache_dir, 'glm', f'{model_name}')
+    if not os.path.exists(path_dir):
+        os.makedirs(path_dir)
+        print(f"Directory path created: {path_dir}")
+
+    filename = f'{model_name}_sess_{session}_glm_parameters_{bin_width}ms.pkl' 
+    file_path = os.path.join(path_dir, filename)
+    
+    exisiting_results = read_cached_glm_parameters(
+        model_name, session, bin_width=bin_width, shuffled=shuffled)
+    if exisiting_results is None:
+        exisiting_results = {}
+
+    # save/update results for model_name
+    layer_results = {
+        'neural_spikes': neural_spikes,
+        'glm_coefficients': glm_coefficients,
+        'natural_param': natural_param,
+    }
+
+    exisiting_results[layer_ID] = layer_results
+    with open(file_path, 'wb') as F: 
+        pickle.dump(exisiting_results, F)
+    print(f"Results saved for {model_name} at path: \n {file_path}.")
+
+
+
+def read_lmbdas(
+        model_name, layer_ID, session, bin_width=20, shuffled=False
+        ):
+    """Reads optimal lmbdas and lmbda losses, for the 
+    model_name, returns a dictionary.
+    """
+    session = int(session)
+    layer_ID = int(layer_ID)
+    if shuffled:
+        path_dir = os.path.join(results_dir, 'lmbdas', 'shuffled')
+    else:
+        path_dir = os.path.join(results_dir, 'lmbdas')
+    filename = f'{model_name}_l{layer_ID}_sess_{session}_optimal_lmbdas_and_losses_{bin_width}ms.pkl'   
+    file_path = os.path.join(path_dir, filename)
+    
+    if os.path.exists(file_path):
+        print(f"Reading from file: {file_path}")
+        with open(file_path, 'rb') as F: 
+            reg_results = pickle.load(F)
+        return reg_results
+    else:
+        print(f"Results not found.")
+        return None
+
+
+def write_lmbdas(
+        model_name, layer_ID, session, optimal_lmbdas, lmbda_loss,
+        bin_width=20, shuffled=False
+                 
+                 ):
+        """writes the lmbdas, separate file for every model..
+        """
+        session = int(session)
+        layer_ID = int(layer_ID)
+        if shuffled:
+            path_dir = os.path.join(results_dir, 'lmbdas', 'shuffled')
+        else:
+            path_dir = os.path.join(results_dir, 'lmbdas')
+        if not os.path.exists(path_dir):
+            os.makedirs(path_dir)
+            print(f"Directory path created: {path_dir}")
+        
+        filename = f'{model_name}_l{layer_ID}_sess_{session}_optimal_lmbdas_and_losses_{bin_width}ms.pkl'    
+        file_path = os.path.join(path_dir, filename)
+        
+        exisiting_results = read_lmbdas(
+            model_name, layer_ID, session, bin_width=bin_width, shuffled=shuffled
+            )
+        if exisiting_results is None:
+            exisiting_results = {}
+
+        # save/update results for model_name
+        exisiting_results['optimal_lmbdas'] = optimal_lmbdas
+        exisiting_results['lmbda_loss'] = lmbda_loss
+        with open(file_path, 'wb') as F: 
+            pickle.dump(exisiting_results, F)
+        print(f"Results saved for {model_name} at path: \n {file_path}.")
+
+
+def read_WER():
+
+    path_dir = os.path.join(results_dir, 'task_optimization')
+    filename = f'pretrained_networks_WERs.csv'    
+    file_path = os.path.join(path_dir, filename)
+    if os.path.isfile(file_path):
+        print("Reading existing WER results")
+        return pd.read_csv(file_path, index_col=0)
+    else:
+        return None
+    
+def write_WER(model_name, benchmark, wer):
+    """Writes WER evaluated on the benchmark specified 
+    for the model_name"""
+    path_dir = os.path.join(results_dir, 'task_optimization')
+    filename = f'pretrained_networks_WERs.csv'    
+    file_path = os.path.join(path_dir, filename)
+    if not os.path.exists(path_dir):
+        os.makedirs(path_dir)
+        print(f"Directory path created: {path_dir}")
+
+    df = read_WER()
+    if df is None:
+        df = pd.DataFrame()
+    if benchmark not in df.columns:
+        df[benchmark] = np.nan
+    if model_name not in df.index:
+        df.loc[model_name] = pd.Series(np.nan)
+    
+    df.at[model_name, benchmark] = wer
+    df.to_csv(file_path)
+    print(f"WER for {model_name}, on {benchmark} saved to {file_path}")
+    
+
 
 
 def read_reg_corr():
@@ -195,7 +351,7 @@ def delete_saved_RDM(model_name, identifier, bin_width):
         print(f"File does not exist.")
 
 
-def read_cached_features(model_name, contextualized=False):
+def read_cached_features(model_name, contextualized=False, shuffled=False):
     """Retrieves cached features from the cache_dir, returns None if 
     features not cached already. 
 
@@ -207,22 +363,28 @@ def read_cached_features(model_name, contextualized=False):
     model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
             'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small']
     assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
+
     
     if contextualized:
         print(f"Reading contextualized features...")
         file_name = f"{model_name}_raw_features_contextualized.pkl"
     else:
         file_name = f"{model_name}_raw_features.pkl"
-        
-    file_path = os.path.join(cache_dir, model_name, file_name)
+
+    if shuffled:
+        file_path = os.path.join(cache_dir, model_name, 'shuffled', file_name)
+    else:
+        file_path = os.path.join(cache_dir, model_name, file_name)
+
     if os.path.exists(file_path):
+        print(f"Reading raw features from {file_path}")
         with open(file_path, 'rb') as F:
             features = pickle.load(F)
         return features
     else:
         return None
 
-def write_cached_features(model_name, features, verbose=True, contextualized=False):
+def write_cached_features(model_name, features, verbose=True, contextualized=False, shuffled=False):
     """Writes features to the cache_dir,
 
     Args:
@@ -241,7 +403,10 @@ def write_cached_features(model_name, features, verbose=True, contextualized=Fal
     else:
         file_name = f"{model_name}_raw_features.pkl"
     # file_name = f"{model_name}_raw_features.pkl"
-    file_path = os.path.join(cache_dir, model_name, file_name)
+    if shuffled:
+        file_path = os.path.join(cache_dir, model_name, 'shuffled', file_name)
+    else:
+        file_path = os.path.join(cache_dir, model_name, file_name)
     # make sure directory structure is in place...
     if not os.path.exists(os.path.dirname(file_path)):
         os.makedirs(os.path.dirname(file_path))

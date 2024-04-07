@@ -11,7 +11,7 @@ setuptools.setup(
     description="Auditory Cortex Modeling with ECoG data in PyTorch",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/akshitark/",
+    url="https://github.com/bilalhsp/",
     packages=setuptools.find_packages(),
     package_data={
         'auditory_ctx': [
@@ -27,6 +27,15 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-        'numpy', 'scipy', 'matplotlib', 'pandas', 'sentencepiece', 'transformers'#, 'cupy', 'seaborn', 'plotly', 'naplib', 'scikit-learn' 
+        'numpy',
+        'scipy',
+        'matplotlib',
+        'pandas',
+        'sentencepiece',
+        'transformers', #, 'cupy', 'seaborn', 'plotly', 'naplib', 'scikit-learn'
+        # 'torch==2.0.1',
+        # 'torchaudio==2.0.2',
+        # 'tensorflow==2.15',
+        # 'tensorflow-probability==0.23'
     ],
 )

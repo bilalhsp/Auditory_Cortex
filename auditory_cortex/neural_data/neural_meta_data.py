@@ -111,9 +111,9 @@ class NeuralMetaData:
             sessions = []
             for k,v in self.cfg.area_wise_sessions.items():
                 sessions.append(v)
-            return np.concatenate(sessions).sort()
+            return np.sort(np.concatenate(sessions))
         else:
-            return self.cfg.area_wise_sessions[area].sort()
+            return np.sort(self.cfg.area_wise_sessions[area])
         
     def get_sessions_for_recording_config(self, subject: str=None):
         """Returns sessions for the 'subject', where subject refers

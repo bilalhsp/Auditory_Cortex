@@ -1,9 +1,14 @@
 #!/bin/sh
 
-#SBATCH --output=./result_cache_features_5.out
+#SBATCH --output=./result_cache_features_5_ss.out
 
 #SBATCH	-A standby
-#SBATCH --constraint=F|G|I|K
+#SBATCH --constraint=F|G|I|K|D|B|H|J 
+
+# High Mem GPUs: F|G|I|K|D
+# very Fast GPUs: F|K
+# Fast GPUs: B|D
+# Slow GPUs: E
 
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1

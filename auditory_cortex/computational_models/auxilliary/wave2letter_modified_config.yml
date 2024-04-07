@@ -1,5 +1,5 @@
 pretrained: True
-shuffle_weights: True
+# shuffle_weights: False
 
 saved_checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
 # saved_checkpoint: Wav2letter-epoch=032-val_loss=0.40.ckpt

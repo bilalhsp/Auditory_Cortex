@@ -2,7 +2,7 @@
 saved_checkpoint: librispeech_pretrained_v3.ckpt
 # /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
 use_pca: False
-shuffle_weights: True
+# shuffle_weights: True
 layers:
 
 - layer_name: conv.seq_module.2

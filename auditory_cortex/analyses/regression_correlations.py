@@ -4,13 +4,13 @@ import pickle
 import numpy as np
 import pandas as pd
 import scipy as scp
-import seaborn as sns
+# import seaborn as sns
 import matplotlib as mpl
-import plotly.express as px
+# import plotly.express as px
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
 
 from palettable.colorbrewer import qualitative
 
@@ -19,7 +19,7 @@ import auditory_cortex.utils as utils
 from auditory_cortex.utils import CorrelationUtils
 from auditory_cortex.neural_data import NeuralMetaData
 from auditory_cortex.neural_data.normalizer import Normalizer
-from auditory_cortex import session_to_coordinates, CMAP_2D, session_to_subject, session_to_area
+from auditory_cortex import session_to_coordinates, session_to_subject, session_to_area#, CMAP_2D
 from auditory_cortex import saved_corr_dir, aux_dir
 from auditory_cortex.io_utils import io
 # from pycolormap_2d import ColorMap2DBremm, config, results_dir
@@ -597,14 +597,17 @@ class Correlations:
 # ------------------  corr distributions of all layers  ----------------#
     
     def get_corr_all_layers_for_bin_width(self, neural_area=None, bin_width=20, delay=0, 
-        N_sents=499, threshold = 0.068, normalized=True):
+        N_sents=499, threshold = 0.068, normalized=True, column=None):
         """Retrieves correlations for all layers, but ONLY the specified bin_width."""
         assert neural_area in ['core', 'belt', 'parabelt', 'all'], print(f"Unknown neural area '{neural_area}' specified.")
 
-        if normalized:
-            column = 'normalized_test_cc'
+        if column is None:
+            if normalized:
+                column = 'normalized_test_cc'
+            else:
+                column = 'test_cc_raw'
         else:
-            column = 'test_cc_raw'
+            print(f"Extracting column: {column}")
 
         area_sessions = self.metadata.get_all_sessions(neural_area)
         select_data = self.get_selected_data(
@@ -762,6 +765,19 @@ class Correlations:
             threshold=threshold, normalized=normalized
         )
         return corr_dist
+    
+    def get_architecture_specific_layer_ids(self):
+        """
+        Returns list of layer ids for each architecture 
+        type e.g.{'conv': [0,1],
+                'rnn': [2,3,4,5]}
+        """
+        data_series = self.data.groupby('layer_type')['layer'].unique()
+        layer_arch_types = data_series.index
+        arch_specific_layer_ids = {}
+        for layer in layer_arch_types:
+            arch_specific_layer_ids[layer] =  data_series[layer]
+        return arch_specific_layer_ids
         
 
 # ------------------  copy normalizer for all bin-widths ----------------#
@@ -795,15 +811,49 @@ class Correlations:
         self.write_back()
 
 
-# ------------------    static methods     ----------------#
+# ------------------    combine resutls, add layer types and normalizer     ----------------#
+
+
+
     @staticmethod
-    def merge_correlation_results(model_name, file_identifiers, idx):
+    def combine_and_ready(
+            model_name, identifiers_list, output_id, normalizer_filename=None,
+            output_identifier=None
+        ):
+        """Merges results for all identifiers, copies layer types and
+        sets normalizer."""
+
+        Correlations.merge_correlation_results(
+                model_name=model_name,
+                file_identifiers=identifiers_list,
+                idx=output_id,
+                output_identifier=output_identifier
+            )
+        
+        if output_identifier is None:
+            output_identifier = identifiers_list[output_id]
+
+        # identifier = identifiers_list[output_id]
+        Correlations.add_layer_types(
+            model_name, output_identifier
+        )
+
+        res = model_name + '_' + output_identifier
+        corr_obj = Correlations(res, normalizer_filename=normalizer_filename)
+
+        corr_obj.set_normalizers()
+
+
+
+    @staticmethod
+    def merge_correlation_results(model_name, file_identifiers, idx, output_identifier=None):
         """
         Args:
 
             model_name: Name of the pre-trained network
             file_identifiers: List of filename identifiers 
             idx:    id of the file identifier to use for saving the merged results
+            output_identifier: if output_identifier is given, it takes preference..
         """
         # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
 
@@ -815,8 +865,9 @@ class Correlations:
             corr_dfs.append(pd.read_csv(file_path))
 
         # save the merged results at the very first filename...
-        output_identifer = file_identifiers[idx]    
-        filename = f"{model_name}_{output_identifer}_corr_results.csv"
+        if output_identifier is None:
+            output_identifier = file_identifiers[idx]    
+        filename = f"{model_name}_{output_identifier}_corr_results.csv"
         file_path = os.path.join(saved_corr_dir, filename)
 
         data = pd.concat(corr_dfs)
@@ -825,7 +876,7 @@ class Correlations:
 
         # once all the files have been merged, remove the files..
         for identifier in file_identifiers:
-            if identifier != output_identifer:
+            if identifier != output_identifier:
                 filename = f"{model_name}_{identifier}_corr_results.csv"
                 file_path = os.path.join(saved_corr_dir, filename)
                 # remove the file

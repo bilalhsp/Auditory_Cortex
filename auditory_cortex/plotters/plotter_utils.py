@@ -2,7 +2,7 @@ import os
 import colorsys
 import numpy as np
 import matplotlib as mpl
-import seaborn as sns
+# import seaborn as sns
 import matplotlib.pyplot as plt
 from palettable.colorbrewer import qualitative
 from auditory_cortex import results_dir
@@ -28,6 +28,13 @@ class PlotterUtils:
             'whisper_tiny': (-0.2, 0.3),
             'whisper_base': (-0.2, 0.3),
         }
+    
+    # architecture_specific_colors = {
+    #     'conv': 'red',
+    #     'rnn': 'blue',
+    #     'transformer': 'green',
+    #     }
+    architecture_types = ['transformer', 'conv', 'rnn']
 
     @classmethod
     def get_model_specific_color(cls, model_name):
@@ -38,6 +45,19 @@ class PlotterUtils:
         else:
             print(f"model_name '{model_name}' not recognizable!!!")
             return cls.colors[-1]
+        
+    @classmethod
+    def get_architecture_specific_color(cls, layer_arch):
+        """Returns color specific to the layer architecture e.g. cnn or rnn"""
+        if layer_arch in cls.architecture_types:
+            cmap = plt.colormaps['tab10']
+            architecture_specific_colors = cmap(np.array([0, 5, 9]))
+            ind = cls.architecture_types.index(layer_arch)
+            return architecture_specific_colors[ind]
+
+            # return cls.architecture_specific_colors[layer_arch]
+        else:
+            raise NameError(f"{layer_arch}: invalid layer architecure type.")
         
     @classmethod
     def get_model_specific_cmap(cls, model_name):
@@ -142,6 +162,7 @@ class PlotterUtils:
         extra_axis_parameters = {
             'width=\\figwidth',
             'height=\\figheight',
+            'axis lines=left',
             'every x tick label/.append style={rotate=0}',
             'xticklabel style={opacity=\\thisXticklabelopacity, align=center}',
         }

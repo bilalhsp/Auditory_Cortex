@@ -2,10 +2,10 @@
 import os
 import yaml
 import numpy as np
-from pycolormap_2d import ColorMap2DBremm, ColorMap2DZiegler
+# from pycolormap_2d import ColorMap2DBremm, ColorMap2DZiegler
 
 # select 2d color map to be used
-CMAP_2D = ColorMap2DZiegler
+# CMAP_2D = ColorMap2DZiegler
 
 # candidate model names
 model_names = ['wave2letter_modified', 'wave2vec2',

@@ -23,6 +23,11 @@ from auditory_cortex import hpc_cluster
 if hpc_cluster:
     import cupy as cp
 
+import tensorflow.compat.v2 as tf
+tf.enable_v2_behavior()
+import tensorflow_probability as tfp
+tfd = tfp.distributions
+
 
 class Regression():
     def __init__(
@@ -74,7 +79,7 @@ class Regression():
     def unroll_features(
             self, bin_width=20, sents = None, numpy=True,
             return_dict=False, layer_IDs=None, third=None,
-            force_reload=False
+            force_reload=False, shuffled=False
             ):
         """
         Unroll and concatenate time axis of extracted features.
@@ -96,7 +101,8 @@ class Regression():
         # sampled_features = self.dataloader.get_resampled_DNN_features(self.model_name, bin_width)
         feats = {}
         all_layer_features = self.dataloader.get_resampled_DNN_features(
-                    self.model_name, bin_width=bin_width, force_reload=force_reload
+                    self.model_name, bin_width=bin_width, force_reload=force_reload,
+                    shuffled=shuffled
                     )
         for layer_ID in layer_IDs:
             # layer_feats = self.dataloader.get_DNN_layer_features(
@@ -397,7 +403,7 @@ class Regression():
 
         session = str(session)
         raw_spikes = self.dataloader.get_session_spikes(session=session, bin_width=bin_width, delay=delay)
-        spikes = np.concatenate([raw_spikes[sent][:-1] for sent in sents], axis=0)
+        spikes = np.concatenate([raw_spikes[sent][:-1] for sent in sents], axis=0).astype(np.float32)
         if not numpy:
             spikes = cp.array(spikes)
         return spikes
@@ -422,15 +428,31 @@ class Regression():
         return feats
     
 
-
+    def regression(self, x, y, lmbda, lr, max_iterations, poisson=False):
+        """Returns model coefficients for linear regression or poisson regression."""
+        if poisson:
+            lr = tf.constant(lr)
+            model_coefficients, predicted_linear_response, is_converged, iter = tfp.glm.fit(
+                    model_matrix=tf.convert_to_tensor(x),
+                    response=tf.convert_to_tensor(y),
+                    model=tfp.glm.Poisson(),
+                    l2_regularizer=lmbda,
+                    # learning_rate=lr,
+                    maximum_iterations=max_iterations
+                )
+            return model_coefficients.numpy()
+        else:
+            return utils.reg(x, y, lmbda)
+        
 
 
     ### Methods for the computing correlations and grid search for optimal delay.
 
     def cross_validated_regression(
-            self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=20,
+            self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=8,
             iterations=10, N_sents=500, return_dict=False, numpy=False,
-            sents=None, test_sents=None, third=None, layer_IDs=None
+            sents=None, test_sents=None, third=None, layer_IDs=None,
+            poisson=False, lr=0.6, max_iterations=50, shuffled=False
         ):
         """
         Returns distribution of correlations for all (12) layers and all channels
@@ -447,15 +469,22 @@ class Regression():
                                     distribution of correlations computed.
 
             third (int) [1,2,3]:    Default: None, section of test sents to compute corr for.  
+            poisson: bool =         Choose type of regression, poisson if True else: linear
 
         Returns:
             corr_coeff (3d-array):  distribution of correlations for all layers and channels (if return_dict=False)
             corr (dict):  median(corr_coeff) stored in dict, along with other details, ready to save (if return_dict=True)
         """
+        if poisson:
+            numpy=True
+
         if numpy:
             module = np
         else:
             module = cp
+
+        if shuffled:
+            print(f"Running regression for shuffled weights..")
 
         if sents is None:
             sents = self.dataloader.sent_IDs
@@ -476,17 +505,26 @@ class Regression():
 
         # loading features for any one sent=12, to get feature_dims..
         feature_dims = self.unroll_features(
-            bin_width=bin_width, sents=[12], layer_IDs=layer_IDs).shape[-1]
+            bin_width=bin_width, sents=[12], layer_IDs=layer_IDs, shuffled=shuffled
+            ).shape[-1]
         
         # feature_dims = self.sampled_features[0].shape[1]
-        lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
+        # lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
+        
+        lmbdas = module.logspace(start=-num_lmbdas//4, stop=num_lmbdas, num=int(1.25*num_lmbdas)+1)
+        # lmbdas = module.logspace(start=1, stop=8, num=7)
+        # lmbdas = module.logspace(start=5, stop=6, num=2)
         B = module.zeros((len(layer_IDs), feature_dims, num_channels))
         corr_coeff = np.zeros((iterations, num_channels, len(layer_IDs)))
+        poiss_entropy = np.zeros((iterations, num_channels, len(layer_IDs)))
+        poiss_entropy_baseline = np.zeros((iterations, num_channels, len(layer_IDs)))
+        uncertainty_per_spike = np.zeros((iterations, num_channels, len(layer_IDs)))
+        bits_per_spike_NLB = np.zeros((iterations, num_channels, len(layer_IDs)))
         corr_coeff_train = np.zeros((iterations, num_channels, len(layer_IDs)))
         # stimuli = np.array(list(self.raw_features[0].keys()))
 
         stimuli = np.random.permutation(sents)[0:N_sents]
-        mapping_sents = int(N_sents*0.7) # 70% test set...!
+        # mapping_sents = int(N_sents*0.7) # 70% test set...!
         # size_of_chunk = int(mapping_sents/k)
         print(f"# of iterations requested: {iterations}, \n \
                 # of lambda samples per iteration: {len(lmbdas)}")
@@ -510,18 +548,27 @@ class Regression():
             
             # lmbda_loss = module.zeros(((len(lmbdas), num_channels, self.num_layers)))
             start_lmbda = time.time()
-            lmbda_loss = self.k_fold_CV(
-                    session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
-                    lmbdas=lmbdas, num_folds=num_folds, layer_IDs=layer_IDs
-                )
-            
+            if poisson:
+                lmbda_loss = self.k_fold_CV_poisson_regression(
+                        session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
+                        lmbdas=lmbdas, num_folds=num_folds, layer_IDs=layer_IDs,
+                        lr = lr, max_iterations=max_iterations, shuffled=shuffled
+                    )
+            else:
+                lmbda_loss = self.k_fold_CV(
+                        session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
+                        lmbdas=lmbdas, num_folds=num_folds, layer_IDs=layer_IDs,
+                        shuffled=shuffled
+                    )
             end_lmbda = time.time()
             time_lmbda += end_lmbda-start_lmbda
             optimal_lmbdas = lmbdas[np.argmin(lmbda_loss, axis=0)]
             start_map = time.time()
             # Loading Mapping set...!
             mapping_x = self.unroll_features(
-                bin_width=bin_width, sents=mapping_set, numpy=numpy, layer_IDs=layer_IDs)
+                bin_width=bin_width, sents=mapping_set, numpy=numpy, layer_IDs=layer_IDs,
+                shuffled=shuffled
+                )
             # mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
             # mapping_y = self.unroll_spikes(session, sents=mapping_set, numpy=numpy)
             mapping_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
@@ -531,9 +578,14 @@ class Regression():
             #computing betas
             for l in range(len(layer_IDs)):
                 for ch in range(num_channels):
-                    B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
+                    B[l,:,ch] = self.regression(
+                        mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l],
+                        lr, max_iterations,
+                        poisson=poisson,
+                        )
+                    # B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
             # self.B[session] = cp.asnumpy(self.B[session])
-
+            
             train_pred = utils.predict(mapping_x, B)
             corr_coeff_train[n] = utils.cc_norm(mapping_y, train_pred)
 
@@ -544,7 +596,7 @@ class Regression():
             # Loading test set...!
             test_x = self.unroll_features(
                 bin_width=bin_width, sents=test_set, numpy=numpy, third=third,
-                layer_IDs=layer_IDs
+                layer_IDs=layer_IDs, shuffled=shuffled
                 )
             test_y = self.unroll_spikes(
                 session, bin_width=bin_width, delay=delay, sents=test_set, numpy=numpy
@@ -552,7 +604,21 @@ class Regression():
             # test_y = self.get_neural_spikes(session, bin_width=bin_width, sents=test_set, numpy=numpy, third=third) 
 
             test_pred = utils.predict(test_x, B)
-            corr_coeff[n] = utils.cc_norm(test_y, test_pred)
+
+            if poisson:
+                corr_coeff[n] = utils.cc_norm(test_y, np.exp(test_pred))
+            else:
+                corr_coeff[n] = utils.cc_norm(test_y, test_pred)
+            poiss_entropy[n] = utils.poisson_cross_entropy(test_y, test_pred)
+            
+            Nsamples, Nchannels = test_y.shape
+            data_sums = cp.asnumpy(np.sum(test_y, axis=0, keepdims=True))
+            data_means = data_sums/Nsamples
+            # using mean spikes as predicted means
+            poiss_entropy_baseline[n] = utils.poisson_cross_entropy(test_y, np.log(data_means[...,None]))
+            uncertainty_per_spike[n] = poiss_entropy[n]/(data_sums.T + 1.e-6)/np.log(2)
+            bits_per_spike_NLB[n] = (poiss_entropy_baseline[n] - poiss_entropy[n])/(data_sums.T + 1.e-6)/np.log(2)
+
             end_map = time.time()
             end_itr = time.time()
             time_map += end_map - start_map
@@ -563,8 +629,17 @@ class Regression():
         print(f"It takes (on avg.) {time_lmbda/(iterations):.2f} sec (all lmbdas). (time for {num_folds}-folds)")
         print(f"It takes (on avg.) {time_map/(iterations):.2f} sec/mapping.")
         print(f"It takes (on avg.) {time_itr/(iterations*60):.2f} minutes/iteration...!")
+
+        # incoming: corr_coeff = (itr, ch, layers), transposed: (itr, layers, ch) 
         corr_coeff = cp.asnumpy(corr_coeff.transpose((0,2,1)))
         corr_coeff = np.median(corr_coeff, axis=0)
+        # same as corr_coeff
+        poiss_entropy = poiss_entropy.transpose((0,2,1))
+        poiss_entropy = np.median(poiss_entropy, axis=0)
+        poiss_entropy_baseline = np.median(poiss_entropy_baseline, axis=0)
+        uncertainty_per_spike = np.median(uncertainty_per_spike, axis=0).transpose((1,0))
+        bits_per_spike_NLB = np.median(bits_per_spike_NLB, axis=0).transpose((1,0))
+
         corr_coeff_train = cp.asnumpy(corr_coeff_train.transpose((0,2,1)))
         lmbda_loss = lmbda_loss.transpose((0,2,1))
         if return_dict:
@@ -580,16 +655,21 @@ class Regression():
                     'model': self.model_name,
                     'N_sents': N_sents,
                     'layer_ids': layer_IDs,
-                    'opt_delays': None
+                    'opt_delays': None,
+                    'poiss_entropy': poiss_entropy,
+                    'uncertainty_per_spike': uncertainty_per_spike,
+                    'bits_per_spike_NLB': bits_per_spike_NLB,
                     }
-            return corr
-        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set
+            return corr, optimal_lmbdas, lmbda_loss
+        # return test_y, test_pred, B, optimal_lmbdas, lmbda_loss
+        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB 
 
 
 
     def k_fold_CV(
             self, session, bin_width, delay, mapping_set, lmbdas,
-            layer_IDs=None, num_folds=5, use_cpu=False
+            layer_IDs=None, num_folds=5, use_cpu=False,
+            shuffled=False
         ):
         """Return MSE loss (avg.) for k-fold CV regression.
 
@@ -624,7 +704,8 @@ class Regression():
 
             # load features and spikes using the sent ids.
             train_x = self.unroll_features(
-                bin_width=bin_width, sents=train_set, numpy=use_cpu, layer_IDs=layer_IDs
+                bin_width=bin_width, sents=train_set, numpy=use_cpu, layer_IDs=layer_IDs,
+                shuffled=shuffled
                 )
             train_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
                                     sents=train_set, numpy=use_cpu)
@@ -641,7 +722,8 @@ class Regression():
             # train_y = self.get_neural_spikes(session, bin_width=bin_width, sents=train_set, numpy=use_cpu)
 
             val_x = self.unroll_features(
-                bin_width=bin_width, sents=val_set, numpy=use_cpu, layer_IDs=layer_IDs
+                bin_width=bin_width, sents=val_set, numpy=use_cpu, layer_IDs=layer_IDs,
+                shuffled=shuffled
                 )
             val_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
                                     sents=val_set, numpy=use_cpu)
@@ -663,6 +745,139 @@ class Regression():
             del val_y
             gc.collect()
             # de-allocation of memory ends here...
+
+        lmbda_loss /= num_folds            
+        return lmbda_loss
+
+##################################################################################
+##############       GLIM: Poisson Regression
+######################################################################################
+
+    def k_fold_CV_poisson_regression(
+            self, session, bin_width, delay, mapping_set, lmbdas,
+            layer_IDs=None, num_folds=5, use_cpu=False, lr=0.6, max_iterations=100,
+            shuffled=False
+        ):
+        """Return Neg. Log Likelihood (avg.) under poisson model for k-fold CV regression.
+
+        Args:
+            session (str): session ID 
+            mapping_set (list): sent ID to be used for CV
+            lmbdas (float): Range of regularization paramters to compare
+            num_folds (int): # of folds
+            use_cpu (bool): default 'False', use numpy or cupy? 
+
+        Returns:
+            avg. MSE loss for validation set.     
+        """
+        print(f"{num_folds}_fold CV for session: {session}")
+        # num_channels = self.spike_datasets[session].num_channels
+        num_channels = self.dataloader.get_num_channels(session)
+        if layer_IDs is None:
+            layer_IDs = self.get_layer_IDs()
+
+        lr = tf.constant(lr)
+
+        lmbdas = cp.asnumpy(lmbdas).astype(np.float32)
+        lmbda_loss = np.zeros(((len(lmbdas), num_channels, len(layer_IDs))))
+        size_of_chunk = int(len(mapping_set) / num_folds)
+        # for i, lmbda in enumerate(lmbdas):
+        #     loss = 0
+        for r in range(num_folds):
+            print(f"For fold={r}: ")
+            # get the sent ids for train and validation folds...
+            if r<(num_folds-1):
+                val_set = mapping_set[r*size_of_chunk:(r+1)*size_of_chunk]
+            else:
+                val_set = mapping_set[r*size_of_chunk:]
+            train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
+
+            # load features and spikes using the sent ids.
+            train_x = self.unroll_features(
+                bin_width=bin_width, sents=train_set, numpy=True, layer_IDs=layer_IDs,
+                shuffled=shuffled
+                )
+            train_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
+                                    sents=train_set, numpy=True)
+            train_x = train_x.astype(np.float32)
+            train_y = train_y.astype(np.float32)
+
+            val_x = self.unroll_features(
+                            bin_width=bin_width, sents=val_set, numpy=True, layer_IDs=layer_IDs,
+                            shuffled=shuffled
+                            )
+            val_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
+                                    sents=val_set, numpy=True)
+
+            val_x = val_x.astype(np.float32)
+            val_y = val_y.astype(np.float32)
+            # computing Betas for lmbdas and removing train_x, train_y to manage memory..
+            num_layers = train_x.shape[0]
+            num_channels = train_y.shape[-1]
+            num_weights = train_x.shape[-1]
+
+            # Betas = {}
+            for i, lmbda in enumerate(lmbdas):
+                model_weights = np.zeros((num_layers, num_weights, num_channels))
+                lmbda_unconverged = np.zeros(((num_channels, len(layer_IDs))), dtype=np.int16)
+                for l in range(num_layers):
+                    x = train_x[l]
+                    for ch in range(num_channels):
+                        y = train_y[:,ch]
+
+                        model_coefficients, predicted_linear_response, is_converged, iter = tfp.glm.fit(
+                            model_matrix=tf.convert_to_tensor(x),
+                            response=tf.convert_to_tensor(y),
+                            model=tfp.glm.Poisson(),
+                            l2_regularizer=lmbda,
+                            maximum_iterations=max_iterations,
+                            learning_rate=lr
+                            )
+                        if not is_converged.numpy():
+                            lmbda_unconverged[:,l] = 1
+                        model_weights[l,:,ch] = model_coefficients.numpy()
+
+                    # x = np.expand_dims(x, axis=0)
+                    # chs = np.arange(train_y.shape[1])
+                    # num_channels = chs.size
+                    # if num_channels > 30:
+                    #     ch_list = []
+                    #     select_chs = chs[:num_channels//2]
+                    #     ch_list.append(select_chs)
+                    #     select_chs = chs[num_channels//2:]
+                    #     ch_list.append(select_chs)
+                    # else:
+                    #     ch_list = []
+                    #     select_chs = chs[:num_channels//2]
+                    #     ch_list.append(select_chs)
+                    # for ch in ch_list:
+                    #     y = np.transpose(train_y[:, ch])
+                    #     print(x.shape)
+                    #     print(y.shape)
+                    #     model_coefficients, predicted_linear_response, is_converged, iter = tfp.glm.fit(
+                    #             model_matrix=tf.convert_to_tensor(x),
+                    #             response=tf.convert_to_tensor(y),
+                    #             model=tfp.glm.Poisson(),
+                    #             l2_regularizer=lmbda,
+                    #             maximum_iterations=max_iterations,
+                    #             # learning_rate=0.8
+                    #     )
+
+                    #     if not is_converged.numpy():
+                    #         lmbda_unconverged[ch,l] = 1
+
+                    #     # model_weights[l,:,ch] = model_coefficients.numpy()
+                    #     model_weights[l,:,ch] = model_coefficients.numpy()
+
+                val_x = tf.convert_to_tensor(val_x)
+                val_y = tf.convert_to_tensor(val_y)
+                model_weights = tf.convert_to_tensor(model_weights, dtype=np.float32)
+                
+                val_predicted_linear_resposne = tf.matmul(val_x, model_weights)
+                # print(type(val_predicted_linear_resposne))
+                log_likelihood = tfp.glm.Poisson().log_prob(val_y, val_predicted_linear_resposne).numpy()
+                lmbda_loss[i] += -1*np.mean(log_likelihood, axis=1).transpose()
+                lmbda_loss[i][np.where(lmbda_unconverged>0)] = num_folds*10000
 
         lmbda_loss /= num_folds            
         return lmbda_loss
@@ -706,7 +921,8 @@ class Regression():
             sents=None,
             numpy=False,
             return_dict=False,
-            third=None
+            third=None,
+            shuffled=False
         ):
         
         if delays is None:
@@ -718,6 +934,9 @@ class Regression():
 
         corr_coeffs = []
         losses = []
+        poiss_entropies = []
+        uncertainty_per_spike_list = []
+        bits_per_spike_NLB_list = []
         session = str(session)
 
         for i, delay in enumerate(delays):
@@ -727,18 +946,24 @@ class Regression():
             # _ = self.get_neural_spikes(
             #         session, bin_width=bin_width, delay=delay, force_reload=True
             #     )
-            corr_coeff, _, loss, _ = self.cross_validated_regression(
+            corr_coeff, _, loss, _, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB = self.cross_validated_regression(
                     session, bin_width=bin_width, delay=delay,layer_IDs=layer_IDs,
                     num_folds=num_folds, iterations=iterations, num_lmbdas=num_lmbdas,
                     return_dict=False, numpy=numpy, N_sents=N_sents, sents=sents, third=third,
-                    test_sents=self.dataloader.test_sent_IDs
+                    test_sents=self.dataloader.test_sent_IDs, shuffled=shuffled
                 )
             corr_coeffs.append(corr_coeff)
             losses.append(loss)
-        
+            poiss_entropies.append(poiss_entropy)
+            uncertainty_per_spike_list.append(uncertainty_per_spike)
+            bits_per_spike_NLB_list.append(bits_per_spike_NLB)
+
         corr_coeffs = np.array(corr_coeffs)
         losses = np.array(losses)
         delays = np.array(delays)
+        poiss_entropies = np.array(poiss_entropies)
+        uncertainty_per_spike_list = np.array(uncertainty_per_spike_list)
+        bits_per_spike_NLB_list = np.array(bits_per_spike_NLB_list)
         # num_channels = self.spike_datasets[session].num_channels
 
         opt_delay_indices = np.argmin(losses, axis=0)
@@ -746,6 +971,15 @@ class Regression():
         corr_coeffs_opt_delay = corr_coeffs[
                 opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
             ]
+        poiss_entropy_opt_delay = poiss_entropies[
+            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        ]
+        uncertainty_per_spike_opt_delay = uncertainty_per_spike_list[
+            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        ]
+        bits_per_spike_NLB_opt_delay = bits_per_spike_NLB_list[
+            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        ]
  
         if return_dict:
             # deallocate the memory of Neural data for current session, this will save memory used.
@@ -760,7 +994,10 @@ class Regression():
                     'model': self.model_name,
                     'N_sents': N_sents,
                     'layer_ids': layer_IDs,
-                    'opt_delays': opt_delays
+                    'opt_delays': opt_delays,
+                    'poiss_entropy': poiss_entropy_opt_delay,
+                    'uncertainty_per_spike': uncertainty_per_spike_opt_delay, 
+                    'bits_per_spike_NLB': bits_per_spike_NLB_opt_delay,
                     }
             return corr_dict
         # optimal_delays = delays[np.argmin(losses, axis=0)]
@@ -1408,7 +1645,7 @@ class Regression():
     
     def neural_prediction(
             self, session, bin_width: int, sents: list, layer_IDs: list=None,
-            force_reload: bool=False
+            force_reload: bool=False, shuffled: bool=False
         ):
         """
         Returns prediction for neural activity 
@@ -1420,7 +1657,8 @@ class Regression():
             ndarray : (time, ch, layers) Prdicted neural activity 
         """
         features = self.unroll_features(
-            bin_width=bin_width, sents=sents, layer_IDs=layer_IDs, force_reload=force_reload
+            bin_width=bin_width, sents=sents, layer_IDs=layer_IDs, force_reload=force_reload,
+            shuffled=shuffled
             )
         # features = np.stack([dict_feats[i] for i in range(12)], axis=0)
         beta = self.get_betas(session, layer_IDs=layer_IDs)

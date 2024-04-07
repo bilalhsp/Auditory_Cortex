@@ -1,6 +1,6 @@
 use_pca: False
 saved_checkpoint: openai/whisper-base
-shuffle_weights: True
+# shuffle_weights: False
 layers:
 - layer_name: model.encoder.conv1
   layer_id: 0
