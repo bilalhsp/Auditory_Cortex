@@ -1,15 +1,20 @@
 #!/bin/sh
 
-#SBATCH --output=./result_regression_ds2.out
+#SBATCH --output=./result_regression_w2v2_features_s.out
 
 #SBATCH	-A standby
-# --constraint=F|G|I|K
+#SBATCH --constraint=F|G|I|K|D|B|H|J
+#F|G|I|K|D|B
 
+# High Mem GPUs: F|G|I|K|D|B
+# very Fast GPUs: F|G|K
+# Fast GPUs: D
+# Slow GPUs: E
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=6
 #SBATCH --mem=0
-#SBATCH --time=3:15:00
+#SBATCH --time=4:00:00
 
 hostname
 NUMBA_DISABLE_INTEL_SVML=1

@@ -1,6 +1,6 @@
 use_pca: False
 pca_comps: 50
-shuffle_weights: True
+# shuffle_weights: False
 layers:
 
 - layer_name: model.encoder.conv.conv_layers.0

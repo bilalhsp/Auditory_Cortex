@@ -2,7 +2,7 @@ import os
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-import seaborn as sns
+# import seaborn as sns
 import matplotlib as mpl
 
 # local imports
@@ -218,6 +218,9 @@ class RegPlotter:
                 keep_yticks = False,
                 keep_xticks = False,
                 indicate_significance=True,
+                column=None,
+                display_inter_quartile_range=False,
+                display_dotted_lines=False,
         ):
         
         corr_obj = Correlations(model_name+identifier)
@@ -229,16 +232,22 @@ class RegPlotter:
         corr_dist_all_layers = corr_obj.get_corr_all_layers_for_bin_width(
                 neural_area=area, bin_width=bin_width,
                 delay=delay, threshold=threshold,
-                normalized=normalized
+                normalized=normalized,
+                column=column
             )
 
         color = PlotterUtils.get_model_specific_color(model_name)
-        ax=RegPlotter.plot_line_with_shaded_region(data_dict=corr_dist_all_layers,
-                    color=color, alpha=alpha)
+        ax=RegPlotter.plot_line_with_shaded_region(
+                data_dict=corr_dist_all_layers, color=color, alpha=alpha,
+                display_inter_quartile_range=display_inter_quartile_range,
+                display_dotted_lines=display_dotted_lines
+            )
         plt.title(f"{model_name}")
         plt.xlabel(f"Layer IDs")
-        plt.ylabel(f"$\\rho$")
-        plt.ylim([0.0, 1.0])
+        
+        if column is None:
+            plt.ylabel(f"$\\rho$")
+            plt.ylim([0.0, 1.0])
 
         # get rid of the bounding boxes...
         ax.spines['top'].set_visible(False)
@@ -284,6 +293,71 @@ class RegPlotter:
             PlotterUtils.save_tikz(filepath)
 
         return corr_dist_all_layers
+    
+
+    def plot_strf_baseline(
+            area='all', bin_width=20, delay=0, alpha=0.1,
+            save_tikz=True, normalized=True,
+            ax=None,
+            display_dotted_lines=False,
+            display_inter_quartile_range=True,
+            keep_xticks = True,
+            keep_yticks = True,
+        ):
+        
+        # baseline is the same for all networks
+        identifier='_bins_corrected_100'
+        corr_obj = Correlations('deepspeech2'+identifier)
+        threshold= corr_obj.get_normalizer_threshold(
+            bin_width=bin_width, poisson_normalizer=True
+        )
+
+        # get baseline results..        
+        baseline_dist = corr_obj.get_baseline_corr_for_area(
+            neural_area=area, bin_width=bin_width, delay=delay,
+            threshold=threshold, normalized=normalized
+        )
+        print(f"Number of samples in distribution: {baseline_dist.size}")           
+        # repeating baseline distribution, to allow plotting horizontal line..
+        x_ticks = [0,1]
+        baseline_dist_all_layer = {key: baseline_dist.values for key in x_ticks}
+
+        # plotting the baseline..
+        model_name = 'STRF'
+        baseline_color = PlotterUtils.get_model_specific_color(model_name)
+        ax=RegPlotter.plot_line_with_shaded_region(data_dict=baseline_dist_all_layer,
+                            color=baseline_color, alpha=alpha, ax=ax,
+                            display_dotted_lines=display_dotted_lines,
+                            display_inter_quartile_range=display_inter_quartile_range
+                            )
+        
+        plt.ylabel(f"$\\rho$")
+        plt.ylim([0.0, 1.0])
+        ax.set_xticklabels([])
+
+                ## formatting the plot...
+        plt.title(f"{model_name}")
+        plt.xlabel(f"   ")
+
+        # get rid of the bounding boxes...
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+
+        # xticks and yticks...
+        if not keep_yticks:
+            ax.set_yticks([])
+        if not keep_xticks:
+            ax.set_xticks([])
+
+        if save_tikz:
+            filepath = os.path.join(
+                results_dir,
+                'tikz_plots',
+                f"Reg-trained-{area}-{model_name}.tex"
+                )
+            PlotterUtils.save_tikz(filepath)
 
 
     @staticmethod
@@ -291,46 +365,64 @@ class RegPlotter:
         model_name, area='core', bin_width=20, delay=0, alpha=0.1,
         save_tikz=True, normalized=True,
         # identifier='_bins_corrected_100',
-        pos_sig_ind = 0.93, p_threshold = 0.01,
+        sig_offset_x=0,
+        sig_offset_y=0.93,
+        arch_ind_offset=1.0,
+        arch_ind_lw=4,
+        p_threshold=0.01,
         plot_baseline=False, 
         display_inter_quartile_range=True,
+        display_dotted_lines=False,
         keep_xticks = True,
         keep_yticks = True,
-        untrained_identifier='reset_weights',
+        trained_identifier='bins_corrected_100',
+        untrained_identifiers=None,
         plot_difference=False,
+        tikz_indicator=None,
+        column=None,
+        indicate_significance=True,
+        indicate_architecture=True,
         ):
 
-        # select appropraite results identifier...
-        if 'randn' in untrained_identifier:
-                tikz_indicator = 'randn'
-                untrained_identifier = '_randn_weights'
-        elif 'reset' in untrained_identifier:
-                tikz_indicator = 'reset'
-                untrained_identifier = '_reset_weights'
-        elif 'shuffle' in untrained_identifier:
-                tikz_indicator = 'shuffled'
-                untrained_identifier = '_weights_shuffled'
+        if untrained_identifiers is None:
+            untrained_identifiers = ['reset_weights']
 
+        # select appropraite results identifier...
+        if tikz_indicator is None:
+            if 'randn' in untrained_identifiers[0]:
+                    tikz_indicator = 'randn'
+            elif 'reset' in untrained_identifiers[0]:
+                    tikz_indicator = 'reset'
+            elif 'shuffle' in untrained_identifiers[0]:
+                    tikz_indicator = 'shuffled'
+        
         # trained_network...
-        identifier='_bins_corrected_100'
-        corr_obj_trained = Correlations(model_name+identifier)
+        # identifier='_bins_corrected_100'
+        corr_obj_trained = Correlations(model_name+'_'+trained_identifier)
         threshold= corr_obj_trained.get_normalizer_threshold(
             bin_width=bin_width, poisson_normalizer=True
         )
         data_dist_trained = corr_obj_trained.get_corr_all_layers_for_bin_width(
-                neural_area=area, bin_width=bin_width,
-                delay=delay, threshold=threshold,
-                normalized=normalized
+                neural_area=area, bin_width=bin_width, delay=delay,
+                threshold=threshold, normalized=normalized,
+                column=column
             )
         
         # weights shuffled ...
         # identifier='_weights_shuffled'
-        corr_obj_shuffled = Correlations(model_name+untrained_identifier)
-        data_dist_shuffled = corr_obj_shuffled.get_corr_all_layers_for_bin_width(
-                neural_area=area, bin_width=bin_width,
-                delay=delay, threshold=threshold,
-                normalized=normalized
-            )
+        data_dist_shuffled_list = []
+        data_dist_shuffled = {}
+        for untrained_identifier in untrained_identifiers:
+            corr_obj_shuffled = Correlations(model_name+'_'+untrained_identifier)
+            data_dist_shuffled_list.append(corr_obj_shuffled.get_corr_all_layers_for_bin_width(
+                    neural_area=area, bin_width=bin_width, delay=delay,
+                    threshold=threshold, normalized=normalized,
+                    column=column
+                ))
+        for key in data_dist_shuffled_list[0]:
+            distributions = list([dist[key] for dist in data_dist_shuffled_list])
+            data_dist_shuffled[key] = np.stack(distributions, axis=0)
+            data_dist_shuffled[key] = np.mean(data_dist_shuffled[key], axis=0)
         
         # get baseline results..        
         baseline_dist = corr_obj_shuffled.get_baseline_corr_for_area(
@@ -352,10 +444,24 @@ class RegPlotter:
             ax=RegPlotter.plot_line_with_shaded_region(
                 data_dict=data_dist_diff, color=color, alpha=alpha,
                 display_inter_quartile_range=display_inter_quartile_range,
-                display_dotted_lines=True,
+                display_dotted_lines=display_dotted_lines,
                 )
+            
+            if indicate_significance:
+                # signigicance of 'difference' distribution...
+                RegPlotter.indicate_statistical_significance(
+                    data_dist_diff,
+                    ax=ax, p = p_threshold, fontsize=15,
+                    offset_y=sig_offset_y,
+                    offset_x=sig_offset_x,
+                    color = 'k'
+                    )
+            
+            # horizontal line at y=0
+            ax.axhline(y=0, xmin=0, xmax=len(data_dist_trained), color='k')
+
             plt.ylabel(f"$\\Delta \\rho$")
-            # plt.ylim([0.0, 1.0])
+            plt.ylim([-0.4, 1.0])
             post_script = 'diff-'
 
 
@@ -364,35 +470,39 @@ class RegPlotter:
             ax=RegPlotter.plot_line_with_shaded_region(
                 data_dict=data_dist_trained, color=color, alpha=alpha,
                 display_inter_quartile_range=display_inter_quartile_range,
-                display_dotted_lines=False,
+                display_dotted_lines=display_dotted_lines,
                 )
             # plot shuffled network results...
             ax=RegPlotter.plot_line_with_shaded_region(
                 data_dict=data_dist_shuffled, color='k', alpha=alpha, ax=ax,
                 display_inter_quartile_range=display_inter_quartile_range,
-                display_dotted_lines=False,
+                display_dotted_lines=display_dotted_lines,
                 )
             
-            # signigicance over 'shuffled' results...
-            RegPlotter.indicate_statistical_significance(
-                data_dist_trained,
-                data_dist_shuffled,
-                ax=ax, p = p_threshold, fontsize=15,
-                offset_y=pos_sig_ind,
-                color = 'k'
-                )
+            if indicate_significance:
+                # signigicance over 'shuffled' results...
+                RegPlotter.indicate_statistical_significance(
+                    data_dist_trained,
+                    data_dist_shuffled,
+                    ax=ax, p = p_threshold, fontsize=15,
+                    offset_y=sig_offset_y,
+                    offset_x=sig_offset_x,
+                    color = 'k'
+                    )
             
             # simply repeating baseline dist for all layers to allow for comparison....
             baseline_dist_all_layer = {key: baseline_dist.values for key in data_dist_trained.keys()}
             baseline_color = PlotterUtils.get_model_specific_color('baseline')
             # signigicance over 'baseline' results...
-            RegPlotter.indicate_statistical_significance(
-                data_dist_trained,
-                baseline_dist_all_layer,
-                ax=ax, p = p_threshold, fontsize=15,
-                offset_y=pos_sig_ind - 0.1,
-                color = baseline_color
-                )
+            if indicate_significance:
+                RegPlotter.indicate_statistical_significance(
+                    data_dist_trained,
+                    baseline_dist_all_layer,
+                    ax=ax, p = p_threshold, fontsize=15,
+                    offset_y=sig_offset_y - 0.1,
+                    offset_x=sig_offset_x,
+                    color = baseline_color
+                    )
 
             # plot baseline...
             if plot_baseline:
@@ -404,9 +514,16 @@ class RegPlotter:
                 
             post_script = ''
 
-
             plt.ylabel(f"$\\rho$")
-            plt.ylim([0.0, 1.0])
+            if column is None:
+                plt.ylim([0.0, 1.0])
+
+        if indicate_architecture:
+            # indicate layer architecture type..
+            architecture_specific_ids = corr_obj_trained.get_architecture_specific_layer_ids()
+            RegPlotter.indicate_layer_architecture(
+                ax, architecture_specific_ids, arch_ind_offset, arch_ind_lw
+            )
 
         ## formatting the plot...
         plt.title(f"{model_name}")
@@ -811,7 +928,7 @@ class RegPlotter:
     @staticmethod
     def indicate_statistical_significance(
             test_distributions,
-            baseline_distributions,
+            baseline_distributions=None,
             ax=None,
             p=0.01,
             fontsize=15,
@@ -828,6 +945,7 @@ class RegPlotter:
                 keys of this dict would be different models (networks/layers)
             baseline_distributions: dict = distributions taked as baseline, keys of 
                 this dict MUST match that of 'test_distributions' for pairwise comparisons.
+                if None (Default), test_distribution is treated as distribution of differences.
             p: float = significance threshold
             fontsize: int = value specifying size of * to be displayed.
             offset_y: float = vertical adjustment to the position of *
@@ -835,17 +953,29 @@ class RegPlotter:
         """
         if color is None:
             color = 'k'
+
+        # ax.text specifies position bottom-left corner of text block, 
+        # adjustment needed to center the stars at exact coordinates..
+        # additionally, slight drift for networks with large number of layers,
+        # was also observed, that is also being compensated.. 
+        num_layers = len(test_distributions)
+        font_adjustment = -0.01*((fontsize/2.0) + (num_layers - 6)*1.3)
+
+        
         # baseline_dist = model_wise_distributions.pop('baseline')
         for i, (model_name, model_dist) in enumerate(test_distributions.items()):
-            # if model_name == 'baseline':
-            #     continue
 
-            # since test and baseline dicts must have the same keys..
-            baseline_dist = baseline_distributions[model_name]
+            # if baseline_dist is None, test_dist is expected to be dist of differences..
+            if baseline_distributions is None:
+                baseline_dist=None
+            else:
+                # since test and baseline dicts must have the same keys..
+                baseline_dist = baseline_distributions[model_name]
 
             stat_result = scipy.stats.wilcoxon(
                 x = model_dist, 
-                y = baseline_dist
+                y = baseline_dist,
+                alternative='greater', # tests only for x greater than y, (default was "two-sided")
             )
             print(f"p-value for {model_name}: {stat_result.pvalue}")
             if stat_result.pvalue < p:
@@ -853,8 +983,27 @@ class RegPlotter:
             else:
                 text_str = ''
 
-            ax.text(i+offset_x, offset_y, text_str, fontdict={'fontsize': fontsize},
-                    color=color)
+            
+            ax.text(
+                i+offset_x+font_adjustment, offset_y, text_str,
+                fontdict={'fontsize': fontsize}, color=color
+            )
+
+    @staticmethod
+    def indicate_layer_architecture(ax, arch_specific_layer_ids, arch_ind_offset, arch_ind_lw):
+        """Indicates layer architecture by drawing a horizontal line 
+        with architecture specific color, on top of layer-wise correlation 
+        plots.
+        """
+        for arch_type, layer_ids in arch_specific_layer_ids.items():
+            heights = arch_ind_offset*np.ones_like(layer_ids)
+            color = PlotterUtils.get_architecture_specific_color(arch_type)
+            layer_ids = np.sort(layer_ids)
+            # extend lines from -0.5 to +0.5 and remove space
+            layer_ids[0] = layer_ids[0] - 0.5
+            layer_ids[-1] = layer_ids[-1] + 0.5  
+
+            ax.plot(layer_ids, heights, color=color, lw=arch_ind_lw)
 
 # ------------------  saving regression results as pickle (for Makin) ----------------#
 

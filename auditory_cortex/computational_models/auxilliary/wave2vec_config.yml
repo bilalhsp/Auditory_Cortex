@@ -3,7 +3,7 @@
 saved_checkpoint: wav2vec_large.pt
 # /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
 use_pca: False
-shuffle_weights: False
+# shuffle_weights: False
 layers:
 
 # feature_extractor

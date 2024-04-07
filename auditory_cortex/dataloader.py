@@ -44,24 +44,27 @@ class DataLoader:
         self.DNN_models = {}
         self.DNN_layer_ids = {}
         self.DNN_feature_dict = {}
-        self.raw_DNN_features = {}
+        self.DNN_shuffled_feature_dict = {}
+        # self.raw_DNN_features = {}
 
-    def _create_DNN_obj(self, model_name='waveletter_modified'):
+    def _create_DNN_obj(self, model_name='waveletter_modified', shuffled=False):
         """Creates DNN feature extractor for the given model_name"""
         # self.DNN_models[model_name] = Regression(model_name, load_features=False)
-        self.DNN_models[model_name] = DNNFeatureExtractor(model_name)
+        self.DNN_models[model_name] = DNNFeatureExtractor(model_name, shuffled=shuffled)
         self.DNN_layer_ids[model_name] = self.DNN_models[model_name].layer_IDs
         self.DNN_feature_dict[model_name] = {}
 
-    def get_DNN_obj(self, model_name='waveletter_modified'):
+    def get_DNN_obj(self, model_name='waveletter_modified', shuffled=False):
         """Retrieves DNN model for the given name, create new if not already 
         exists.
         """
         if model_name not in self.DNN_models.keys():
-            self._create_DNN_obj(model_name=model_name)
+            self._create_DNN_obj(model_name=model_name, shuffled=shuffled)
         return self.DNN_models[model_name]
 
-    def get_raw_DNN_features(self, model_name, force_reload=False, contextualized=False):
+    def get_raw_DNN_features(
+            self, model_name, force_reload=False, contextualized=False, shuffled=False
+        ):
         """Retrieves raw features for the 'model_name', starts by
         attempting to read cached features, if not found, extract
         features and also cache them, for future use.
@@ -75,21 +78,27 @@ class DataLoader:
         # self.raw_DNN_features[model_name] = read_cached_features(model_name)
         # stop saving 'raw_DNN_features' to save the memory....
         # only need to save the resampled...that I am already doing...
-        raw_DNN_features = read_cached_features(model_name, contextualized=contextualized)
+
+        # shuffled = self.get_DNN_obj(model_name).shuffled
+        raw_DNN_features = read_cached_features(model_name, contextualized=contextualized, shuffled=shuffled)
         if raw_DNN_features is None or force_reload:
             # self.get_DNN_obj(model_name).load_features(resample=False)
             # self.raw_DNN_features[model_name] = self.get_DNN_obj(model_name).sampled_features
 
             if contextualized:
                 long_audio, total_duration, *_ = self.get_contextualized_stim_audio(include_repeated_trials=True)
-                raw_DNN_features = self.get_DNN_obj(model_name).extract_features_for_audio(long_audio, total_duration)
+                raw_DNN_features = self.get_DNN_obj(
+                    model_name, shuffled=shuffled
+                    ).extract_features_for_audio(long_audio, total_duration)
             else:
-                raw_DNN_features = self.get_DNN_obj(model_name).extract_DNN_features()
+                raw_DNN_features = self.get_DNN_obj(
+                    model_name, shuffled=shuffled
+                    ).extract_DNN_features()
             # cache features for future use...
-            write_cached_features(model_name, raw_DNN_features, contextualized=contextualized)
+            write_cached_features(model_name, raw_DNN_features, contextualized=contextualized, shuffled=shuffled)
         return raw_DNN_features
         
-    def get_resampled_DNN_features(self, model_name, bin_width, force_reload=False):
+    def get_resampled_DNN_features(self, model_name, bin_width, force_reload=False, shuffled=False):
         """
         Retrieves resampled all DNN layer features to specific bin_width
 
@@ -101,11 +110,21 @@ class DataLoader:
         Returns:
             List of dict: all layer features (resampled at required sampling_rate).
         """
-        if model_name not in self.DNN_feature_dict.keys():
-            self.DNN_feature_dict[model_name] = {}
-        model_features = self.DNN_feature_dict[model_name]
+        if shuffled:
+            DNN_feature_dict = self.DNN_shuffled_feature_dict
+        else:
+            DNN_feature_dict = self.DNN_feature_dict
+
+
+        if model_name not in DNN_feature_dict.keys():
+            DNN_feature_dict[model_name] = {}
+
+
+        model_features = DNN_feature_dict[model_name]
         if bin_width not in model_features.keys() or force_reload:
-            raw_features = self.get_raw_DNN_features(model_name, force_reload=force_reload)
+            raw_features = self.get_raw_DNN_features(
+                model_name, force_reload=force_reload, shuffled=shuffled
+                )
             # num_layers = len(raw_features)
             resampled_features = {layer_id:{} for layer_id in raw_features.keys()}
             
@@ -130,8 +149,46 @@ class DataLoader:
                     # resampled_features[j][sent] = tmp #- mean
                         
                     resampled_features[layer_ID][sent_ID] = tmp
-            self.DNN_feature_dict[model_name][bin_width] = resampled_features
-        return self.DNN_feature_dict[model_name][bin_width]
+            DNN_feature_dict[model_name][bin_width] = resampled_features
+        return DNN_feature_dict[model_name][bin_width]
+
+
+        # if model_name not in self.DNN_feature_dict.keys():
+        #     self.DNN_feature_dict[model_name] = {}
+
+
+
+        # model_features = self.DNN_feature_dict[model_name]
+        # if bin_width not in model_features.keys() or force_reload:
+        #     raw_features = self.get_raw_DNN_features(
+        #         model_name, force_reload=force_reload, shuffled=shuffled
+        #         )
+        #     # num_layers = len(raw_features)
+        #     resampled_features = {layer_id:{} for layer_id in raw_features.keys()}
+            
+        #     layer_IDs = list(raw_features.keys())
+        #     # reads first 'value' to get list of sent_IDs
+        #     sent_IDs = raw_features[layer_IDs[0]].keys()
+
+        #     print(f"Resamping ANN features at bin-width: {bin_width}")
+        #     bin_width_sec = bin_width/1000 # ms
+        #     for sent_ID in sent_IDs:
+        #         # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
+        #         sent_duration = self.metadata.stim_duration(sent_ID)
+        #         n = int(np.ceil(round(sent_duration/bin_width_sec, 3)))
+
+        #         for layer_ID in layer_IDs:
+        #             if bin_width == 1000:
+        #                 # treat this as a special case, and sum all samples across time...
+        #                 tmp = np.sum(raw_features[layer_ID][sent_ID].numpy(), axis=0)[None, :]
+        #             else:
+        #                 tmp = signal.resample(raw_features[layer_ID][sent_ID], n, axis=0)
+        #             # mean = np.mean(tmp, axis=0)
+        #             # resampled_features[j][sent] = tmp #- mean
+                        
+        #             resampled_features[layer_ID][sent_ID] = tmp
+        #     self.DNN_feature_dict[model_name][bin_width] = resampled_features
+        # return self.DNN_feature_dict[model_name][bin_width]
     
     def get_DNN_layer_features(self, model_name, layer_ID, bin_width=20):
         """Retrieves layer features, sampled according to bin_width,

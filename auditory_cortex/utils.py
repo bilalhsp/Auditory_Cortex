@@ -16,7 +16,7 @@ from scipy import linalg
 import matplotlib.pylab as plt
 
 # local
-from auditory_cortex import session_to_coordinates, CMAP_2D
+from auditory_cortex import session_to_coordinates#, #CMAP_2D
 from auditory_cortex import results_dir, aux_dir, saved_corr_dir
 
 # import GPU specific packages...
@@ -311,11 +311,41 @@ class CorrelationUtils:
 
 
 
-def get_2d_cmap(session):
-    cmap_2d = CMAP_2D(range_x=(-2, 2), range_y=(-2, 2))
-    coordinates = session_to_coordinates[int(session)]
-    color = coordinates_to_color(cmap_2d, coordinates)
-    return color
+def _get_layer_receptive_field(kernels, strides, layer_id):
+    """Computes receptive field for the layer at index 'layer_id'.
+
+    Args:
+        kernels: list = kernels sizes of convolution layers in order.
+        strides: list = strides of convolution layers in order.
+        layer_id: int = index of layer to compute the receptive field for.
+
+    Returns:
+        Receptive field (number of samples of input).
+    """
+    samples = kernels[layer_id]
+    for i in range(layer_id,0,-1):
+        samples = (samples - 1)*strides[i-1] + kernels[i-1]
+
+    return samples
+
+def get_receptive_fields(kernels, strides, fs=16000):
+    """Computes receptive fields for all the layers of the network,
+    the given arrays fo kernels and strides.
+    Args:
+        kernels: list = kernels sizes of convolution layers in order.
+        strides: list = strides of convolution layers in order.
+
+    """
+    print("Calculating receptive fields for all layers...")
+    samping_rates = np.zeros(len(kernels))
+    samping_rates[0] = fs/strides[0]
+    for i in range(0,len(strides)):
+        rf_samples = _get_layer_receptive_field(kernels, strides, i)
+        rf_ms = rf_samples*1000/fs
+        if i>0:
+            samping_rates[i] = samping_rates[i-1]/strides[i] 
+        print(f"Layer {i}, RF: {rf_samples:5d} samples, {rf_ms:4.2f} ms," +
+              f" sampling_rate: {samping_rates[i]:.0f}Hz, sampling_time: {(1000/samping_rates[i]):.3f}ms",)
 
 
 def coordinates_to_color(cmap_2d, coordinates):
@@ -358,12 +388,35 @@ def gaussian_cross_entropy(Y, Y_hat):
     
     return cross_entropy
 
-def poisson_cross_entropy(Y, Y_hat):
-    # Poisson predictions with Poisson Loss
-    loss_fn = nn.PoissonNLLLoss(log_input=False, full=True)
-    cross_entropy = loss_fn(Y, Y_hat).item()
+# def poisson_cross_entropy(Y, Y_hat):
+#     # Poisson predictions with Poisson Loss
+#     loss_fn = nn.PoissonNLLLoss(log_input=False, full=True)
+#     cross_entropy = loss_fn(Y, Y_hat).item()
     
-    return cross_entropy
+#     return cross_entropy
+
+def poisson_cross_entropy(ref, predictions):
+    """Computes the poisson cross entropy on the predicted outputs,
+    that can come from multiple model candidates (layers). 
+
+    Args:
+        ref: ndarray or cupy array: (samples, response_channels)
+        predictions: ndarray or cupy array: (samples, respose_channels, layers)
+    
+    Returns:
+        loss: ndarray = (channels, layers)
+    """
+    poisson_loss = torch.nn.PoissonNLLLoss(log_input=True, full=True, reduction='none')
+
+    with torch.no_grad():
+        ref_tensor = torch.tensor(ref)
+        predictions_tensor = torch.tensor(predictions)
+        ref_tensor = ref_tensor.transpose(0,1).unsqueeze(dim=1)
+        predictions_tensor = predictions_tensor.transpose(0,1).transpose(1,2)
+
+        loss = poisson_loss(predictions_tensor, ref_tensor)
+        loss = torch.mean(loss, dim=2).cpu().numpy()
+    return loss
 
 def linear_regression_score(Y, Y_hat):
     # using Y_hat 'prediction from linear regression' with Poisson Loss 
@@ -485,8 +538,9 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     """
     columns=[
             'session','layer','channel','bin_width', 'delay',
-            'train_cc_raw','test_cc_raw', 'normalizer', 'N_sents',
-            'opt_delays'
+            'train_cc_raw','test_cc_raw', 'poiss_entropy', 
+            'uncertainty_per_spike', 'bits_per_spike_NLB',
+            'normalizer', 'N_sents', 'opt_delays' 
             ]
 
 
@@ -515,6 +569,9 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
                                     np.ones_like(ch)*delay,
                                     corr_dict['train_cc_raw'][layer,:],
                                     corr_dict['test_cc_raw'][layer,:],
+                                    corr_dict['poiss_entropy'][layer,:],
+                                    corr_dict['uncertainty_per_spike'][layer,:],
+                                    corr_dict['bits_per_spike_NLB'][layer,:],
                                     normalizer,
                                     np.ones_like(ch)*N_sents,
                                     opt_delays[layer,:]

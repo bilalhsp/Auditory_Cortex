@@ -16,6 +16,7 @@ import argparse
 from auditory_cortex import config
 import auditory_cortex.utils as utils
 import auditory_cortex.models as models
+from auditory_cortex.io_utils.io import write_lmbdas
 # from wav2letter.datasets import DataModuleRF 
 # from wav2letter.models import LitWav2Letter, Wav2LetterRF
 
@@ -45,6 +46,7 @@ def compute_and_save_regression(args):
 
     # model_name = config['model_name']
     model_name = args.model_name
+    shuffled = args.shuffled
 
     # identifier = config['identifier']
     identifier = args.identifier
@@ -56,10 +58,6 @@ def compute_and_save_regression(args):
     if not third:
         third = None
     # # Create w2l model..
-
-
-
-
 
     # use_cpu = True
     # csv_file_name = 'testing_for_modified_code.csv'
@@ -75,6 +73,11 @@ def compute_and_save_regression(args):
         data = pd.read_csv(file_path)
         file_exists = True
 
+    if shuffled:
+        print(f"Running Linear Regression for 'Untrained' networks...")
+    else:
+        print(f"Running Linear Regression for 'Trained' networks...")
+
     ## read the sessions available in data_dir
     sessions = np.array(os.listdir(data_dir))
     sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
@@ -84,8 +87,6 @@ def compute_and_save_regression(args):
 
     # sessions = sessions[:20]
     # sessions = sessions[20:]
-    # sessions = sessions[15:30]
-
 
     obj = models.Regression(
                 model_name=model_name, delay_features=delay_features, audio_zeropad=audio_zeropad
@@ -107,7 +108,7 @@ def compute_and_save_regression(args):
                 subjects = sessions[np.isin(sessions,sessions_done.astype(int).astype(str), invert=True)]
             else:
                 subjects = sessions
-            
+
             for session in subjects:
                 print(f"Working with '{session}'")
                 # obj = get_reg_obj(data_dir, sub)
@@ -126,14 +127,17 @@ def compute_and_save_regression(args):
                         corr_dict = obj.grid_search_CV(
                                 session, bin_width=bin_width, iterations=iterations,
                                 num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
-                                numpy=use_cpu, delays=delays_grid, third=third, layer_IDs=args.layer_IDs
+                                numpy=use_cpu, delays=delays_grid, third=third, layer_IDs=args.layer_IDs,
+                                shuffled=shuffled
                             )
                     else:
-                        corr_dict = obj.cross_validated_regression(
+                        corr_dict, optimal_lmbdas, lmbda_loss = obj.cross_validated_regression(
                                 session, bin_width=bin_width, delay=delay, iterations=iterations,
                                 num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
-                                numpy=use_cpu,third=third, layer_IDs=args.layer_IDs
+                                numpy=use_cpu,third=third, layer_IDs=args.layer_IDs,
+                                shuffled=shuffled
                             )
+
                     df = utils.write_to_disk(corr_dict, file_path, normalizer=norm)
 
     END = time.time()
@@ -175,6 +179,11 @@ def get_parser():
         default='sampling_rate_opt_neural_delay',
         # choices=[],
         help="Specify identifier for saved results."
+    )
+    parser.add_argument(
+        '-s','--shuffle', dest='shuffled', action='store_true', default=False,
+        # choices=[],
+        help="Specify if shuffled network to be used."
     )
 
     return parser

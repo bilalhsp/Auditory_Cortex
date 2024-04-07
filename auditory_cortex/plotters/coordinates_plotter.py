@@ -28,6 +28,14 @@ class CoordinatesPlotter:
         ax.set_yticks([-2, -1, 0 , 1, 2], [-10, -5, 0, 5, 10])
         # ax.set_xticks([-2, 0 , 2], [-10, 0, 10], rotation=0)
         # ax.set_yticks([-2, 0 , 2], [-10, 0, 10])
+
+        # area separating lines..
+        # core-belt separation
+        ax.plot([-1.5, 1.5], [-0.35, 0.65], color='k')
+        # belt-parabelt separation
+        ax.plot([-1.5, 1.5], [-1.15, -0.2], color='k')
+
+
         plt.grid(grid)
         return ax
     
@@ -84,6 +92,7 @@ class CoordinatesPlotter:
 
     def scatter_sessions_for_recording_config(
             self, subject=None, annotate=False, save_tikz=False, 
+            highlight_sessions=None, default_color='k',
             **kwargs
         ):
         """Makes a scatter plot of session coordinates, labelled 
@@ -94,6 +103,10 @@ class CoordinatesPlotter:
             subject: str = subject+hemisphere out of
                     ['c_RH', 'c_RH', 'b_RH', 'f_RH']. Default=None.
                     In case of default, plots all the sessions 
+            annotate: bool= annotate (label) each session scatter dot
+            highlight_sessions: dict = sessions to be highlighted, with 
+                corresponding color as value. e.g. {200206: orange}
+            default_color: color = color to be used normally.
             
         """
         assert subject in ['c_LH', 'c_RH', 'b_RH', 'f_RH'], "Invalid recorind configuration."
@@ -115,10 +128,10 @@ class CoordinatesPlotter:
             x_coordinates.append(cx)
             y_coordinates.append(cy)
             labels.append(session)
-            if session == 200206:
-                color = 'tab:orange'
+            if session in highlight_sessions:
+                color = highlight_sessions[session]
             else:
-                color = 'tab:blue'
+                color = default_color
 
             colors.append(color)
             
