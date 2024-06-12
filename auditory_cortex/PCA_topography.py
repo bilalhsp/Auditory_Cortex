@@ -24,7 +24,7 @@ pca_dist_modes_filename = 'modes_pc_space_distributions.csv'
 
 
 class PCATopography:
-    def __init__(self, model_name='wave2letter_modified', load_features=False) -> None:
+    def __init__(self, model_name='wav2letter_modified', load_features=False) -> None:
         # regression object and load features.
 
         # correlation results object.

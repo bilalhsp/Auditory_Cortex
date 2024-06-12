@@ -20,7 +20,7 @@ hpc_cluster: True
 use_cpu: False
 
 # Ensure these settings before submitting every job..
-# model_name: wave2vec2
+# model_name: wav2vec2
 # identifier: neural_delay_only_feature_extractor
 # identifier: all_opt_delays_feature_extractor
 # identifier: basic_features_extractor #basic 
@@ -32,20 +32,20 @@ use_cpu: False
 # identifier: all_opt_delays_l0
 # identifier: opt_delay_l0
 
-# model_name: wave2vec
+# model_name: wav2vec
 # identifier: ''
 # identifier: neural_delay_only_l0
 
-# model_name: wave2letter_modified
+# model_name: wav2letter_modified
 # model_name: speech2text #
-# model_name: wave2vec2
-# model_name: wave2vec
+# model_name: wav2vec2
+# model_name: wav2vec
 # model_name: deepspeech2
 
 
 # identifier: opt_neural_delay_2_third #_feature_extractor
 # third: None
-model_name: wave2letter_modified
+model_name: wav2letter_modified
 # model_name: whisper_tiny
 # model_name: whisper_small
 # model_name: whisper_base
@@ -107,9 +107,9 @@ iterations: 1
 
 
 optimal_inputs_param:
-  # model_name: wave2letter_modified
-  # model_name: wave2vec2
-  model_name: wave2vec
+  # model_name: wav2letter_modified
+  # model_name: wav2vec2
+  model_name: wav2vec
   # model_name: speech2text
   # model_name: whisper
   starting_sent: 12        # 0 would mean, starting from random noise.

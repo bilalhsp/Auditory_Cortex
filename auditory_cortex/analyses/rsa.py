@@ -21,7 +21,7 @@ class RSA:
         self.identifier = identifier
         # self.corr_obj = Correlations(model_name=model_name+'_'+'opt_neural_delay')
         # needed only for sessions and channels selection...!
-        self.corr_obj = Correlations('wave2letter_modified_normalizer2')
+        self.corr_obj = Correlations('wav2letter_modified_normalizer2')
         self.dataloader = DataLoader()
         self.metadata = NeuralMetaData()
         # self.model = None

@@ -11,7 +11,7 @@ import pandas as pd
 # using the following models (best layers for each) for ensemble results.
 models_list = [
     {
-        'model_name': 'wave2letter_modified',
+        'model_name': 'wav2letter_modified',
         'layer': 6,
         'opt_neural_delay': 37.75,
     },
@@ -21,11 +21,11 @@ models_list = [
         'opt_neural_delay': 49.83,
     },
     # {
-    #     'model_name': 'wave2vec',
+    #     'model_name': 'wav2vec',
     #     'layer': 8
     # },
     {
-        'model_name': 'wave2vec2',
+        'model_name': 'wav2vec2',
         'layer': 7,
         'opt_neural_delay': 49.23,
     },

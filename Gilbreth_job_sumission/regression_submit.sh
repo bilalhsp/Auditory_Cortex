@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#SBATCH --output=./result_regression_w2v2_features_s.out
+# --output=./result_regression_w2l_spect.out
 
 #SBATCH	-A standby
 #SBATCH --constraint=F|G|I|K|D|B|H|J

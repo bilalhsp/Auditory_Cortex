@@ -21,8 +21,8 @@ from auditory_cortex.computational_models.feature_extractors import DNNFeatureEx
 from auditory_cortex.io_utils.io import read_cached_spikes, write_cached_spikes
 from auditory_cortex.io_utils.io import read_cached_features, write_cached_features
 
-from auditory_cortex.io_utils.io import read_cached_spikes_session_wise
-from auditory_cortex.io_utils.io import write_cached_spikes_session_wise
+# from auditory_cortex.io_utils.io import read_cached_spikes_session_wise
+# from auditory_cortex.io_utils.io import write_cached_spikes_session_wise
 
 from auditory_cortex.io_utils.io import read_context_dependent_normalizer
 
@@ -34,7 +34,7 @@ class DataLoader:
     def __init__(self):
         
         # Needs to be replaced with more robust way of getting the normalizers..
-        self.corr_obj = Correlations('wave2letter_modified_normalizer2')
+        self.corr_obj = Correlations('wav2letter_modified_normalizer2')
         self.metadata = NeuralMetaData()
         self.test_sent_IDs = self.metadata.test_sent_IDs #[12,13,32,43,56,163,212,218,287,308]
         self.sent_IDs = self.metadata.sent_IDs
@@ -284,18 +284,23 @@ class DataLoader:
         Returns:
             dict = dict of neural spikes with sent IDs as keys.
         """
-        print(f"DataLoader: Extracting spikes for session-{session}...", end='')
+        print(f"DataLoader: Extracting spikes for session-{session}...", end='\n')
         session = str(int(session))
+        # extracting spikes for all sentences...
+        return self.get_dataset_object(session).extract_spikes(bin_width, delay)
         # combination of session, bin_width and delay becomes the key self.neural_spikes
-        spikes_key = f"{int(session):06d}-{bin_width:04d}-{delay:04d}"
-        if spikes_key not in self.neural_spikes.keys():
-            self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
-            # self.num_channels[session] = self.get_dataset_object(session).num_channels
-            self.neural_spikes[spikes_key] = self.get_dataset_object(session).raw_spikes
-        print(f"Done.")
-        return self.neural_spikes[spikes_key]
+        # spikes_key = f"{int(session):06d}-{bin_width:04d}-{delay:04d}"
+        # if spikes_key not in self.neural_spikes.keys():
+        #     # self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
+        #     # # self.num_channels[session] = self.get_dataset_object(session).num_channels
+        #     # self.neural_spikes[spikes_key] = self.get_dataset_object(session).raw_spikes
+            
+        #     self.neural_spikes[spikes_key] = self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
+
+        # print(f"Done.")
+        # return self.neural_spikes[spikes_key]
     
-    def get_session_spikes(self, session, bin_width=20, delay=0):
+    def get_session_spikes(self, session, bin_width=50, delay=0):
         """Reads neural spikes from the cache directiory, extracts again
         if not found there.
 
@@ -309,27 +314,29 @@ class DataLoader:
             dict = dict of neural spikes with sent IDs as keys."""
         session = str(int(session))
         sum_spikes = False
+        # stop caching to memory, to avoid unnessary complexity...
+        force_redo = True
         spikes_key = f"{int(session):06d}-{bin_width:04d}-{delay:04d}"
         if spikes_key not in self.neural_spikes.keys():
-            if bin_width == 1000:
-                # treat this as a special case, where all samples are summed across time.
-                bin_width = 20
-                sum_spikes = True
-            session_wise_spikes = read_cached_spikes_session_wise(bin_width=bin_width, delay=delay)
-            if session_wise_spikes is None or session not in session_wise_spikes.keys():
-                spikes = self._extract_session_spikes(session, bin_width=bin_width,
+            # if bin_width == 1000:
+            #     # treat this as a special case, where all samples are summed across time.
+            #     bin_width = 20
+            #     sum_spikes = True
+            # # session_wise_spikes = read_cached_spikes_session_wise(bin_width=bin_width, delay=delay)
+            # if session_wise_spikes is None or session not in session_wise_spikes.keys():
+            spikes = self._extract_session_spikes(session, bin_width=bin_width,
                                                     delay=delay)
-                write_cached_spikes_session_wise(
-                    spikes, session=session, bin_width=bin_width, delay=delay
-                    )
-                self.neural_spikes[spikes_key] = spikes
-            else:
-                self.neural_spikes[spikes_key] = session_wise_spikes[session]
+            #     write_cached_spikes_session_wise(
+            #         spikes, session=session, bin_width=bin_width, delay=delay
+            #         )
+            self.neural_spikes[spikes_key] = spikes
+            # else:
+            #     self.neural_spikes[spikes_key] = session_wise_spikes[session]
 
-            if sum_spikes:
-                self.neural_spikes[spikes_key] = {
-                    sent_id: np.sum(spike_signal, axis=0)[None, :] for sent_id, spike_signal in self.neural_spikes[spikes_key].items()
-                    }
+            # if sum_spikes:
+            #     self.neural_spikes[spikes_key] = {
+            #         sent_id: np.sum(spike_signal, axis=0)[None, :] for sent_id, spike_signal in self.neural_spikes[spikes_key].items()
+            #         }
         # saving num of channels for the session..
         self.num_channels[session] = next(iter(self.neural_spikes[spikes_key].values())).shape[-1]
         return self.neural_spikes[spikes_key]

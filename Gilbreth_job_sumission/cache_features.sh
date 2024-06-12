@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#SBATCH --output=./result_cache_features_5_ss.out
+# --output=./result_cache_features_5.out
 
 #SBATCH	-A standby
 #SBATCH --constraint=F|G|I|K|D|B|H|J 

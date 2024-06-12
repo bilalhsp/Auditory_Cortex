@@ -23,7 +23,7 @@ import matplotlib.pylab as plt
 import matplotlib as mpl
 # %matplotlib inline
 
-model_name = 'wave2letter_modified'
+model_name = 'wav2letter_modified'
 obj = Regression(model_name=model_name)
 
 import time

@@ -84,7 +84,7 @@ class BetaPlotter():
         """Plots confusion matrix in the standard form, with option of
         adding title and bboxes etc.
         """
-        # model_name = 'wave2letter_modified'
+        # model_name = 'wav2letter_modified'
         # get the list of betas for significant channels
         
         title = f"{self.model_name} \n Beta confusion matrix"

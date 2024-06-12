@@ -14,6 +14,8 @@ from auditory_cortex.dataloader import DataLoader
 
 data_dir = '/scratch/gilbreth/ahmedb/data/'
 
+# voxpopuli: /scratch/gilbreth/ahmedb/data/voxpopuli
+
 class LibriSpeechDataset():
     """Dataset for Librispeech data"""
     def __init__(self, manifest, labels_normalizer=None):
@@ -159,6 +161,102 @@ def get_TEDLIUM_dataloader(
 
     return test_dataloader
 
+
+################################################
+########        VoxPopuli.en          ###############s
+
+class VoxPopuliDataset():
+    """VoxPopuli (en)"""
+    def __init__(self, labels_normalizer=None):
+        # data_dir = '/scratch/gilbreth/ahmedb/data/'
+        voxpopuli_dir = os.path.join(data_dir, 'voxpopuli/transcribed_data/en')
+        filename = 'asr_test.tsv'
+        manifest_file = os.path.join(voxpopuli_dir, filename)
+        audio_paths = []
+        audio_trans = []
+            
+        with open(manifest_file, 'r') as file:
+            reader  = csv.reader(file, delimiter='\t')
+            for i, row in enumerate(reader):
+                if i>0:
+                    if row[2] != '':
+                        id = row[0]
+                        year = id[:4]
+                        audio_filepath = os.path.join(
+                            voxpopuli_dir, year, f'{id}.ogg'
+                        )
+                        audio_paths.append(audio_filepath)
+                        audio_trans.append(row[2])
+        data = np.array([audio_paths, audio_trans], dtype=str).transpose()
+        self.manifest = pd.DataFrame(
+                columns=['audio', 'trans'],
+                data = data
+            )
+        self.labels_normalizer = labels_normalizer
+        self.fs = 16000
+    
+    def __len__(self):
+        return len(self.manifest)
+        
+    def __getitem__(self, idx):
+        audio_path = self.manifest.iloc[idx]['audio']
+        trans = self.manifest.iloc[idx]['trans']
+
+        audio, fs = soundfile.read(audio_path, always_2d=True)
+        audio = audio.squeeze()
+        # In order to match dimensions/dtype of audio required by librosa processing...!
+        # return audio.transpose(), fs, trans
+        # In order to match dimensions/dtype of audio returned by pytorch loader...!
+        return torch.tensor(np.expand_dims(audio, axis=0), dtype=torch.float32), self.fs, trans
+    
+    def collate_fn(self, data):
+        """Defines how individual data items should be combined,
+        simply returns them as a list"""    
+        waves = []
+        labels = []
+        target_lens = []
+        for (wav, fs, trans, *_) in data:
+            waves.append(wav)
+            # waves.append(wav.squeeze())
+            if self.labels_normalizer is not None:
+                trans = self.labels_normalizer(trans)
+            else:
+                trans = trans.lower()
+            labels.append(trans) #.lower()
+            target_len = np.ceil(50*wav.shape[-1]/fs) - 1
+            target_lens.append(target_len)
+        # padded_waves = torch.nn.utils.rnn.pad_sequence(sequences=waves, batch_first=True)
+        # return padded_waves, labels, target_lens
+        return waves, labels, target_lens
+
+
+
+def get_VoxPopuli_dataloader(
+        batch_size=32, labels_normalizer=None
+    ):
+    """
+    Returns dataloader for Common Voice 5.1
+    
+    Args:
+        batch_size: int = Default = 32
+    """
+
+    dataset = VoxPopuliDataset(labels_normalizer)
+
+    test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+        # num_workers=self.num_workers, 
+        shuffle=False, collate_fn=dataset.collate_fn, 
+        #  pin_memory=True, persistent_workers=self.persistant_workers  
+        )
+
+    return test_dataloader
+
+
+
+
+
+
+
 ################################################
 ########        Common voice 5.1          ###############s
 
@@ -291,6 +389,10 @@ def compute_WER(
             )
     elif 'common-voice' in benchmark:
         test_dataloader = get_CommonVoice_dataloader(
+            batch_size=batch_size, labels_normalizer=labels_normalizer
+        )
+    elif 'voxpopuli' in benchmark:
+        test_dataloader = get_VoxPopuli_dataloader(
             batch_size=batch_size, labels_normalizer=labels_normalizer
         )
     else:

@@ -17,6 +17,7 @@ from auditory_cortex import config
 import auditory_cortex.utils as utils
 import auditory_cortex.models as models
 from auditory_cortex.io_utils.io import write_lmbdas
+from auditory_cortex import valid_model_names
 # from wav2letter.datasets import DataModuleRF 
 # from wav2letter.models import LitWav2Letter, Wav2LetterRF
 
@@ -47,6 +48,7 @@ def compute_and_save_regression(args):
     # model_name = config['model_name']
     model_name = args.model_name
     shuffled = args.shuffled
+    test_trial = args.test_trial
 
     # identifier = config['identifier']
     identifier = args.identifier
@@ -120,15 +122,22 @@ def compute_and_save_regression(args):
                 norm = np.zeros(obj.dataloader.get_num_channels(session=session))
                 for N_sents in dataset_sizes:
                     if delays_grid_search:
-                        # delays_grid = [-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30]
+                        # # delays_grid = [-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30]
                         # delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
-                        delays_grid = [0,10,20,30,40,50,60,70,80,90,100] # for high bin_widths..
+
+                        # delays_grid = [0,10,20,30,40,50,60,70,80,90,100] # for high bin_widths..
+                        delays_grid = [
+                            0, 20, 40, 60 ,80 ,100,
+                            150, 200, 250, 300,
+                            350, 400, 450, 500,
+                            ]
+                        # delays_grid = [0, 20, 40, 60, 80, 100] # for wav2letter_spect...(untrained)
                         # delays_grid = [0] # Only for 1000 bin_width
                         corr_dict = obj.grid_search_CV(
                                 session, bin_width=bin_width, iterations=iterations,
                                 num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
                                 numpy=use_cpu, delays=delays_grid, third=third, layer_IDs=args.layer_IDs,
-                                shuffled=shuffled
+                                shuffled=shuffled, test_trial=test_trial
                             )
                     else:
                         corr_dict, optimal_lmbdas, lmbda_loss = obj.cross_validated_regression(
@@ -158,9 +167,12 @@ def get_parser():
     # add arguments to read from command line
     parser.add_argument(
         '-m', '--model_name', dest='model_name', action='store',#  dest='model_name', required=True,
-        choices=['wave2letter_modified', 'wave2vec2', 'speech2text', 'deepspeech2',
-                'whisper_tiny', 'whisper_small', 'whisper_base', 'whisper_medium'],
-        default='wave2letter_modified', 
+        choices=valid_model_names,
+        # choices=['wav2letter_modified', 'wav2vec2', 'speech2text', 'deepspeech2',
+        #         'whisper_tiny', 'whisper_small', 'whisper_base', 'whisper_medium',
+        #         'wav2letter_spect',
+                # ],
+        default='wav2letter_modified', 
         help='model to be used for Regression analysis.'
     )
 
@@ -185,6 +197,13 @@ def get_parser():
         # choices=[],
         help="Specify if shuffled network to be used."
     )
+    parser.add_argument(
+        '-t','--test_trial', dest='test_trial', type= int, action='store',
+        default=None,
+        # choices=[],
+        help="trial to test on."
+    )
+
 
     return parser
 

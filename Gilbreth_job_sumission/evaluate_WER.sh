@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#SBATCH --output=./result_WER_common_w2l.out
+#SBATCH --output=./result_WER_vox_w2l.out
 
 #SBATCH	-A standby
 #SBATCH --constraint=F|G|I|K|D|B|H|J

@@ -14,7 +14,7 @@ from auditory_cortex import utils
 threshold = 0.068
 layer_id = 2
 model_name = 'deepspeech2'
-# model_name = 'wave2letter_modified'
+# model_name = 'wav2letter_modified'
 
 # correlation object
 corr_obj = regression_correlations.Correlations(model_name=model_name+'_'+'opt_neural_delay')

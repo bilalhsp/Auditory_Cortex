@@ -16,7 +16,7 @@ class NeuralData:
   'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
   """
   def __init__(self, sub, dir=None, mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
-    print(f"Loading Neural data for session: {sub} ... ", end='')
+    print(f"NeuralData:  Creating object for session: {sub} ... ", end='')
     self.sub = sub
     if dir is None:
       dir = neural_data_dir
@@ -255,7 +255,13 @@ class NeuralData:
     return counts
 
   def extract_spikes(self, bin_width=20, delay=0, sents = None):
-    """Return neural spikes for given sents"""
+    """Return neural spikes for given sents
+    
+    Args:
+        bin_width: int = in ms
+        delay: int = in ms
+    """
+    print(f"NeuralData: Reading neural spikes for {self.sub}. ")
     if sents is None:
         sents = self.sents
     raw_spikes = {}

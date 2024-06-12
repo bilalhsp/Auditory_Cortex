@@ -1,6 +1,7 @@
 import time
 import argparse
 
+from auditory_cortex import valid_model_names
 from auditory_cortex.dataloader import DataLoader
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
 
@@ -12,10 +13,18 @@ def cache_features(args):
     dataloader = DataLoader()
     i = args.ind
     shuffled = args.shuffled
-    model_name = PlotterUtils.model_names[i]
+    
+    assert i < len(valid_model_names), f"Specified i={i} out of range."
+    model_name = valid_model_names[i]
+    # try:
+    #     model_name = PlotterUtils.model_names[i]
+    # except:
+    #     i = i-6
+    #     extra_models = ['wav2letter_spect']
+    #     model_name = extra_models[i]
     # model_names = [
-    #     'deepspeech2', 'speech2text', 'wave2letter_modified',
-    #     'whisper_tiny', 'whisper_base', 'wave2vec2',
+    #     'deepspeech2', 'speech2text', 'wav2letter_modified',
+    #     'whisper_tiny', 'whisper_base', 'wav2vec2',
     #     ]
     print(f"Model: {model_name}")
     raw_features = dataloader.get_raw_DNN_features(

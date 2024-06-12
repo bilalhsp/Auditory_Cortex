@@ -2,13 +2,194 @@ import os
 import numpy as np
 import pandas as pd
 import pickle
-from auditory_cortex import opt_inputs_dir, results_dir, cache_dir
+from auditory_cortex import opt_inputs_dir, results_dir, cache_dir, normalizers_dir
+from auditory_cortex import valid_model_names
+
+
+
+#-----------      Null distribution using poisson sequences    -----------#
+
+def read_significant_sessions_and_channels(bin_width, p_threshold, use_poisson_null=True):
+    """Retrieves significant sessions and channels at the specified bin width."""
+
+    if use_poisson_null:
+        subdir = 'using_poisson_null'
+    else:
+        subdir = 'using_shifts_null'
+    # path_dir = os.path.join(results_dir, 'normalizers', 'significant_neurons', subdir)
+    path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
+    file_path = os.path.join(path_dir, f"significant_sessions_and_channels_bw_{bin_width}ms_pvalue_{p_threshold}.pkl")
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as F: 
+            significant_sessions_and_channels = pickle.load(F)
+        return significant_sessions_and_channels
+    else:
+        print(f"Sigificant sessions/channels data not found: for bin-width {bin_width}ms.")
+        return None
+
+def write_significant_sessions_and_channels(
+        bin_width, p_threshold, significant_sessions_and_channels,
+        use_poisson_null=True):
+    """Writes significant sessions and channels at the specified bin width."""
+    if use_poisson_null:
+        subdir = 'using_poisson_null'
+    else:
+        subdir = 'using_shifts_null'
+
+    # path_dir = os.path.join(results_dir, 'normalizers', 'significant_neurons', subdir)
+    path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
+    if not os.path.exists(path_dir):
+        print(f"Path not found, creating directories...")
+        os.makedirs(path_dir)
+
+    file_path = os.path.join(path_dir, f"significant_sessions_and_channels_bw_{bin_width}ms_pvalue_{p_threshold}.pkl")
+    with open(file_path, 'wb') as F: 
+        pickle.dump(significant_sessions_and_channels, F)
+    print(f"Sigificant sessions/channels saved to: {file_path}")
+
+
+#-----------      Null distribution using poisson sequences    -----------#
+
+def read_normalizer_null_distribution_using_poisson(bin_width, spike_rate):
+    """Retrieves null distribution of correlations computed using poisson sequences."""
+    bin_width = int(bin_width)
+    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
+    path_dir = os.path.join(normalizers_dir, 'null_distribution')
+    file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as F: 
+            norm_null_dist = pickle.load(F)
+        return norm_null_dist
+    else:
+        print(f"Null dist. not found: for bin-width {bin_width}ms and {spike_rate}Hz spike rate.")
+        return None
+
+def write_normalizer_null_distribution_using_poisson(bin_width, spike_rate, null_dist_poisson):
+    """Writes null distribution of correlations computed using poisson sequences for the given selection."""
+    bin_width = int(bin_width)
+    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
+    path_dir = os.path.join(normalizers_dir, 'null_distribution')
+    if not os.path.exists(path_dir):
+        print(f"Path not found, creating directories...")
+        os.makedirs(path_dir)
+    file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
+    
+    with open(file_path, 'wb') as F: 
+        pickle.dump(null_dist_poisson, F)
+    print(f"Null dist. poisson saved to: {file_path}")
+
+
+#-----------      Null distribution using sequence shifts    -----------#
+
+def read_normalizer_null_distribution_random_shifts(
+        bin_width, min_shift_frac, max_shift_frac
+        ):
+    """Retrieves null distribution of correlations computed using randomly 
+        shifted spike sequence of one trial vs (non-shifted) seconds trial."""
+    bin_width = int(bin_width)
+    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution', 'shifted_sequence')
+    path_dir = os.path.join(normalizers_dir, 'null_distribution', 'shifted_sequence')
+    file_path = os.path.join(
+        path_dir,
+        f"normalizers_null_dist_sequence_shifted_bw_{bin_width}ms_shift_range_{min_shift_frac:01.2f}_{max_shift_frac:01.2f}.pkl"
+        )
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as F: 
+            norm_null_dist = pickle.load(F)
+        return norm_null_dist
+    else:
+        print(f"Null dist. not found: for bin-width {bin_width}ms and shift range {min_shift_frac:01.2f}--{max_shift_frac:01.2f}.")
+        return None
+
+def write_normalizer_null_distribution_using_random_shifts(
+        session, bin_width, min_shift_frac,
+        max_shift_frac, null_dist_sess,
+        ):
+    """Writes null distribution of correlations computed using poisson sequences for the given selection."""
+    bin_width = int(bin_width)
+    session = str(int(float(session)))
+    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution', 'shifted_sequence')
+    path_dir = os.path.join(normalizers_dir, 'null_distribution', 'shifted_sequence')
+    file_path = os.path.join(
+        path_dir,
+        f"normalizers_null_dist_sequence_shifted_bw_{bin_width}ms_shift_range_{min_shift_frac:01.2f}_{max_shift_frac:01.2f}.pkl"
+        )
+    
+    if not os.path.exists(path_dir):
+        print(f"Path not found, creating directories...")
+        os.makedirs(path_dir)
+
+    null_dict_all_sessions = read_normalizer_null_distribution_random_shifts(
+        bin_width, min_shift_frac, max_shift_frac
+        )
+        
+    if null_dict_all_sessions is None:
+        null_dict_all_sessions = {}
+
+    null_dict_all_sessions[session] = null_dist_sess
+    with open(file_path, 'wb') as F: 
+        pickle.dump(null_dict_all_sessions, F)
+    print(f"Writing normalizer dictionary to the {file_path}")
+
+
+
+#-----------  Normalizer distribution using all possible pairs of trials  ----------#
+
+def read_normalizer_distribution(
+        bin_width, delay, method='app'
+        ):
+    """Retrieves distribution of normalizers for the given selection."""
+    bin_width = int(bin_width)
+    delay = int(delay)
+    if method == 'app':
+        subdir = 'all_possible_pairs'
+    else:
+        subdir = 'random_pairs'
+    path_dir = os.path.join(normalizers_dir, subdir)
+    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as F: 
+            normalizers_dist = pickle.load(F)
+        return normalizers_dist
+    else:
+        print(f"Normalizers not found: for bin-width {bin_width}ms and delay {delay}ms.")
+        return None
+
+def write_normalizer_distribution(
+        session, bin_width, delay, normalizer_dist, method='app',
+                                    ):
+    """Writes distribution of normalizers for the given selection."""
+    bin_width = int(bin_width)
+    delay = int(delay)
+    if method == 'app':
+        subdir = 'all_possible_pairs'
+    else:
+        subdir = 'random_pairs'
+    # path_dir = os.path.join(results_dir, 'normalizer', subdir)
+    path_dir = os.path.join(normalizers_dir, subdir)
+    if not os.path.exists(path_dir):
+        print(f"Path not found, creating directories...")
+        os.makedirs(path_dir)
+    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
+    norm_dict_all_sessions = read_normalizer_distribution(
+        bin_width, delay, method=method)
+    
+    if norm_dict_all_sessions is None:
+        norm_dict_all_sessions = {}
+
+    norm_dict_all_sessions[session] = normalizer_dist
+    with open(file_path, 'wb') as F: 
+        pickle.dump(norm_dict_all_sessions, F)
+    print(f"Writing normalizer dictionary to the {file_path}")
+
+
 
 def read_cached_glm_parameters(model_name, session, bin_width=20, shuffled=False):
     """Reads parameters of GLM alongthwith neural spikes and natural parameters 
     model_name, returns a dictionary.
     """
     session = int(session)
+    bin_width = int(bin_width)
     # layer_ID = int(layer_ID)
     if shuffled:
         path_dir = os.path.join(cache_dir, 'glm', f'{model_name}', 'shuffled')
@@ -223,6 +404,19 @@ def write_reg_corr(model_name, results_dict):
     print(f"Results saved for {model_name} at path: \n {file_path}.")
 
 
+def read_model_parameters(model_name):
+    """Retrieves model parameters/betas at path 
+    determined using the model_name.
+    """
+    dirpath = os.path.join(opt_inputs_dir, model_name)
+    filepath = os.path.join(dirpath, f"{model_name}_beta_bank.pkl")
+    if os.path.exists(filepath):
+        with open(filepath, 'rb') as f:
+            beta_bank = pickle.load(f)
+        return beta_bank
+    else:
+        return None
+
 
 def write_model_parameters(
         model_name, session, coefficents):
@@ -236,17 +430,14 @@ def write_model_parameters(
         os.makedirs(dirpath)
 
     # loading existing betas or creating new (if not available already)
-    filepath = os.path.join(dirpath, f"{model_name}_beta_bank.pkl")
-    if os.path.exists(filepath):
-        with open(filepath, 'rb') as f:
-            beta_bank = pickle.load(f)
-            print("Loading file...")
-    else:
+    beta_bank = read_model_parameters(model_name=model_name)
+    if beta_bank is None:
         print(f"Creating new beta bank")
         beta_bank = {}
 
     beta_bank[session] = coefficents
 
+    filepath = os.path.join(dirpath, f"{model_name}_beta_bank.pkl")
     with open(filepath, 'wb') as f:
         pickle.dump(beta_bank, f) 
 
@@ -357,12 +548,13 @@ def read_cached_features(model_name, contextualized=False, shuffled=False):
 
     Args:
         model_name: str specifying model name, possible choices are
-            ['wave2letter_modified', 'wave2vec2', 'speech2text',
+            ['wav2letter_modified', 'wav2vec2', 'speech2text',
             'deepspeech2', 'whiper_tiny', 'whisper_base', 'whisper_small']
     """
-    model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
-            'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small']
-    assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
+    # model_choices = ['wav2letter_modified', 'wav2vec2', 'speech2text',
+    #         'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small',
+    #         'wav2letter_spect']
+    assert model_name in valid_model_names, f"Invalid model name '{model_name}' specified!"
 
     
     if contextualized:
@@ -389,13 +581,14 @@ def write_cached_features(model_name, features, verbose=True, contextualized=Fal
 
     Args:
         model_name: str specifying model name, possible choices are
-            ['wave2letter_modified', 'wave2vec2', 'speech2text',
+            ['wav2letter_modified', 'wav2vec2', 'speech2text',
             'deepspeech2', 'whiper_tiny', 'whisper_base', 'whisper_small']
         features: list = features for each layers as a list of dictionaries 
     """
-    model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
-            'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small']
-    assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
+    # model_choices = ['wav2letter_modified', 'wav2vec2', 'speech2text',
+    #         'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small',
+    #         'wav2letter_spect']
+    assert model_name in valid_model_names, f"Invalid model name '{model_name}' specified!"
     
     if contextualized:
         print(f"writing contextualized features...")
@@ -517,7 +710,7 @@ def read_cached_RDM_correlations(model_name, identifier, area, bin_width):
 
     Args:
         model_name: str specifying model name, possible choices are
-            ['wave2letter_modified', 'wave2vec2', 'speech2text',
+            ['wav2letter_modified', 'wav2vec2', 'speech2text',
             'deepspeech2', 'whiper_tiny', 'whisper_base']
         identifier: str specifying time alignment operation..
             ['', 'global','average']
@@ -538,10 +731,10 @@ def write_cached_RDM_correlations(corr_dict, model_name, identifier, area, bin_w
 
     Args:
         model_name: str specifying model name, possible choices are
-            ['wave2letter_modified', 'wave2vec2', 'speech2text',
+            ['wav2letter_modified', 'wav2vec2', 'speech2text',
             'deepspeech2', 'whiper_tiny', 'whisper_base']
     """
-    model_choices = ['wave2letter_modified', 'wave2vec2', 'speech2text',
+    model_choices = ['wav2letter_modified', 'wav2vec2', 'speech2text',
             'deepspeech2', 'whisper_tiny', 'whisper_base']
     assert model_name in model_choices, f"Invalid model name '{model_name}' specified!"
     assert identifier in ['', 'global','average'], print(f"Please specify right identifier..")

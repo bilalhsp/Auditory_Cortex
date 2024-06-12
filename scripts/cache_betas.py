@@ -9,8 +9,8 @@ from auditory_cortex.analyses import regression_correlations
 
 # model_name = 'deepspeech2'
 # model_name = 'speech2text'
-model_name = 'wave2vec2'
-# model_name = 'wave2letter_modified'
+model_name = 'wav2vec2'
+# model_name = 'wav2letter_modified'
 threshold = 0.068
 
 print(f"Creating objects for {model_name}")

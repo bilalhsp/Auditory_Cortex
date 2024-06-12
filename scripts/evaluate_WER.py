@@ -33,14 +33,15 @@ def get_parser():
     # add arguments to read from command line
     parser.add_argument(
         '-m', '--model_name', dest='model_name', action='store',#  dest='model_name', required=True,
-        choices=['wave2letter_modified', 'wave2vec2', 'speech2text', 'deepspeech2',
+        choices=['wav2letter_modified', 'wav2vec2', 'speech2text', 'deepspeech2',
                 'whisper_tiny', 'whisper_small', 'whisper_base', 'whisper_medium'],
-        # default='wave2letter_modified', 
+        # default='wav2letter_modified', 
         help='model to be evaluated .'
     )
     parser.add_argument(
         '-b','--benchmark', dest='benchmark', type= str, action='store',
-        choices=['librispeech-test-clean', 'librispeech-test-other','tedlium', 'common-voice'],
+        choices=['librispeech-test-clean', 'librispeech-test-other','tedlium', 'common-voice',
+                 'voxpopuli'],
         help="Specify the benchmark to compute WER on."
     )
     return parser
