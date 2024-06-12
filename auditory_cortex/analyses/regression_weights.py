@@ -31,10 +31,10 @@ class BetaAnalyzer:
         self.beta_bank = self._read_betas()
         # first layer in beta_banks, this will be used to adjust layer index
         self.beta_first_layer = {
-            'wave2letter_modified': 0,
+            'wav2letter_modified': 0,
             'speech2text': 2,
             'deepspeech2': 2,
-            'wave2vec2': 7
+            'wav2vec2': 7
         }
 
     def _read_betas(self):
@@ -318,7 +318,7 @@ class BetaAnalyzer:
     #     """Plots confusion matrix in the standard form, with option of
     #     adding title and bboxes etc.
     #     """
-    #     # model_name = 'wave2letter_modified'
+    #     # model_name = 'wav2letter_modified'
     #     # get the list of betas for significant channels
     #     title = f"{self.model_name} \n Beta confusion matrix"
 

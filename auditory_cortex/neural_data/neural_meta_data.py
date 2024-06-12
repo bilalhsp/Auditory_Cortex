@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from scipy import io
-
+import fnmatch
 
 from auditory_cortex import neural_data_dir, config
 # from auditory_cortex.neural_data.config import RecordingConfig
@@ -94,6 +94,12 @@ class NeuralMetaData:
     def get_session_area(self, session):
         """Returns 'area' (core/belt/PB) for the given session"""
         return self.session_to_area[int(session)]
+    
+    def get_area_choices(self):
+        """Returns all brain areas covered in recordings. e.g. ['core', 'belt']"""
+        area_choices = list(self.cfg.area_wise_sessions.keys())
+        area_choices.append('all')
+        return area_choices
 
     def get_session_coordinates(self, session):
         """Returns coordinates of recoring site (session)"""
@@ -215,4 +221,13 @@ class NeuralMetaData:
             sessions = np.delete(sessions, np.where(sessions == s))
         sessions = np.sort(sessions)
         return sessions
+    
+
+    def get_num_channels(self, session):
+        """Returns the number of channels in a session."""
+        session = str(int(float(session)))
+        session_dir = os.path.join(neural_data_dir, session)
+        channel_filenames = np.array(os.listdir(session_dir)) 
+        valid_channels = fnmatch.filter(channel_filenames,'*Ch*MUspk.mat')
+        return len(valid_channels)
         

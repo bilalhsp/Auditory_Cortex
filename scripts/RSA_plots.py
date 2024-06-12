@@ -11,7 +11,7 @@ from auditory_cortex.plotters.rsa_plotter import plot_line_with_shaded_region
 from auditory_cortex.plotters.rsa_plotter import bar_plot_with_model_colors
 from auditory_cortex import results_dir
 
-# model_names = ['wave2letter_modified', 'wave2vec2',
+# model_names = ['wav2letter_modified', 'wav2vec2',
 #                 'deepspeech2', 'speech2text', 'whisper_tiny', 
 #                 'whisper_base']
 

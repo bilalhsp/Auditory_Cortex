@@ -50,9 +50,9 @@ def get_parser():
 
     parser.add_argument(
         '-m', '--model_name', dest='model_name', action='store',#  dest='model_name', required=True,
-        choices=['wave2letter_modified', 'wave2vec2', 'speech2text', 'deepspeech2',
+        choices=['wav2letter_modified', 'wav2vec2', 'speech2text', 'deepspeech2',
                 'whisper_tiny', 'whisper_small', 'whisper_base', 'whisper_medium'],
-        default='wave2letter_modified', 
+        default='wav2letter_modified', 
         help='model to be used for Regression analysis.'
     )
     parser.add_argument(

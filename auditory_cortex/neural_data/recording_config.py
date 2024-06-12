@@ -73,8 +73,9 @@ class RecordingConfig:
 
                 180501  # not assigned by Josh, moved here based on coordinates plot..
             ]),
+        'non-primary': np.array([
 
-        'belt': np.array([
+        # 'belt': np.array([
                 # CL
                 # 180808, moved to core..based on coordinates plot (josh was unsure)
                 180405,  # close to recordings assigned to A1 (core)
@@ -96,8 +97,8 @@ class RecordingConfig:
                 # unassigned
                 # 180619, #c_RH
 
-            ]),            
-        'parabelt': np.array([
+        #     ]),            
+        # 'parabelt': np.array([
                 #CPB
                 180724, 
                 200318, 200401,

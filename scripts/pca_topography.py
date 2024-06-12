@@ -37,7 +37,7 @@ def get_parser():
     # add arguments to read from command line
     parser.add_argument(
         'model_name', action='store', #  dest='model_name', required=True,
-        choices=['wave2letter_modified', 'wave2vec', 'speech2text', 'wave2vec2'],
+        choices=['wav2letter_modified', 'wav2vec', 'speech2text', 'wav2vec2'],
         help='model to be used for PCA (KDE) plots.'
     )
     parser.add_argument(

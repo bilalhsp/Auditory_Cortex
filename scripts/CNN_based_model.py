@@ -89,9 +89,9 @@ def get_parser():
         # add arguments to read from command line
     parser.add_argument(
         '-m', '--model_name', dest='model_name', action='store',#  dest='model_name', required=True,
-        choices=['wave2letter_modified', 'wave2vec2', 'speech2text', 'deepspeech2',
+        choices=['wav2letter_modified', 'wav2vec2', 'speech2text', 'deepspeech2',
                 'whisper_tiny', 'whisper_small', 'whisper_base', 'whisper_medium'],
-        default='wave2vec2', 
+        default='wav2vec2', 
         help='model to be used for RSA analysis.'
     )
     parser.add_argument(
@@ -115,7 +115,7 @@ def get_parser():
 
 def run_study(args):
     # pretrained = True
-    # model_name = 'wave2vec2'
+    # model_name = 'wav2vec2'
     # layer_ID = 7
     global PRETRAINED
     global MODEL_NAME

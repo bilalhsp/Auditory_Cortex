@@ -8,9 +8,14 @@ import numpy as np
 # CMAP_2D = ColorMap2DZiegler
 
 # candidate model names
-model_names = ['wave2letter_modified', 'wave2vec2',
-                'deepspeech2', 'speech2text', 'whisper_tiny', 
-                'whisper_base']
+valid_model_names = [
+		'deepspeech2', 'speech2text',
+		'wav2letter_modified',
+		'whisper_tiny', 'whisper_base',
+		'wav2vec2',
+        'wav2letter_spect',
+        'w2v2_audioset',
+    ]
 
  
 
@@ -24,16 +29,19 @@ with open(os.path.join(config_dir, 'regression_config.yaml'), 'r') as f:
     config = yaml.load(f, yaml.FullLoader)
 
 hpc_cluster = config['hpc_cluster']
-
 neural_data_dir = config['neural_data_dir']
-
 results_dir = config['results_dir']
+
 saved_corr_dir = os.path.join(results_dir, 'cross_validated_correlations')
 pretrained_dir = os.path.join(results_dir, 'pretrained_weights')
 opt_inputs_dir = os.path.join(results_dir, 'optimal_inputs')
 
 # Used to cache frequently used data (e.g. features, spikes etc.)
 cache_dir = config['cache_dir']
+normalizers_dir = os.path.join(cache_dir, 'normalizers')
+
+
+
 
 
 bad_sessions = config['bad_sessions']
@@ -97,17 +105,27 @@ area_to_sessions = {
                     
                         
                    ]),
-
-     'belt': np.array([
+    'higher': np.array([
+            ## Belt..
             180622, 190703, 190607, 190605, 180728, 180619, 180502, #c_RH
             191211, 200323, 200312, 200219, 200401, 200318,      #f_RH
             191115, 200205, 191219, 200617, 200212, 191121, 191210, #c_LH
+            ## Parabelt...
+            180501, 180801, 180417, 180413, 180420,
 
-                ]),            
-      'parabelt': np.array([
-          #b_RH (need to confirm these)
-          180501, 180801, 180417, 180413, 180420,
-      ]),          
+                ]),
+
+
+    #  'belt': np.array([
+    #         180622, 190703, 190607, 190605, 180728, 180619, 180502, #c_RH
+    #         191211, 200323, 200312, 200219, 200401, 200318,      #f_RH
+    #         191115, 200205, 191219, 200617, 200212, 191121, 191210, #c_LH
+
+    #             ]),            
+    #   'parabelt': np.array([
+    #       #b_RH (need to confirm these)
+    #       180501, 180801, 180417, 180413, 180420,
+    #   ]),          
 }
 
 session_to_area = {}

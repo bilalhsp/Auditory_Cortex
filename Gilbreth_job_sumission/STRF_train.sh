@@ -1,8 +1,16 @@
 #!/bin/sh
 
-#SBATCH --output=./result_train_STRF.out
+# --output=./result_train_STRF50.out
 
 #SBATCH	-A standby
+#SBATCH --constraint=F|G|I|K|D
+#|B|H|J
+#F|G|I|K|D|B|H|J
+
+# High Mem GPUs: F|G|I|K|D
+# very Fast GPUs: F|K
+# Fast GPUs: D
+# Slow GPUs: E
 
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
@@ -18,4 +26,4 @@ module load use.own
 module load conda-env/wav2letter-py3.8.5
 #module load conda-env/wav2letter_pretrained-py3.8.5
 
-python ../scripts/train_STRF.py
+python ../scripts/train_STRF.py $@

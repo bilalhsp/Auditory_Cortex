@@ -24,7 +24,7 @@ def get_parser():
     # add arguments to read from command line
     parser.add_argument(
         'model_name', action='store',#  dest='model_name', required=True,
-        choices=['wave2letter_modified', 'wave2vec', 'speech2text'], 
+        choices=['wav2letter_modified', 'wav2vec', 'speech2text'], 
         help='model to be used for synthesizing input.'
     )
     parser.add_argument(

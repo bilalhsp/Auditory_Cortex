@@ -19,10 +19,482 @@ import auditory_cortex.utils as utils
 from auditory_cortex.utils import CorrelationUtils
 from auditory_cortex.neural_data import NeuralMetaData
 from auditory_cortex.neural_data.normalizer import Normalizer
-from auditory_cortex import session_to_coordinates, session_to_subject, session_to_area#, CMAP_2D
+from auditory_cortex import session_to_coordinates, session_to_subject, session_to_area, area_to_sessions #, CMAP_2D
 from auditory_cortex import saved_corr_dir, aux_dir
 from auditory_cortex.io_utils import io
 # from pycolormap_2d import ColorMap2DBremm, config, results_dir
+
+
+
+class BaseCorrelations:
+    """Base class for Correlation and STRFCorrelation class. Provides
+    the blueprint to create instances of sub-classes, merge results,
+    add normalizer etc. """
+    def __init__(
+            self, model_name, normalizer_filename=None, third=None
+        ) -> None:
+        
+        self.model = model_name
+        filename = f'{model_name}_corr_results.csv'
+        self.corr_file_path = os.path.join(saved_corr_dir, filename)
+        self.metadata = NeuralMetaData()
+        self.norm_obj = Normalizer(normalizer_filename)
+
+        self.data = pd.read_csv(self.corr_file_path)
+        # check if 'test_cc_raw' not one of the columns
+        # this will be the case for STRF correlations
+        # in that case, copy 'strf_corr' to 'test_cc_raw'
+        if 'test_cc_raw' not in self.data.columns:
+            self.data['test_cc_raw'] = self.data['strf_corr']
+            print(f"'test_cc_raw added as a column..!")
+        
+        if 'normalizer' not in self.data.columns:
+            self.data.loc[:, 'normalizer'] = np.nan
+            # self.set_normalizers()
+            self.set_normalizers_using_bootsrap()
+
+        if 'normalizer_app' not in self.data.columns:
+            # need to remove these bad channels...
+            bad_sessions = [180725., 190607., 191212., 200226.]
+            all_bad_ids = []
+            for sess in bad_sessions:
+                all_bad_ids.append(self.data[self.data['session'] == sess].index)
+            all_bad_ids = np.concatenate(all_bad_ids)
+            self.data.drop(all_bad_ids, inplace=True)
+
+            # self.set_normalizers_using_app()
+            # self.set_normalizers_using_bootsrap()
+
+
+
+    # ---------------- methods using normalizer dist. using all-possible-pairs (app) ---------#
+
+    def set_normalizers_using_app(self):
+        """Uses normalizer distribution computed using all-possible-pairs (app),
+        and takes following steps:
+            - adds a column 'normalizer_app' containig the new normalizer.
+            - adds a column 'corr_normalized_app' containing corrected correlations.
+        """
+        bin_widths = self.data['bin_width'].unique()
+        for bin_width in bin_widths:
+            select_data = self.get_selected_data(bin_width=bin_width)
+            sessions = select_data['session'].unique()
+            delays = select_data['delay'].unique()
+            for session in sessions:
+                for delay in delays:
+                    select_data = self.get_selected_data(
+                        sessions=[session], bin_width=bin_width, delay=delay
+                    )
+                    channels = select_data['channel'].unique()
+
+                    # reading the normalizer...
+                    normalizers_dist = self.norm_obj.get_normalizer_for_session_app(
+                        session=session, bin_width=bin_width 
+                    )
+                    normalizers_dist = np.mean(normalizers_dist, axis=0)
+
+                    for ch in channels:
+                        ch = int(ch)
+                        ch_normalizer = normalizers_dist[ch]
+                        ids = select_data[select_data['channel']==ch].index
+                        self.data.loc[ids, 'normalizer_app'] = ch_normalizer 
+
+        self.data['corr_normalized_app'] = self.data['test_cc_raw']/(self.data['normalizer_app'].apply(np.sqrt))
+        print(f"Normalizers updated using normalizer (app) dist , writing back now...")
+        self.write_back()
+
+    # ---------------- methods using normalizer dist. using all-possible-pairs (app) ---------#
+
+    def set_normalizers_using_bootsrap(self):
+        """Uses normalizer distribution computed using 100k runs 
+        with random concatenation order of trials, and takes following steps:
+            - adds a column 'normalizer' containig the new normalizer.
+            - adds a column 'normalized_test_cc' containing corrected correlations.
+        """
+        bin_widths = self.data['bin_width'].unique()
+        for bin_width in bin_widths:
+            select_data = self.get_selected_data(bin_width=bin_width)
+            sessions = select_data['session'].unique()
+            delays = select_data['delay'].unique()
+            for session in sessions:
+                for delay in delays:
+                    select_data = self.get_selected_data(
+                        sessions=[session], bin_width=bin_width, delay=delay
+                    )
+                    channels = select_data['channel'].unique()
+
+                    # reading the normalizer...
+                    normalizers_dist = self.norm_obj.get_normalizer_for_session_random_pairs(
+                        session=session, bin_width=bin_width 
+                    )
+                    normalizers_dist = np.median(normalizers_dist, axis=0)
+
+                    for ch in channels:
+                        ch = int(ch)
+                        ch_normalizer = normalizers_dist[ch]
+                        ids = select_data[select_data['channel']==ch].index
+                        self.data.loc[ids, 'normalizer'] = ch_normalizer 
+
+        self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
+        print(f"Normalizers updated using normalizer (random pairs) dist , writing back now...")
+        self.write_back()
+
+    # def get_selected_data(
+    #             self, sessions: list=None, bin_width=None, delay=None, channel=None
+    #     ):
+    #     """Retrieves selected data based on provided arguments. 
+    #     If an argument if 'None', no filter is applied on that column.
+
+    #     Args:
+    #         sessions: list of ints = list of sessions IDs to get data for.
+    #         bin_width: int = bin_width in ms.
+    #         delay: int = delay in ms.
+        
+    #     Returns:
+    #         pandas DataFrame
+    #     """
+    #     select_data = self.data
+    #     if bin_width is not None:
+    #         select_data = select_data[select_data['bin_width']==float(bin_width)]
+        
+    #     if delay is not None:
+    #         select_data = select_data[select_data['delay']==float(delay)]
+        
+    #     if channel is not None:
+    #         select_data = select_data[select_data['channel']==float(channel)]
+
+    #     if sessions is not None:
+    #         session_data = []
+    #         # sessions is a list...
+    #         for session in sessions:
+    #             session_data.append(select_data[
+    #                     (select_data['session']==float(session))
+    #                 ])
+    #         select_data = pd.concat(session_data)
+    #     return select_data
+
+
+# ------------------  Retrieve data for analysis ----------------#
+
+    def get_normalizer_threshold(self, bin_width=20, poisson_normalizer=True):
+        """Retrieves significance threshold from the NULL distribution
+        of normalizer.
+        """
+        threshold_dict = io.read_normalizer_threshold(
+            bin_width=bin_width, poisson_normalizer=poisson_normalizer
+            )
+        if threshold_dict is None or bin_width not in threshold_dict.keys():
+            if poisson_normalizer:
+                threshold = self.norm_obj.compute_normalizer_threshold_using_poisson(bin_width=bin_width)[0]
+            else:
+                threshold = self.norm_obj.compute_normalizer_threshold(bin_width=bin_width)[0]
+
+            io.write_normalizer_threshold(
+                bin_width=bin_width, poisson_normalizer=poisson_normalizer,
+                thresholds=threshold
+            )
+            return threshold
+        else:
+            return threshold_dict[bin_width]
+
+
+
+    # ------------------  copy normalizer for all bin-widths ----------------#
+    def set_normalizers(self, bin_widths: list=None):
+        """Set normalizers (repeatability correlations) from the saved results.
+        """
+        if bin_widths is None:
+            bin_widths = self.data['bin_width'].unique()
+        for bin_width in bin_widths:
+            select_data = self.get_selected_data(bin_width=bin_width)
+            sessions = select_data['session'].unique()
+            delays = select_data['delay'].unique()
+            for session in sessions:
+                for delay in delays:
+                    select_data = self.get_selected_data(
+                        sessions=[session], bin_width=bin_width, delay=delay
+                    )
+                    channels = select_data['channel'].unique()
+                    selected_normalizers = self.norm_obj.get_normalizer_for_session(
+                        session=session, bin_width=bin_width, delay=delay
+                        )
+                    for ch in channels:
+                        ids = select_data[select_data['channel']==ch].index
+                        ch_normalizer = selected_normalizers[
+                                selected_normalizers['channel']==ch
+                            ]['normalizer'].head(1).item()
+                        self.data.loc[ids, 'normalizer'] = ch_normalizer #/0.82   # adjusting for context..
+
+        self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
+        print(f"Normalizers updated FOR CONTEXT AS WELL, writing back now...")
+        self.write_back()
+
+    
+
+    def write_back(self):
+        """Saves the updated dataframe to disk."""
+        self.data.to_csv(self.corr_file_path, index=False)
+        print(f"Saved at {self.corr_file_path}")
+
+
+    @staticmethod
+    def merge_correlation_results(model_name, identifiers_list, output_id, output_identifier=None):
+        """
+        Args:
+
+            model_name: Name of the pre-trained network
+            file_identifiers: List of filename identifiers 
+            idx:    id of the file identifier to use for saving the merged results
+            output_identifier: if output_identifier is given, it takes preference..
+        """
+        # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
+        print("Combining results...")
+        corr_dfs = []
+        for identifier in identifiers_list:
+            filename = f"{model_name}_{identifier}_corr_results.csv"
+            file_path = os.path.join(saved_corr_dir, filename)
+
+            corr_dfs.append(pd.read_csv(file_path))
+
+        # save the merged results at the very first filename...
+        if output_identifier is None:
+            output_identifier = identifiers_list[output_id]    
+        filename = f"{model_name}_{output_identifier}_corr_results.csv"
+        file_path = os.path.join(saved_corr_dir, filename)
+
+        data = pd.concat(corr_dfs)
+        data.to_csv(file_path, index=False)
+        print(f"Output saved at: \n {file_path}")
+
+        # once all the files have been merged, remove the files..
+        for identifier in identifiers_list:
+            if identifier != output_identifier:
+                filename = f"{model_name}_{identifier}_corr_results.csv"
+                file_path = os.path.join(saved_corr_dir, filename)
+                # remove the file
+                os.remove(file_path)
+
+
+
+class STRFCorrelations(BaseCorrelations):
+    def __init__(
+            self, model_name = None, third=None, normalizer_filename=None,
+            
+        ) -> None:
+        if model_name is None:
+            model_name = f'STRF_freqs80_all_lags'
+
+        super().__init__(model_name, third, normalizer_filename)
+
+
+
+    def get_significant_data_using_app(
+                self, bin_width, sessions: list=None, delay=None, lag=None,
+                inclusion_p_threshold=0.01, use_poisson_null=True,
+        ):
+        """Retrieves selected data based on provided arguments. 
+        If an argument if 'None', no filter is applied on that column.
+        Only retrieves data for signigicant neurons (selected based on 
+        t-test by normalizer object.)
+
+        Args:
+            bin_width: int = bin_width in ms.
+            sessions: list of ints = list of sessions IDs to get data for,
+                if no session is provided, all significant sessions are retrieved.
+            delay: int = delay in ms.
+            lag: int = max delay spanned by the TRF window.
+
+        
+        Returns:
+            pandas DataFrame
+        """
+        select_data = self.data
+        select_data = select_data[select_data['bin_width']==float(bin_width)]
+        
+        if delay is not None:
+            select_data = select_data[select_data['delay']==float(delay)]
+
+        if lag is not None:
+            select_data = select_data[select_data['tmax']==float(lag)]
+
+        if use_poisson_null:
+            sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_poisson_null(
+                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                )
+        else:
+            sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_shifts_null(
+                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                )
+
+        if sessions is None:
+            sessions = list(sig_sess_n_chs.keys())
+
+        filtered_data = []
+        # sessions is a list...
+        for session in sessions:
+            session = str(int(float(session)))
+            if session in sig_sess_n_chs.keys():
+                session_data = select_data[(select_data['session']==float(session))]
+                for ch in sig_sess_n_chs[session]:
+                    filtered_data.append(
+                        session_data[session_data['channel']==float(ch)]
+                    )
+
+        filtered_data = pd.concat(filtered_data)
+        return filtered_data
+    
+    def get_selected_data(
+                self, sessions: list=None, bin_width=None, delay=None, 
+                threshold=None, lag=None,
+        ):
+        """Retrieves selected data based on provided arguments. 
+        If an argument if 'None', no filter is applied on that column.
+
+        Args:
+            sessions: list of ints = list of sessions IDs to get data for.
+            bin_width: int = bin_width in ms.
+            delay: int = delay in ms.
+        
+        Returns:
+            pandas DataFrame
+        """
+        select_data = self.data
+        if bin_width is not None:
+            select_data = select_data[select_data['bin_width']==float(bin_width)]
+        
+        if delay is not None:
+            select_data = select_data[select_data['delay']==float(delay)]
+        
+        # if channel is not None:
+        #     select_data = select_data[select_data['channel']==float(channel)]
+        if threshold is not None:
+            select_data = select_data[
+                (select_data['normalizer']>=threshold)
+            ]
+        if lag is not None:
+            select_data = select_data[select_data['tmax']==float(lag)]
+
+
+        if sessions is not None:
+            session_data = []
+            # sessions is a list...
+            for session in sessions:
+                session_data.append(select_data[
+                        (select_data['session']==float(session))
+                    ])
+            select_data = pd.concat(session_data)
+        return select_data
+
+
+    def get_correlations_for_bin_width(
+            self, neural_area='core', bin_width=20, delay=0,
+            threshold=None, lag=None, normalized=True,
+            use_stat_inclusion=False, inclusion_p_threshold=0.01,
+            use_poisson_null=True,
+        ):
+        """Retrieves the column of correlations (normalized or un-normalized), for the
+        given selections filters.
+        """
+        
+        column='test_cc_raw'
+        if normalized:
+            if use_stat_inclusion:
+                column = 'corr_normalized_app'
+            else:
+                column = 'normalized_test_cc'
+
+        # if lag is None:
+        #     lag = 0.3
+
+        area_sessions = self.metadata.get_all_sessions(neural_area)
+        if use_stat_inclusion:
+            selected_data = self.get_significant_data_using_app(
+                sessions=area_sessions, bin_width=bin_width, delay=delay,
+                lag=lag, inclusion_p_threshold=inclusion_p_threshold,
+                use_poisson_null=use_poisson_null,
+            )
+        else:
+            selected_data = self.get_selected_data(
+                sessions=area_sessions, bin_width=bin_width, delay=delay,
+                threshold=threshold, lag=lag
+            )
+        # if threshold is not None:
+        #     selected_data = selected_data[
+        #         (selected_data['normalizer']>=threshold)
+        #     ]
+        
+        # selected_data = selected_data[
+        #     (selected_data['tmax']==lag)
+        # ]
+
+        return selected_data[column]
+    
+    # def get_corr_for_area(
+    #         self, neural_area='core',bin_width=20, delay=0,
+    #         threshold=0.068, lag=None, normalized=True
+    #     ):
+    #     """Retrieves baseline correlations for all sig. sessions."""
+    #     area_sessions = self.metadata.get_all_sessions(neural_area)
+
+    #     corr_dist = self.get_correlations(
+    #         sessions=area_sessions, bin_width=bin_width, delay=delay,
+    #         threshold=threshold, lag=lag, normalized=normalized
+    #     )
+    #     return corr_dist
+
+
+
+
+    @staticmethod
+    def combine_and_ready(
+            model_name, identifiers_list, output_id, normalizer_filename=None,
+            output_identifier=None
+        ):
+        """Merges results for all identifiers, copies layer types and
+        sets normalizer."""
+
+        BaseCorrelations.merge_correlation_results(
+                model_name=model_name,
+                identifiers_list=identifiers_list,
+                output_id=output_id,
+                output_identifier=output_identifier
+            )
+        
+        if output_identifier is None:
+            output_identifier = identifiers_list[output_id]
+
+        # print("Updating Normalizer...!")
+        # res = model_name + '_' + output_identifier
+        # corr_obj = STRFCorrelations(res, normalizer_filename=normalizer_filename)
+        # # make sure 'test_cc_raw' and 'normalizer' columns are set...!
+        # corr_obj.data['test_cc_raw'] = corr_obj.data['strf_corr']
+        # corr_obj.set_normalizers()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -36,7 +508,7 @@ class Correlations:
         ) -> None:
         
         if model_name is None:
-            model_name = 'wave2letter_modified'
+            model_name = 'wav2letter_modified_trained_all_bins'
         self.model = model_name
         filename = f'{model_name}_corr_results.csv'
         self.corr_file_path = os.path.join(saved_corr_dir, filename)
@@ -54,7 +526,8 @@ class Correlations:
         
         if 'normalizer' not in self.data.columns:
             self.data.loc[:, 'normalizer'] = np.nan
-            self.set_normalizers()
+            # self.set_normalizers()
+            self.set_normalizers_using_bootsrap()
             # CorrelationUtils.copy_normalizer(model_name)
             # self.data = pd.read_csv(self.corr_file_path)
         if 'N_sents' not in self.data.columns:
@@ -82,6 +555,17 @@ class Correlations:
         self.fill_color = {}
         for layer, color in zip(layer_types, colors):
             self.fill_color[layer] = color
+
+        # if 'normalizer_app' not in self.data.columns:
+        #     # need to remove these bad channels...
+        #     bad_sessions = [180725., 190607., 191212., 200226.]
+        #     all_bad_ids = []
+        #     for sess in bad_sessions:
+        #         all_bad_ids.append(self.data[self.data['session'] == sess].index)
+        #     all_bad_ids = np.concatenate(all_bad_ids)
+        #     self.data.drop(all_bad_ids, inplace=True)
+
+        #     self.set_normalizers_using_app()
         # self.fill_color = {'conv': Set2_3.mpl_colors[0], 'rnn': 'lightgreen', 'transformer': 'lightskyblue'}
         
 
@@ -189,6 +673,158 @@ class Correlations:
     # def add_layer_types(self, other_type):
     #     self.data['layer_type'] = other_type
     #     self.write_back()
+
+    # ---------------- methods using normalizer dist. using random pairs of trials ---------#
+    def set_normalizers_using_bootsrap(self):
+        """Uses normalizer distribution computed using 100k runs 
+        with random concatenation order of trials, and takes following steps:
+            - adds a column 'normalizer' containig the new normalizer.
+            - adds a column 'normalized_test_cc' containing corrected correlations.
+        """
+        bin_widths = self.data['bin_width'].unique()
+        for bin_width in bin_widths:
+            select_data = self.get_selected_data(bin_width=bin_width)
+            sessions = select_data['session'].unique()
+            delays = select_data['delay'].unique()
+            for session in sessions:
+                for delay in delays:
+                    select_data = self.get_selected_data(
+                        sessions=[session], bin_width=bin_width, delay=delay
+                    )
+                    channels = select_data['channel'].unique()
+
+                    # reading the normalizer...
+                    normalizers_dist = self.norm_obj.get_normalizer_for_session_random_pairs(
+                        session=session, bin_width=bin_width 
+                    )
+                    normalizers_dist = np.median(normalizers_dist, axis=0)
+
+                    for ch in channels:
+                        ch = int(ch)
+                        ch_normalizer = normalizers_dist[ch]
+                        ids = select_data[select_data['channel']==ch].index
+                        self.data.loc[ids, 'normalizer'] = ch_normalizer 
+
+        self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
+        print(f"Normalizers updated using normalizer (random pairs) dist , writing back now...")
+        self.write_back()
+
+
+    # ---------------- methods using normalizer dist. using all-possible-pairs (app) ---------#
+
+    def set_normalizers_using_app(self):
+        """Uses normalizer distribution computed using all-possible-pairs (app),
+        and takes following steps:
+            - adds a column 'normalizer_app' containig the new normalizer.
+            - adds a column 'corr_normalized_app' containing corrected correlations.
+        """
+        bin_widths = self.data['bin_width'].unique()
+        for bin_width in bin_widths:
+            select_data = self.get_selected_data(bin_width=bin_width)
+            sessions = select_data['session'].unique()
+            delays = select_data['delay'].unique()
+            for session in sessions:
+                for delay in delays:
+                    select_data = self.get_selected_data(
+                        sessions=[session], bin_width=bin_width, delay=delay
+                    )
+                    channels = select_data['channel'].unique()
+
+                    # reading the normalizer...
+                    normalizers_dist = self.norm_obj.get_normalizer_for_session_app(
+                        session=session, bin_width=bin_width 
+                    )
+                    normalizers_dist = np.mean(normalizers_dist, axis=0)
+
+                    for ch in channels:
+                        ch = int(ch)
+                        ch_normalizer = normalizers_dist[ch]
+                        ids = select_data[select_data['channel']==ch].index
+                        self.data.loc[ids, 'normalizer_app'] = ch_normalizer 
+
+        self.data['corr_normalized_app'] = self.data['test_cc_raw']/(self.data['normalizer_app'].apply(np.sqrt))
+        print(f"Normalizers updated using normalizer (app) dist , writing back now...")
+        self.write_back()
+
+    def get_significant_data_using_app(
+                self, bin_width, sessions: list=None, delay=None,
+                N_sents=499, layer=None, inclusion_p_threshold=0.01,
+                use_poisson_null=True,
+        ):
+        """Retrieves selected data based on provided arguments. 
+        If an argument if 'None', no filter is applied on that column.
+        Only retrieves data for signigicant neurons (selected based on 
+        t-test by normalizer object.)
+
+        Args:
+            bin_width: int = bin_width in ms.
+            sessions: list of ints = list of sessions IDs to get data for,
+                if no session is provided, all significant sessions are retrieved.
+            delay: int = delay in ms.
+
+        
+        Returns:
+            pandas DataFrame
+        """
+        print(f"Retrieving significant data using APP normalizers and ", end='')
+        select_data = self.data
+        select_data = select_data[select_data['bin_width']==float(bin_width)]
+        
+        if delay is not None:
+            select_data = select_data[select_data['delay']==float(delay)]
+        
+        if N_sents is not None:
+            select_data = select_data[select_data['N_sents']>=float(N_sents)]
+        
+        # if threshold is not None:
+        #     select_data = select_data[select_data['normalizer']>=float(threshold)]
+
+        if layer is not None:
+            select_data = select_data[select_data['layer']==float(layer)]
+
+        ## select significant sessions....
+        ## get sig. sessions and channels
+        ## filter the channels also..
+        if use_poisson_null:
+            print(f"Poisson Null...")
+            sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_poisson_null(
+                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                )
+        else:
+            print(f"Random shifts Null...")
+            sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_shifts_null(
+                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                )
+
+
+
+        if sessions is None:
+            sessions = list(sig_sess_n_chs.keys())
+
+        filtered_data = []
+        # sessions is a list...
+        for session in sessions:
+            session = str(int(float(session)))
+            if session in sig_sess_n_chs.keys():
+                session_data = select_data[(select_data['session']==float(session))]
+                for ch in sig_sess_n_chs[session]:
+                    filtered_data.append(
+                        session_data[session_data['channel']==float(ch)]
+                    )
+
+        filtered_data = pd.concat(filtered_data)
+        return filtered_data
+
+
+
+
+
+
+
+
+
+
+    # ---------------- Methods defined before app normalizers ---------#
 
     def get_significant_sessions(self, threshold = None, bin_width=20):
         """Returns sessions with corr scores above significant threshold for at least 1 channel"""
@@ -390,6 +1026,7 @@ class Correlations:
         Returns:
             pandas DataFrame
         """
+        
         select_data = self.data
         if bin_width is not None:
             select_data = select_data[select_data['bin_width']==float(bin_width)]
@@ -401,6 +1038,7 @@ class Correlations:
             select_data = select_data[select_data['N_sents']>=float(N_sents)]
         
         if threshold is not None:
+            print(f"Retreiving data using normalizer threshold..")
             select_data = select_data[select_data['normalizer']>=float(threshold)]
 
         if layer is not None:
@@ -597,26 +1235,44 @@ class Correlations:
 # ------------------  corr distributions of all layers  ----------------#
     
     def get_corr_all_layers_for_bin_width(self, neural_area=None, bin_width=20, delay=0, 
-        N_sents=499, threshold = 0.068, normalized=True, column=None):
-        """Retrieves correlations for all layers, but ONLY the specified bin_width."""
-        assert neural_area in ['core', 'belt', 'parabelt', 'all'], print(f"Unknown neural area '{neural_area}' specified.")
+        N_sents=499, threshold = 0.068, normalized=True, column=None, use_stat_inclusion=False,
+        inclusion_p_threshold=0.01, use_poisson_null=True):
+        """Retrieves correlations for all layers, but ONLY the specified bin_width.
+        
+        Args:
+            use_stat_inclusion: bool = If True, select significant sessions/channels 
+                using t-test instead of thresholding method.
+        """
 
+        area_choices = self.metadata.get_area_choices()
+        # assert neural_area in ['core', 'belt', 'parabelt', 'all'], print(f"Unknown neural area '{neural_area}' specified.")
+        assert neural_area in area_choices, print(f"Unknown neural area '{neural_area}' specified.")
         if column is None:
             if normalized:
-                column = 'normalized_test_cc'
+                if use_stat_inclusion:
+                    column = 'corr_normalized_app'
+                else:
+                    column = 'normalized_test_cc'
             else:
                 column = 'test_cc_raw'
         else:
             print(f"Extracting column: {column}")
 
         area_sessions = self.metadata.get_all_sessions(neural_area)
-        select_data = self.get_selected_data(
-            sessions=area_sessions, 
-            bin_width=bin_width,
-            delay=delay,
-            threshold=threshold,
-            N_sents=N_sents
-        )
+        if use_stat_inclusion:
+            select_data = self.get_significant_data_using_app(
+                bin_width=bin_width, sessions=area_sessions, delay=delay,
+                inclusion_p_threshold=inclusion_p_threshold,
+                use_poisson_null=use_poisson_null
+            )
+        else:
+            select_data = self.get_selected_data(
+                sessions=area_sessions, 
+                bin_width=bin_width,
+                delay=delay,
+                threshold=threshold,
+                N_sents=N_sents
+            )
 
         layer_spread = {}   
         layer_IDs = select_data['layer'].unique()
@@ -626,6 +1282,9 @@ class Correlations:
         # sort the result based on keys...
         layer_spread = dict(sorted(layer_spread.items(), key=lambda item: item[0]))
         return layer_spread
+
+
+    
     
 
 # ------------------  corr KDE for all layers  ----------------#
@@ -725,12 +1384,120 @@ class Correlations:
 
 
 
+    ## ------------ analysis at all bin widths -----------------------------##
+
+    def get_significant_session_and_channels_at_all_bin_width(
+            self, poisson_normalizer = True,
+        ):
+        """Retrieves significant sessions and channels at each bin-width using normalizer
+        threshold (different for each bin width), and returns are super-set 
+        of sessions-channels as a dict.
+
+        Args:
+            poisson_normalizer: bool = If True, uses poisson normalizer.
+
+        Returns:
+            dict: significant sessions as keys and significant channels against each session as values.
+        """
+        sig_sessions = {}
+        all_session_channels = {}
+        bin_widths = np.sort(self.data['bin_width'].unique())
+        for bin_width in bin_widths:
+            bw_threshold = self.get_normalizer_threshold(bin_width=bin_width, poisson_normalizer=poisson_normalizer)
+            sig_sessions[bin_width] = self.get_significant_sessions(threshold=bw_threshold, bin_width=bin_width)
+
+            for session in sig_sessions[bin_width]:
+                channels = self.get_selected_data(
+                    sessions=[session], bin_width=bin_width, delay=0, threshold=bw_threshold
+                )['channel']
+
+                if session in all_session_channels.keys():
+                    all_session_channels[session].extend(list(np.unique(channels)))
+                else:
+                    all_session_channels[session] = list(np.unique(channels))
+
+        for sess, channels in all_session_channels.items():
+            all_session_channels[sess] = np.unique(channels)
+
+        return all_session_channels
     
+
+    def get_corr_super_set_all_layers_for_bin_width(
+            self, sig_session_channel_dict, bin_width=20, delay=0, 
+            normalized=True, column=None
+        ):
+        """Retrieves corr dist using 'superset' (all session-channels significant at any bin-width),
+        and zeroing out the values for extra entries i.e. the ones that would not qualify based on 
+        normalizer threshold.
+        
+        """
+        if column is None:
+            if normalized:
+                column = 'normalized_test_cc'
+            else:
+                column = 'test_cc_raw'
+        else:
+            print(f"Extracting column: {column}")
+
+        bin_width_data = []
+        sessions = np.sort(list(sig_session_channel_dict.keys()))
+        for sess in sessions:
+            select_data = self.get_selected_data(
+                sessions=[sess], delay=delay, bin_width=bin_width
+            )
+
+            session_data = []
+            # channels is a list...
+            channels = np.sort(sig_session_channel_dict[sess])
+            for channel in channels:
+                session_data.append(select_data[
+                        (select_data['channel']==float(channel))
+                    ])
+            session_data = pd.concat(session_data)
+            bin_width_data.append(session_data)
+        bin_width_data = pd.concat(bin_width_data)
+
+        # replace the entries with insignificant normalizer with zero...
+        bw_threshold = self.get_normalizer_threshold(bin_width=bin_width, poisson_normalizer=True)
+        insignificant_ids = bin_width_data[bin_width_data['normalizer'] < float(bw_threshold)].index
+        bin_width_data.loc[insignificant_ids, column] = 0
+
+        # get all layer distributions...
+        layer_spread = {}   
+        layer_IDs = bin_width_data['layer'].unique()
+        for layer in layer_IDs:
+            ids = bin_width_data[bin_width_data['layer']==layer].index
+            layer_spread[int(layer)] = np.array(bin_width_data.loc[ids, column]).squeeze()
+        # sort the result based on keys...
+        layer_spread = dict(sorted(layer_spread.items(), key=lambda item: item[0]))
+        return layer_spread
+
+
+
+    
+    def get_layer_dist_with_peak_median_using_super_set(
+            self, sig_session_channel_dict,
+            bin_width, delay=0, normalized=True, column=None,
+        ):
+        """Returns the corr distribution, at specific bin width,
+        for the layer with peak median. Takes in super-set of sessions-channels.
+        """
+        layer_spread = self.get_corr_super_set_all_layers_for_bin_width(
+            sig_session_channel_dict, bin_width=bin_width, normalized=normalized,
+            column=column, delay=delay
+            )
+        
+        layer_medians = {np.median(v):k for k,v in layer_spread.items()}
+        peak_median = max(layer_medians)
+        peak_layer = layer_medians[peak_median]
+        print(f"At bin_width: {bin_width}, layer with peak median is: {peak_layer}")
+        return layer_spread[peak_layer]
+
+
 
     def get_layer_dist_with_peak_median(
             self, bin_width, neural_area='all', delay=0,
             normalized=True, poisson_normalizer=True
-            
         ):
         """Returns the corr distribution, at specific bin width,
         for the layer with peak median.
@@ -745,7 +1512,7 @@ class Correlations:
                 normalized=normalized
             )
 
-        # pick the peak layer..
+        #pick the peak layer..
         layer_medians = {np.median(v):k for k,v in corr_dict.items()}
         peak_median = max(layer_medians)
         peak_layer = layer_medians[peak_median]
@@ -838,10 +1605,12 @@ class Correlations:
             model_name, output_identifier
         )
 
-        res = model_name + '_' + output_identifier
-        corr_obj = Correlations(res, normalizer_filename=normalizer_filename)
+        # setting the normalizer..
+        # res = model_name + '_' + output_identifier
+        # corr_obj = Correlations(res, normalizer_filename=normalizer_filename)
 
-        corr_obj.set_normalizers()
+        # corr_obj.set_normalizers()
+        # corr_obj.set_normalizers_using_bootsrap()
 
 
 

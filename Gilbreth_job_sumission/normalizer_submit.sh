@@ -1,8 +1,14 @@
 #!/bin/sh
 
-#SBATCH --output=./result_normalizer10.out
+# --output=./result_normalizer50.out
 
 #SBATCH	-A standby
+#SBATCH --constraint=F|G|I|K|D|B|H|J 
+
+# High Mem GPUs: F|G|I|K|D
+# very Fast GPUs: F|K
+# Fast GPUs: B|D
+# Slow GPUs: E
 
 
 #SBATCH --nodes=1 

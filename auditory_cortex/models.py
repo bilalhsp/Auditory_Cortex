@@ -110,6 +110,7 @@ class Regression():
             #         )
             layer_feats = all_layer_features[layer_ID]
             if third is None:
+                # [:-1] is used to drop the partial bins at the end of each sequence.
                 feats[layer_ID] = np.concatenate([layer_feats[sent][:-1] for sent in sents], axis=0)
                 # feats[j] = np.concatenate([sampled_features[layer_ID][sent] for sent in sents], axis=0)
             else:
@@ -403,10 +404,34 @@ class Regression():
 
         session = str(session)
         raw_spikes = self.dataloader.get_session_spikes(session=session, bin_width=bin_width, delay=delay)
+        # [:-1] is used to drop the partial bins at the end of each sequence.
         spikes = np.concatenate([raw_spikes[sent][:-1] for sent in sents], axis=0).astype(np.float32)
         if not numpy:
             spikes = cp.array(spikes)
         return spikes
+
+    def get_held_out_spikes(
+            self, session, bin_width=20, delay=0, numpy=False):
+        """
+        Retrieves all trials of neural spikes for held out sentences.
+
+        Args:
+            session: int = ID of recording site (session) 
+            bin_width: int = bin width in ms.
+            delay: int = neural delay in ms.
+            numpy: bool = Setting numpy=True would mean using CPU and not GPU.
+
+        Returns:
+            return ndarray =(num_trials, samples, n_channels)
+        """
+
+        repeated_trials = self.dataloader.get_neural_data_for_repeated_trials(
+	        session, bin_width=bin_width, delay=delay
+            )
+        if not numpy:
+            repeated_trials = cp.array(repeated_trials)
+        return repeated_trials
+        
         
     def get_normalizer(self, session, sents=None, bin_width=20, delay=0, n=1000):
         """Compute dist. of normalizer for correlations (repeatability of neural
@@ -426,6 +451,8 @@ class Regression():
         except AttributeError:
             raise AttributeError("Run 'load_features()' method before using hidden features...")
         return feats
+
+
     
 
     def regression(self, x, y, lmbda, lr, max_iterations, poisson=False):
@@ -452,7 +479,8 @@ class Regression():
             self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=8,
             iterations=10, N_sents=500, return_dict=False, numpy=False,
             sents=None, test_sents=None, third=None, layer_IDs=None,
-            poisson=False, lr=0.6, max_iterations=50, shuffled=False
+            poisson=False, lr=0.6, max_iterations=50, shuffled=False,
+            test_trial=None
         ):
         """
         Returns distribution of correlations for all (12) layers and all channels
@@ -509,9 +537,10 @@ class Regression():
             ).shape[-1]
         
         # feature_dims = self.sampled_features[0].shape[1]
-        # lmbdas = module.logspace(start=-4, stop=-1, num=num_lmbdas)
+        # lmbdas = module.logspace(start=-7, stop=-1, num=num_lmbdas)
+        lmbdas = module.logspace(start=-12, stop=7, num=20)
         
-        lmbdas = module.logspace(start=-num_lmbdas//4, stop=num_lmbdas, num=int(1.25*num_lmbdas)+1)
+        # lmbdas = module.logspace(start=-num_lmbdas//4, stop=num_lmbdas, num=int(1.25*num_lmbdas)+1)
         # lmbdas = module.logspace(start=1, stop=8, num=7)
         # lmbdas = module.logspace(start=5, stop=6, num=2)
         B = module.zeros((len(layer_IDs), feature_dims, num_channels))
@@ -608,7 +637,13 @@ class Regression():
             if poisson:
                 corr_coeff[n] = utils.cc_norm(test_y, np.exp(test_pred))
             else:
-                corr_coeff[n] = utils.cc_norm(test_y, test_pred)
+                # computing avg test corr across all trials..
+                test_y_all_trials = self.get_held_out_spikes(
+            		session, bin_width=bin_width, delay=delay, numpy=numpy)
+                corr_coeff[n] = utils.compute_avg_test_corr(
+                    test_y_all_trials, test_pred, test_trial)
+                # previous implementation...
+                # corr_coeff[n] = utils.cc_norm(test_y, test_pred)
             poiss_entropy[n] = utils.poisson_cross_entropy(test_y, test_pred)
             
             Nsamples, Nchannels = test_y.shape
@@ -642,6 +677,7 @@ class Regression():
 
         corr_coeff_train = cp.asnumpy(corr_coeff_train.transpose((0,2,1)))
         lmbda_loss = lmbda_loss.transpose((0,2,1))
+        optimal_lmbdas = np.log10(cp.asnumpy(optimal_lmbdas.transpose((1,0))))
         if return_dict:
             # deallocate the memory of Neural data for current session, this will save memory used.
             # del self.spike_datasets[session]
@@ -656,13 +692,14 @@ class Regression():
                     'N_sents': N_sents,
                     'layer_ids': layer_IDs,
                     'opt_delays': None,
+                    'opt_lmbdas': optimal_lmbdas,
                     'poiss_entropy': poiss_entropy,
                     'uncertainty_per_spike': uncertainty_per_spike,
                     'bits_per_spike_NLB': bits_per_spike_NLB,
                     }
             return corr, optimal_lmbdas, lmbda_loss
         # return test_y, test_pred, B, optimal_lmbdas, lmbda_loss
-        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB 
+        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, optimal_lmbdas 
 
 
 
@@ -922,7 +959,8 @@ class Regression():
             numpy=False,
             return_dict=False,
             third=None,
-            shuffled=False
+            shuffled=False,
+            test_trial=None,
         ):
         
         if delays is None:
@@ -934,6 +972,7 @@ class Regression():
 
         corr_coeffs = []
         losses = []
+        opt_lmbdas_all_delays = []
         poiss_entropies = []
         uncertainty_per_spike_list = []
         bits_per_spike_NLB_list = []
@@ -946,17 +985,19 @@ class Regression():
             # _ = self.get_neural_spikes(
             #         session, bin_width=bin_width, delay=delay, force_reload=True
             #     )
-            corr_coeff, _, loss, _, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB = self.cross_validated_regression(
+            corr_coeff, _, loss, _, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, opt_lmbdas = self.cross_validated_regression(
                     session, bin_width=bin_width, delay=delay,layer_IDs=layer_IDs,
                     num_folds=num_folds, iterations=iterations, num_lmbdas=num_lmbdas,
                     return_dict=False, numpy=numpy, N_sents=N_sents, sents=sents, third=third,
-                    test_sents=self.dataloader.test_sent_IDs, shuffled=shuffled
+                    test_sents=self.dataloader.test_sent_IDs, shuffled=shuffled,
+                    test_trial=test_trial
                 )
             corr_coeffs.append(corr_coeff)
             losses.append(loss)
             poiss_entropies.append(poiss_entropy)
             uncertainty_per_spike_list.append(uncertainty_per_spike)
             bits_per_spike_NLB_list.append(bits_per_spike_NLB)
+            opt_lmbdas_all_delays.append(opt_lmbdas)
 
         corr_coeffs = np.array(corr_coeffs)
         losses = np.array(losses)
@@ -964,6 +1005,7 @@ class Regression():
         poiss_entropies = np.array(poiss_entropies)
         uncertainty_per_spike_list = np.array(uncertainty_per_spike_list)
         bits_per_spike_NLB_list = np.array(bits_per_spike_NLB_list)
+        opt_lmbdas_all_delays = np.array(opt_lmbdas_all_delays)
         # num_channels = self.spike_datasets[session].num_channels
 
         opt_delay_indices = np.argmin(losses, axis=0)
@@ -978,6 +1020,9 @@ class Regression():
             opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
         ]
         bits_per_spike_NLB_opt_delay = bits_per_spike_NLB_list[
+            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        ]
+        opt_lmbdas_opt_delays = opt_lmbdas_all_delays[
             opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
         ]
  
@@ -995,6 +1040,7 @@ class Regression():
                     'N_sents': N_sents,
                     'layer_ids': layer_IDs,
                     'opt_delays': opt_delays,
+                    'opt_lmbdas': opt_lmbdas_opt_delays,
                     'poiss_entropy': poiss_entropy_opt_delay,
                     'uncertainty_per_spike': uncertainty_per_spike_opt_delay, 
                     'bits_per_spike_NLB': bits_per_spike_NLB_opt_delay,
@@ -1005,7 +1051,10 @@ class Regression():
     
 
 
-    def get_betas(self, session, layer_IDs=None, use_cpu=False, force_redo = False):
+    def get_betas(
+            self, session, bin_width, delay=0, layer_IDs=None,
+            use_cpu=False, force_redo = False
+            ):
         """
         Returns betas for all channels and layers.,
 
@@ -1015,8 +1064,9 @@ class Regression():
         session = str(int(session))
         if session not in self.B.keys() or force_redo:
             _, B, *_ = self.cross_validated_regression(
-                session=session, num_lmbdas=10, iterations=1, numpy=use_cpu,
-                layer_IDs=layer_IDs
+                session=session,  bin_width=bin_width, delay=delay,
+                num_lmbdas=8, iterations=1, numpy=use_cpu,
+                layer_IDs=layer_IDs,
             )
             self.B[session] = B
         return self.B[session]
@@ -1644,8 +1694,10 @@ class Regression():
     #     return B
     
     def neural_prediction(
-            self, session, bin_width: int, sents: list, layer_IDs: list=None,
-            force_reload: bool=False, shuffled: bool=False
+            self, session, bin_width: int, delay: int,
+            sents: list, layer_IDs: list=None,
+            force_reload: bool=False, shuffled: bool=False,
+            force_redo: bool=True,
         ):
         """
         Returns prediction for neural activity 
@@ -1657,11 +1709,13 @@ class Regression():
             ndarray : (time, ch, layers) Prdicted neural activity 
         """
         features = self.unroll_features(
-            bin_width=bin_width, sents=sents, layer_IDs=layer_IDs, force_reload=force_reload,
-            shuffled=shuffled
+            bin_width=bin_width, sents=sents, layer_IDs=layer_IDs,
+            force_reload=force_reload, shuffled=shuffled
             )
         # features = np.stack([dict_feats[i] for i in range(12)], axis=0)
-        beta = self.get_betas(session, layer_IDs=layer_IDs)
+        beta = self.get_betas(
+            session, bin_width=bin_width, delay=delay,
+            layer_IDs=layer_IDs, force_redo=force_redo)
         beta = cp.asnumpy(beta)
         return utils.predict(features, beta)
 

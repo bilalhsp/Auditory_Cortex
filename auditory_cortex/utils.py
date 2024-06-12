@@ -290,7 +290,7 @@ class CorrelationUtils:
         data1 = pd.read_csv(corr_file_path)
         print(f"Reading file from: \n {corr_file_path}")
         # normalizer
-        normalizer_file = 'wave2letter_modified_normalizer2_corr_results.csv'
+        normalizer_file = 'wav2letter_modified_normalizer2_corr_results.csv'
         norm_file_path = os.path.join(saved_corr_dir, normalizer_file)
         data2 = pd.read_csv(norm_file_path)
         print(f"Reading normalizers from: \n {norm_file_path}")
@@ -495,8 +495,11 @@ def write_df_to_disk(df, file_path):
 
 def write_STRF(corr_dict, file_path):
 
-    columns_list = ['session','channel','bin_width',
-                                'delay','strf_corr']
+    columns_list = [
+        'session','channel','bin_width', 'delay',
+        'num_freqs', 'tmin', 'tmax', 'lmbda',
+        'strf_corr', 
+        ]
     if os.path.isfile(file_path):
         data = pd.read_csv(file_path)
         # making sure there is no extra columns in the existing dataframe.
@@ -509,11 +512,19 @@ def write_STRF(corr_dict, file_path):
     win = corr_dict['win']
     delay = corr_dict['delay']
     ch = np.arange(corr_dict['strf_corr'].shape[0])
+    num_freqs = corr_dict['num_freqs']
+    tmin = corr_dict['tmin']
+    tmax = corr_dict['tmax']
+    lmbda = corr_dict['lmbda']
 
     df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
                                     ch, 
                                     np.ones_like(ch)*win, 
                                     np.ones_like(ch)*delay,
+                                    np.ones_like(ch)*num_freqs,
+                                    np.ones_like(ch)*tmin,
+                                    np.ones_like(ch)*tmax,
+                                    np.ones_like(ch)*lmbda,
                                     corr_dict['strf_corr'],
                                     ]).transpose(),
                         columns=data.columns
@@ -537,10 +548,10 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     | file_path: path of csv file
     """
     columns=[
-            'session','layer','channel','bin_width', 'delay',
-            'train_cc_raw','test_cc_raw', 'poiss_entropy', 
-            'uncertainty_per_spike', 'bits_per_spike_NLB',
-            'normalizer', 'N_sents', 'opt_delays' 
+            'session','layer','channel','bin_width',
+            'delay', 'test_cc_raw', 'normalizer',
+            'opt_lag', 'opt_lmbda', 'N_sents', 
+            'poiss_entropy', 'uncertainty_per_spike', 'bits_per_spike_NLB',
             ]
 
 
@@ -556,25 +567,26 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     layers = np.arange(corr_dict['test_cc_raw'].shape[0])
     N_sents = corr_dict['N_sents']
     layer_ids = corr_dict['layer_ids']
-    opt_delays = corr_dict['opt_delays']
+    opt_lag = corr_dict['opt_lag']
+    opt_lmbda = corr_dict['opt_lmbda']
     if normalizer is None:
         normalizer = np.zeros_like(ch)
-    if opt_delays is None:
-        opt_delays = np.zeros((len(layers), len(ch)))
+    # if opt_lags is None:
+    #     opt_lags = np.zeros((len(layers), len(ch)))
     for layer in layers:
         df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
                                     np.ones_like(ch)*layer_ids[int(layer)],
                                     ch, 
                                     np.ones_like(ch)*win, 
                                     np.ones_like(ch)*delay,
-                                    corr_dict['train_cc_raw'][layer,:],
                                     corr_dict['test_cc_raw'][layer,:],
+                                    normalizer,
+                                    np.ones_like(ch)*opt_lag,
+                                    np.ones_like(ch)*opt_lmbda,
+                                    np.ones_like(ch)*N_sents,
                                     corr_dict['poiss_entropy'][layer,:],
                                     corr_dict['uncertainty_per_spike'][layer,:],
                                     corr_dict['bits_per_spike_NLB'][layer,:],
-                                    normalizer,
-                                    np.ones_like(ch)*N_sents,
-                                    opt_delays[layer,:]
                                     ]).transpose(),
                         columns=data.columns
                         )
@@ -615,6 +627,26 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
         return cp.asnumpy(corr_coeff)
     else:
         return corr_coeff
+    
+def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None):
+    """Computes correlation for each trial and averages across all trials.
+    
+    Args:
+        y_all_trials: (num_trials, num_bins)
+        y_pred: (num_bins,)
+        tr: int = integer in range=[0, 11], Default=None.
+
+    """
+    if test_trial is None:
+        trial_corr = []
+        total_trial_repeats = 11
+        for tr in range(total_trial_repeats):
+            trial_corr.append(cc_norm(y_all_trials[tr], y_pred))
+        trial_corr = np.stack(trial_corr, axis=0)
+        trial_corr = np.mean(trial_corr, axis=0)
+    else:
+        trial_corr = cc_norm(y_all_trials[test_trial], y_pred)
+    return trial_corr
 
 # def cc_norm_cp(y, y_hat, sp=1, normalize=False):
 #     """
