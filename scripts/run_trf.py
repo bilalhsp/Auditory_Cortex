@@ -58,6 +58,14 @@ def compute_and_save_regression(args):
 
     metadata = NeuralMetaData()
     sessions = metadata.get_all_available_sessions()
+    ################################################################
+    # list of significant sessions only...
+    sig_sessions = np.array([180613., 180627., 180719., 180720., 180728., 180730., 180731.,
+						180807., 180808., 180814., 190606., 191113., 191121., 191125.,
+						191206., 191210., 200205., 200206., 200207., 200213., 200219.])
+
+    sessions = sig_sessions.astype(int)
+    ###############################################################
     sessions = np.sort(sessions)
 
     # sessions = sessions[:20]

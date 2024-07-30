@@ -16,7 +16,7 @@ def get_parser():
 
     parser.add_argument(
         '-b','--bin_width', dest='bin_widths', nargs='+', type=int, action='store', 
-        default=[20],
+        default=[50],
         # choices=[],
         help="Choose bin_width for normalizers."
     )
@@ -28,7 +28,7 @@ def get_parser():
     )
     parser.add_argument(
         '-n','--n_itr', dest='n_itr', type=int, action='store', 
-        default=100000,
+        default=1000000,
         help="Number of iterations."
     )
     
@@ -38,11 +38,16 @@ def get_parser():
         help="Specify if force redoing the distribution again.."
     )
     parser.add_argument(
-        '-i','--identifier', dest='identifier', type= str, action='store',
-        default='modified_bins_normalizer',
-        # choices=[],
-        help="Specify identifier for saved results."
+        '-v','--mVocs', dest='mVocs', action='store_true', default=False,
+        help="Specify if spikes for mVocs are to be used."
     )
+    # Deprecated.
+    # parser.add_argument(
+    #     '-i','--identifier', dest='identifier', type= str, action='store',
+    #     default='modified_bins_normalizer',
+    #     # choices=[],
+    #     help="Specify identifier for saved results."
+    # )
     
     return parser
 
@@ -56,14 +61,16 @@ def compute_and_save_null_dist(args):
     spike_rates = args.spike_rates
     n_itr = args.n_itr
     force_redo = args.force_redo
-    normalizer_filename = f"{args.identifier}.csv"
-    norm_obj = Normalizer(normalizer_filename)
+    mVocs=args.mVocs
+    # normalizer_filename = f"{args.identifier}.csv"
+    norm_obj = Normalizer()
 
     for bin_width in args.bin_widths:
         for spike_rate in spike_rates:
             bin_width = int(bin_width)
             null_dist_poisson = norm_obj.get_normalizer_null_dist_using_poisson(
-                bin_width, spike_rate=spike_rate, itr=n_itr, force_redo=force_redo
+                bin_width, spike_rate=spike_rate, itr=n_itr, force_redo=force_redo,
+                mVocs=mVocs
             )
 
 

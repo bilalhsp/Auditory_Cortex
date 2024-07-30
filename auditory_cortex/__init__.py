@@ -9,12 +9,17 @@ import numpy as np
 
 # candidate model names
 valid_model_names = [
-		'deepspeech2', 'speech2text',
-		'wav2letter_modified',
-		'whisper_tiny', 'whisper_base',
-		'wav2vec2',
-        'wav2letter_spect',
-        'w2v2_audioset',
+		'deepspeech2',              # 0
+        'speech2text',              # 1
+		'wav2letter_modified',      # 2
+		'whisper_tiny',             # 3
+        'whisper_base',             # 4
+		'wav2vec2',                 # 5
+        'wav2letter_spect',         # 6
+        'w2v2_audioset',            # 7
+        'MERT',                     # 8
+        'CLAP',                     # 9
+        'w2v2_generic',             # 10
     ]
 
  
@@ -31,6 +36,7 @@ with open(os.path.join(config_dir, 'regression_config.yaml'), 'r') as f:
 hpc_cluster = config['hpc_cluster']
 neural_data_dir = config['neural_data_dir']
 results_dir = config['results_dir']
+LPF_analysis_bw = config['LPF_analysis_bw']
 
 saved_corr_dir = os.path.join(results_dir, 'cross_validated_correlations')
 pretrained_dir = os.path.join(results_dir, 'pretrained_weights')

@@ -17,3 +17,20 @@ sent ID's with repeats:  [12,13,32,43,56,163,212,218,287,308]
 
 ### Export tensorboard logs to web...
     tensorboard dev upload --logdir=/scratch/gilbreth/ahmedb/wav2letter/modified_w2l/logs/lightning_logs/
+
+
+### creating a new environment:
+conda-env-mod create -n huggingface --jupyter
+
+#### load the newly created environment
+module load anaconda/2020.11-py38
+module load use.own
+module load conda-env/huggingface-py3.8.5
+
+#### installing required packages
+- Install pytorch alingwith suitable 
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+
+numpy scipy matplotlib pandas sentencepiece transformers[Audio] datasets
+soundfile librosa

@@ -35,6 +35,7 @@ def compute_and_save_STRF_baseline(args):
     lags = [5, 10, 20, 40, 80, 160, 320]
     test_trial=None
     use_nonlinearity=args.non_linearity
+    mVocs = args.mVocs
 
     if identifier != '':
         identifier = identifier + '_'
@@ -67,8 +68,13 @@ def compute_and_save_STRF_baseline(args):
         subjects = sessions
 
     strf_model = baseline.STRF()
-    # subjects = subjects[30:]
+    # subjects = np.array(['200206'])
     for session in subjects:
+        if mVocs:
+            excluded_sessions = ['190726', '200213']
+            if session in excluded_sessions:
+                print(f"Excluding session: {session}")
+                continue
         print(f"\n Working with '{session}'")
         # obj = get_reg_obj(data_dir, sub)
 
@@ -76,11 +82,11 @@ def compute_and_save_STRF_baseline(args):
             session, bin_width, lags=lags, tmin=tmin,
             num_workers=num_workers, num_lmbdas=num_alphas, 
             num_folds=num_folds, use_nonlinearity=use_nonlinearity,
-            test_trial=test_trial
+            test_trial=test_trial, mVocs=mVocs
         )
 
 
-
+        # Deprecated
         # alphas = np.logspace(-2, 5, num_alphas)
         # estimator = RidgeCV(alphas=alphas, cv=5)
 
@@ -95,16 +101,23 @@ def compute_and_save_STRF_baseline(args):
         #         )
 
         # corr = strf_model.fit(third=third)
+        if mVocs:
+            mVocs_corr = corr
+            timit_corr = np.zeros_like(corr)
+        else:
+            mVocs_corr = np.zeros_like(corr)
+            timit_corr = corr
 
         results_dict = {
             'win': bin_width,
             'delay': delay,
             'session': session,
-            'strf_corr': corr,
+            'strf_corr': timit_corr,
+            'mVocs_strf_corr': mVocs_corr,
             'num_freqs': num_freqs,
             'tmin': tmin,
             'tmax': opt_lag,
-            'lmbda': opt_lmbda,
+            'lmbda': np.log10(opt_lmbda),
             }
         df = utils.write_STRF(results_dict, file_path)
 
@@ -155,6 +168,10 @@ def get_parser():
         '-n','--non_linearity', dest='non_linearity', 
         action='store_true', default=False,
         help="Use non-linearity after the linear model."
+    )
+    parser.add_argument(
+        '-v','--mVocs', dest='mVocs', action='store_true', default=False,
+        help="Specify if spikes for mVocs are to be used."
     )
     return parser
 

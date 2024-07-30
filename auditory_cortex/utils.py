@@ -493,14 +493,16 @@ def write_df_to_disk(df, file_path):
     data.to_csv(file_path, index=False)
     print(f"Dataframe {action} to {file_path}.")
 
-def write_STRF(corr_dict, file_path):
+def write_STRF(corr_dict, file_path, normalizer=None):
 
     columns_list = [
         'session','channel','bin_width', 'delay',
         'num_freqs', 'tmin', 'tmax', 'lmbda',
-        'strf_corr', 
+        'test_cc_raw', 'normalizer',
+        'mVocs_test_cc_raw', 'mVocs_normalizer',
         ]
     if os.path.isfile(file_path):
+        print(f"Reading existing result from: {file_path}")
         data = pd.read_csv(file_path)
         # making sure there is no extra columns in the existing dataframe.
         for column in data.columns:
@@ -516,6 +518,8 @@ def write_STRF(corr_dict, file_path):
     tmin = corr_dict['tmin']
     tmax = corr_dict['tmax']
     lmbda = corr_dict['lmbda']
+    if normalizer is None:
+        normalizer = np.zeros_like(ch)
 
     df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
                                     ch, 
@@ -526,6 +530,9 @@ def write_STRF(corr_dict, file_path):
                                     np.ones_like(ch)*tmax,
                                     np.ones_like(ch)*lmbda,
                                     corr_dict['strf_corr'],
+                                    normalizer,
+                                    corr_dict['mVocs_strf_corr'],
+                                    normalizer,
                                     ]).transpose(),
                         columns=data.columns
                         )
@@ -549,9 +556,12 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     """
     columns=[
             'session','layer','channel','bin_width',
-            'delay', 'test_cc_raw', 'normalizer',
+            'delay', 'test_cc_raw', 'normalizer', 
+            'mVocs_test_cc_raw', 'mVocs_normalizer',
             'opt_lag', 'opt_lmbda', 'N_sents', 
-            'poiss_entropy', 'uncertainty_per_spike', 'bits_per_spike_NLB',
+
+            # Deprecated
+            # 'poiss_entropy', 'uncertainty_per_spike', 'bits_per_spike_NLB',
             ]
 
 
@@ -567,13 +577,22 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
     layers = np.arange(corr_dict['test_cc_raw'].shape[0])
     N_sents = corr_dict['N_sents']
     layer_ids = corr_dict['layer_ids']
-    opt_lag = corr_dict['opt_lag']
-    opt_lmbda = corr_dict['opt_lmbda']
     if normalizer is None:
         normalizer = np.zeros_like(ch)
-    # if opt_lags is None:
-    #     opt_lags = np.zeros((len(layers), len(ch)))
+
     for layer in layers:
+        if 'opt_lag' in corr_dict.keys():
+            opt_lag = corr_dict['opt_lag']
+            opt_lags = np.ones_like(ch)*opt_lag
+        else:
+            opt_lags = corr_dict['opt_delays'][layer]
+        
+        if 'opt_lmbda' in corr_dict.keys():
+            opt_lmbda = corr_dict['opt_lmbda']
+            opt_lmbdas = np.ones_like(ch)*opt_lmbda
+        else:
+            opt_lmbdas = corr_dict['opt_lmbdas'][layer]
+
         df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
                                     np.ones_like(ch)*layer_ids[int(layer)],
                                     ch, 
@@ -581,12 +600,15 @@ def write_to_disk(corr_dict, file_path, normalizer=None):
                                     np.ones_like(ch)*delay,
                                     corr_dict['test_cc_raw'][layer,:],
                                     normalizer,
-                                    np.ones_like(ch)*opt_lag,
-                                    np.ones_like(ch)*opt_lmbda,
+                                    corr_dict['mVocs_test_cc_raw'][layer,:],
+                                    normalizer,
+                                    opt_lags,
+                                    opt_lmbdas,
                                     np.ones_like(ch)*N_sents,
-                                    corr_dict['poiss_entropy'][layer,:],
-                                    corr_dict['uncertainty_per_spike'][layer,:],
-                                    corr_dict['bits_per_spike_NLB'][layer,:],
+                                    # Deprecated
+                                    # corr_dict['poiss_entropy'][layer,:],
+                                    # corr_dict['uncertainty_per_spike'][layer,:],
+                                    # corr_dict['bits_per_spike_NLB'][layer,:],
                                     ]).transpose(),
                         columns=data.columns
                         )
@@ -628,7 +650,7 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
     else:
         return corr_coeff
     
-def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None):
+def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
     """Computes correlation for each trial and averages across all trials.
     
     Args:
@@ -639,7 +661,11 @@ def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None):
     """
     if test_trial is None:
         trial_corr = []
-        total_trial_repeats = 11
+        if mVocs:
+            total_trial_repeats = 15
+        else:
+            total_trial_repeats = 11
+        # total_trial_repeats = y_all_trials.shape[0]
         for tr in range(total_trial_repeats):
             trial_corr.append(cc_norm(y_all_trials[tr], y_pred))
         trial_corr = np.stack(trial_corr, axis=0)

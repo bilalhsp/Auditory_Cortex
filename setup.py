@@ -32,10 +32,11 @@ setuptools.setup(
         'matplotlib',
         'pandas',
         'sentencepiece',
-        'transformers', #, 'cupy', 'seaborn', 'plotly', 'naplib', 'scikit-learn'
-        # 'torch==2.0.1',
-        # 'torchaudio==2.0.2',
-        # 'tensorflow==2.15',
-        # 'tensorflow-probability==0.23'
+        'transformers'
+        'cupy', 'seaborn', 'plotly', 'naplib', 'scikit-learn'
+        'torch==2.0.1',
+        'torchaudio==2.0.2',
+        'tensorflow==2.15',
+        'tensorflow-probability==0.23'
     ],
 )

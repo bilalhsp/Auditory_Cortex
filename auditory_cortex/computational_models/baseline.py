@@ -8,6 +8,7 @@ from auditory_cortex import config
 from auditory_cortex.dataloader import DataLoader
 from auditory_cortex import utils
 from sklearn.linear_model import RidgeCV, ElasticNet, Ridge, PoissonRegressor
+from transformers import Speech2TextProcessor
 
 
 
@@ -24,21 +25,55 @@ class STRF:
         data_dir = config['neural_data_dir']
         # self.dataset = NeuralData(data_dir, session)
         # self.dataset.extract_spikes(bin_width=self.bin_width, delay=0)
+        
+        self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
         # self.fs = self.dataset.fs
         self.dataloader = DataLoader()
-
-        self.fs = self.dataloader.metadata.get_sampling_rate()
         self.num_freqs = num_freqs # num_freqs in the spectrogram
-
-        sent_IDs = self.dataloader.sent_IDs
-        self.testing_sent_ids = self.dataloader.test_sent_IDs
-        self.training_sent_ids = sent_IDs[np.isin(sent_IDs, self.testing_sent_ids, invert=True)]
-
         self.session_bw_cache = {}
 
+    def get_spectrogram(self, aud, sampling_rate):
+        """Transforms the given audio into the spectrogram"""
+        # Getting the spectrogram at 10 ms and then resample to match the bin_width
+        # spect = nl.features.auditory_spectrogram(aud, sampling_rate, frame_len=10)
+        spect = self.processor(aud, padding=True, sampling_rate=sampling_rate).input_features[0]
+        return spect
+    def get_training_stim_ids(self, session=None, mVocs=False):
+        """Returns the stim ids for training set.
+        
+        Args:
+            session: int = session ID, needed ONLY if mVocs=True.
+            mVocs: bool = If True, returns ids for mVocs,
+                otherwise for timit stimuli.
+        """
+        if mVocs:
+            stim_ids = self.dataloader.metadata.mVocTrialIds
+            # exclude the missing trial IDs from list of Ids
+            missing_trial_ids = self.dataloader.get_dataset_object(session=session).missing_trial_ids
+            stim_ids = stim_ids[np.isin(stim_ids, missing_trial_ids, invert=True)]
+            test_ids = self.dataloader.metadata.mVoc_test_trIds
+            training_stim_ids = stim_ids[np.isin(stim_ids, test_ids, invert=True)]
+        else:
+            sent_IDs = self.dataloader.sent_IDs
+            testing_sent_ids = self.dataloader.test_sent_IDs
+            training_stim_ids = sent_IDs[np.isin(sent_IDs, testing_sent_ids, invert=True)]
+        return training_stim_ids
+    
+    def get_testing_stim_ids(self, mVocs=False):
+        """Returns the stim ids for testing set.
+        
+        Args:
+            session: int = session ID, needed ONLY if mVocs=True.
+            mVocs: bool = If True, returns ids for mVocs,
+                otherwise for timit stimuli.
+        """
+        if mVocs:
+            testing_stim_ids = self.dataloader.metadata.mVoc_test_stimIds
+        else:
+            testing_stim_ids = self.dataloader.test_sent_IDs
+        return testing_stim_ids
 
-
-    def load_sent_wise_data(self, session, bin_width):
+    def load_sent_wise_data(self, session, bin_width, mVocs=False):
         """Reads data for all the sents, and caches the spectrogram and spike pairs,
         saves using session-bin_width key.
         """
@@ -47,54 +82,65 @@ class STRF:
         raw_spikes = self.dataloader.get_session_spikes(
             session=session,
             bin_width=bin_width,
-            delay=0
+            delay=0,
+            mVocs=mVocs
             )
-
-        sent_wise_spects = {}
-        sent_wise_spikes = {} 
-        for sent in self.training_sent_ids:
-            aud = self.dataloader.metadata.stim_audio(sent)
+        
+        training_stim_ids = self.get_training_stim_ids(session=session, mVocs=mVocs)
+        sampling_rate = self.dataloader.metadata.get_sampling_rate(mVocs=mVocs)
+        stim_wise_spects = {}
+        stim_wise_spikes = {} 
+        for stim in training_stim_ids:
+            aud = self.dataloader.get_stim_aud(stim, mVocs=mVocs)
+            spect = self.get_spectrogram(aud, sampling_rate)
             # Getting the spectrogram at 10 ms and then resample to match the bin_width
-            spect = nl.features.auditory_spectrogram(aud, self.fs, frame_len=10)
+            # spect = nl.features.auditory_spectrogram(aud, sampling_rate, frame_len=10)
             
-            spikes = raw_spikes[sent]
+            spikes = raw_spikes[stim]
             num_bins = spikes.shape[0]
             spect = resample(spect, num_bins, axis=0)
             spect = resample(spect, self.num_freqs, axis=1)
 
-            sent_wise_spects[sent] = spect
-            sent_wise_spikes[sent] = spikes
+            stim_wise_spects[stim] = spect
+            stim_wise_spikes[stim] = spikes
 
         cache_data = {
-            'spects': sent_wise_spects,
-            'spikes': sent_wise_spikes,
+            'spects': stim_wise_spects,
+            'spikes': stim_wise_spikes,
         }
 
-        cache_key = str(int(session))+'-'+str(int(bin_width))
+        cache_key = str(int(session))+'_'+str(int(bin_width))
+        if mVocs:
+            cache_key = 'mVocs_'+cache_key
         self.session_bw_cache[cache_key] = cache_data
         print(f"Done.")
 
-    def get_data(self, session, bin_width, sent_IDs=None):
+    def get_data(self, session, bin_width, stim_ids=None, mVocs=False):
         """Returns spectral-features, spikes pair for the 
         given session ID and sent IDs. If test=True,
         returns repeated trials data.
         """
-        cache_key = str(int(session))+'-'+str(int(bin_width))
-        if cache_key not in self.session_bw_cache.keys():
-            self.load_sent_wise_data(session, bin_width)
+        cache_key = str(int(session))+'_'+str(int(bin_width))
+        if mVocs:
+            cache_key = 'mVocs_'+cache_key
+        # print(f"key: {cache_key}")
         
-        if sent_IDs is None:
-            sent_IDs = self.training_sent_ids
+        if cache_key not in self.session_bw_cache.keys():
+            print(f"loading again..")
+            self.load_sent_wise_data(session, bin_width, mVocs=mVocs)
+        # else:
+        #     print(self.session_bw_cache.keys())
+
+        if stim_ids is None:
+            stim_ids = self.get_training_stim_ids(session, mVocs)
         
         spects = self.session_bw_cache[cache_key]['spects']
         spikes = self.session_bw_cache[cache_key]['spikes']
-
         spikes_list = []
         spects_list = []
-
-        for sent in sent_IDs:
-            spects_list.append(spects[sent])
-            spikes_list.append(spikes[sent])
+        for stim in stim_ids:
+            spects_list.append(spects[stim])
+            spikes_list.append(spikes[stim])
         
         return spects_list, spikes_list
 
@@ -123,7 +169,7 @@ class STRF:
 
         # return spect_list, spikes_list
     
-    def get_test_data(self, session, bin_width):
+    def get_test_data(self, session, bin_width, mVocs = False):
         """Returns spectral-features, spikes (all trials)
         for the test sent IDs, given session.
 
@@ -141,19 +187,28 @@ class STRF:
         """
         session = str(session)
         spect_list = []
+        # mVocs = True
         # repeated_spikes_list = {i: [] for i in range(11)}
         all_sent_spikes = []
+        testing_stim_ids = self.get_testing_stim_ids(mVocs=mVocs)
+        sampling_rate = self.dataloader.metadata.get_sampling_rate(mVocs=mVocs)
 
-        for sent in self.testing_sent_ids:
-            aud = self.dataloader.metadata.stim_audio(sent)
+        for stim in testing_stim_ids:
+            if mVocs:
+                tr_id = self.dataloader.metadata.get_mVoc_tr_id(stim)[0]
+                aud = self.dataloader.get_stim_aud(tr_id, mVocs=mVocs)
+            else:
+                aud = self.dataloader.get_stim_aud(stim, mVocs=mVocs)
             # Getting the spectrogram at 10 ms and then resample to match the bin_width
-            spect = nl.features.auditory_spectrogram(aud, self.fs, frame_len=10)
+            # spect = nl.features.auditory_spectrogram(aud, sampling_rate, frame_len=10)
+            spect = self.get_spectrogram(aud, sampling_rate)
 
             repeated_spikes = self.dataloader.get_neural_data_for_repeated_trials(
                 session=session,
                 bin_width=bin_width,
                 delay=0,
-                sent_IDs=[sent]
+                stim_ids=[stim],
+                mVocs=mVocs,
                 )
 
             num_bins = repeated_spikes.shape[1]
@@ -166,8 +221,55 @@ class STRF:
         all_sent_spikes = np.concatenate(all_sent_spikes, axis=1)
         return spect_list, all_sent_spikes
 
+    # Deprecated
+    # def get_test_data_timit(self, session, bin_width):
+    #     """Returns spectral-features, spikes (all trials)
+    #     for the test sent IDs, given session.
 
-    def evaluate(self, strf_model, session, bin_width, test_trial=None):
+    #     Args:
+    #         session: int = session ID
+    #         bin_width: int = bin width in ms
+            
+    #     Returns:
+    #         spect_list: list = each entry of list is a spect 
+    #             for a sent audio.
+    #         repeated_spikes_list: list of lists = 11 lists 
+    #             corresponding to 11 trials and each one having
+    #             entries equal to number of sentences in test set.
+
+    #     """
+    #     session = str(session)
+    #     spect_list = []
+    #     # repeated_spikes_list = {i: [] for i in range(11)}
+    #     all_sent_spikes = []
+
+    #     for sent in self.testing_sent_ids:
+    #         aud = self.dataloader.metadata.stim_audio(sent)
+    #         # Getting the spectrogram at 10 ms and then resample to match the bin_width
+    #         spect = nl.features.auditory_spectrogram(aud, self.fs, frame_len=10)
+
+    #         repeated_spikes = self.dataloader.get_neural_data_for_repeated_trials(
+    #             session=session,
+    #             bin_width=bin_width,
+    #             delay=0,
+    #             sent_IDs=[sent]
+    #             )
+
+    #         num_bins = repeated_spikes.shape[1]
+    #         spect = resample(spect, num_bins, axis=0)
+    #         spect = resample(spect, self.num_freqs, axis=1)
+    #         spect_list.append(spect)
+    #         all_sent_spikes.append(repeated_spikes)
+    #         # for i in range(11):
+    #         #     repeated_spikes_list[i].append(repeated_spikes[i])
+    #     all_sent_spikes = np.concatenate(all_sent_spikes, axis=1)
+    #     return spect_list, all_sent_spikes
+
+
+    def evaluate(
+            self, strf_model, session, bin_width,
+            test_trial=None, mVocs=False
+        ):
         """Computes correlation on trials of test set for the model provided.
         
         Args:
@@ -181,12 +283,13 @@ class STRF:
             ndarray: (num_channels,)   
         """
 
-        test_spect_list, all_test_spikes = self.get_test_data(session, bin_width)
+        test_spect_list, all_test_spikes = self.get_test_data(
+            session, bin_width, mVocs=mVocs)
         predicted_response = strf_model.predict(X=test_spect_list)
         predicted_response = np.concatenate(predicted_response, axis=0)
 
         corr = utils.compute_avg_test_corr(
-            all_test_spikes, predicted_response, test_trial)
+            all_test_spikes, predicted_response, test_trial, mVocs=mVocs)
         return corr
 
     def cross_validted_fit(
@@ -194,6 +297,7 @@ class STRF:
             tmin=0, num_workers=1,
             num_lmbdas=8, num_folds=3,
             use_nonlinearity = False,
+            mVocs=False,
         ):
         """Computes score for the given lag (tmax) using cross-validated fit.
         
@@ -207,23 +311,28 @@ class STRF:
             num_folds: int = number of folds of cross-validation
             use_nonlinearity: bool = using non-linearity with the linear model or not.
                 Default = False.
+            mVocs: bool = if True, uses mVocs as set of stimuli.
         
         """
         
         tmin = tmin/1000
         tmax = tmax/1000
         sfreq = 1000/bin_width
-        lmbdas = np.logspace(-2, 5, num_lmbdas)
-
+        # lmbdas = np.logspace(-2, 5, num_lmbdas)
+        lmbdas = np.logspace(-2, 10, 13)
+        session = str(int(session))
         # load session spikes, if not already done so far..
-        cache_key = str(int(session))+'-'+str(int(bin_width))
+        cache_key = session+'_'+str(int(bin_width))
+        if mVocs:
+            cache_key = 'mVocs_'+cache_key
         if cache_key not in self.session_bw_cache.keys():
-            self.load_sent_wise_data(session, bin_width)
+            self.load_sent_wise_data(session, bin_width, mVocs=mVocs)
 
         num_channels = self.dataloader.get_num_channels(session)
         lmbda_score = np.zeros(((len(lmbdas), num_channels)))
         # val_score = np.zeros(num_channels)
-        mapping_set = self.training_sent_ids
+        # mapping_set = self.training_sent_ids
+        mapping_set = self.get_training_stim_ids(session, mVocs)
         np.random.shuffle(mapping_set)
         size_of_chunk = int(len(mapping_set) / num_folds)
 
@@ -236,12 +345,13 @@ class STRF:
             train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
 
             train_x, train_y = self.get_data(
-                session, bin_width, sent_IDs=train_set
+                session, bin_width, stim_ids=train_set, mVocs=mVocs
             )
 
             val_x, val_y = self.get_data(
-                session, bin_width, sent_IDs=val_set
+                session, bin_width, stim_ids=val_set, mVocs=mVocs
             )
+        # Deprecated
         #     # changing Ridge to RidgeCV
         #     alphas = np.logspace(-2, 5, 6)
         #     estimator = RidgeCV(alphas=alphas, cv=5)
@@ -292,6 +402,7 @@ class STRF:
             num_folds = 3, 
             use_nonlinearity = False, 
             test_trial=None,
+            mVocs=False,
         ):
         """Fits the linear model (with or without non-linearity) 
         by searching for optimal lag (max window lag) using cross-
@@ -310,6 +421,7 @@ class STRF:
             test_trial: int = trial ID to be tested on. Default=None, 
                 in which case, it tests on all the trials [0--10]
                 and returns averaged correlations. 
+            mVocs: bool = if True, uses mVocs as set of stimuli.
         Return:
             ndarray: (num_channels,) 
             optimal_lag: int 
@@ -331,7 +443,8 @@ class STRF:
                 tmin=tmin, tmax=lag, 
                 num_workers=num_workers,
                 num_lmbdas=num_lmbdas, num_folds=num_folds,
-                use_nonlinearity=use_nonlinearity
+                use_nonlinearity=use_nonlinearity,
+                mVocs=mVocs
                 )
             lag_scores.append(score)
             opt_lmbdas.append(lmbda)
@@ -364,7 +477,7 @@ class STRF:
 
         # get mapping data..
         mapping_x, mapping_y = self.get_data(
-                        session, bin_width
+                        session, bin_width, mVocs=mVocs
                     )
 
         # fit strf using opt lag and lmbda
@@ -380,7 +493,7 @@ class STRF:
                 )
         strf.fit(X=mapping_x, y=mapping_y)
 
-        corr = self.evaluate(strf, session, bin_width, test_trial)
+        corr = self.evaluate(strf, session, bin_width, test_trial, mVocs=mVocs)
 
         return corr, opt_lag, opt_lmbda
 

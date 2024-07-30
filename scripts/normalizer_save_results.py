@@ -54,6 +54,11 @@ def get_parser():
         # choices=[],
         help="Specify if force redoing the distribution again.."
     )
+    parser.add_argument(
+        '-v','--mVocs', dest='mVocs', action='store_true', default=False,
+        # choices=[],
+        help="Specify if computing for mVoc"
+    )
 
     
     return parser
@@ -71,24 +76,32 @@ def compute_and_save_normalizers(args):
     print(f"Running for sessions starting at index-{args.start_ind}, ending before index-{args.end_ind}..")
     random_pairs = args.random_pairs
     force_redo = args.force_redo
+    mVocs = args.mVocs
+    excluded_sessions = ['190726', '200213']
     for session in sessions:
-        # all bin_widths in list
-        for bin_width in args.bin_widths:
-            bin_width = int(bin_width)
-            for delay in args.delays:
-                # select_data = norm_obj.get_normalizer_for_session(
-                #     session, bin_width=bin_width, delay=delay
-                # )
-                if random_pairs:
-                    session_norm = norm_obj.get_normalizer_for_session_random_pairs(
-                        session, bin_width=bin_width, delay=delay, force_redo=force_redo
-                    )
-                else:
-                    session_norm = norm_obj.get_normalizer_for_session_app(
-                        session, bin_width=bin_width, delay=delay, force_redo=force_redo
-                    )
-            # print(f"Saving normalizers for for bin_width-{bin_width} & delay-{delay}...")
-            # norm_obj.save_normalizer_for_all_sessions(bin_width=bin_width, delay=delay)
+            
+        if mVocs and (session in excluded_sessions):
+            print(f"Excluding session: {session}")
+            continue
+        else:
+            # all bin_widths in list
+            for bin_width in args.bin_widths:
+                bin_width = int(bin_width)
+                for delay in args.delays:
+                    # select_data = norm_obj.get_normalizer_for_session(
+                    #     session, bin_width=bin_width, delay=delay
+                    # )
+                    if random_pairs:
+                        session_norm = norm_obj.get_normalizer_for_session_random_pairs(
+                            session, bin_width=bin_width, delay=delay, force_redo=force_redo,
+                            mVocs=mVocs
+                        )
+                    else:
+                        session_norm = norm_obj.get_normalizer_for_session_app(
+                            session, bin_width=bin_width, delay=delay, force_redo=force_redo
+                        )
+                # print(f"Saving normalizers for for bin_width-{bin_width} & delay-{delay}...")
+                # norm_obj.save_normalizer_for_all_sessions(bin_width=bin_width, delay=delay)
 
 
 # ------------------  Normalizer computing function ----------------------#

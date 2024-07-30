@@ -2,6 +2,8 @@ import os
 import yaml
 import torch
 import numpy as np
+import naplib as nl
+from scipy.signal import resample
 from torch import nn, Tensor
 from abc import ABC, abstractmethod
 
@@ -9,6 +11,9 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 from transformers import AutoProcessor, AutoModelForPreTraining
+from transformers import Wav2Vec2FeatureExtractor
+from transformers import ClapModel, ClapProcessor
+from transformers import AutoModel
 
 # local
 from auditory_cortex.neural_data import NeuralMetaData
@@ -71,6 +76,12 @@ class DNNFeatureExtractor():
             self.extractor = FeatureExtractorW2V2(self.device)
         elif model_name == 'w2v2_audioset':
             self.extractor = FeatureExtractorW2V2Audioset(self.device)
+        elif model_name == 'w2v2_generic':
+            self.extractor = FeatureExtractorW2V2Generic(self.device)
+        elif model_name == 'MERT':
+            self.extractor = FeatureExtractorMERT(self.device)
+        elif model_name == 'CLAP':
+            self.extractor = FeatureExtractorCLAP(self.device)
         elif model_name == 'speech2text':
             self.extractor = FeatureExtractorS2T(self.device)
         elif 'whisper' in model_name:
@@ -135,6 +146,8 @@ class DNNFeatureExtractor():
             if 'rnn' in layer.__name__:
                output = output[0].data
                 # output = output[1][0][1].squeeze()  # reading the 2nd half of data (only backward RNNs)
+            elif 'audio' in layer.__name__:
+                output = output[0]
             else:
                 output = output.squeeze()
                 if 'conv' in layer.__name__:
@@ -163,7 +176,6 @@ class DNNFeatureExtractor():
         for given audio input.
 
         Args:
-        
             layer_ID (int): layer identifier, assigned in config.
 
         returns:
@@ -233,6 +245,62 @@ class DNNFeatureExtractor():
     ###########          Starts here....!               #########
     #############################################################
 
+    def extract_DNN_features_for_mVocs(self):
+        """
+        Returns raw features for all layers of the DNN for mVoc stimuli
+        (NOT TIMIT stimuli)!
+
+        Returns:
+            dict of dict: read this as features[layer_ID][sent_ID]
+        """
+        print(f"Extracting raw features for {self.model_name}...!")
+        features = {id:{} for id in self.layer_IDs}
+        # self.audio_padding_duration = 0 # incase of no padding, 
+        sampling_rate = self.metadata.get_sampling_rate(mVocs=True)
+        for tr_id in self.metadata.mVocTrialIds:
+            audio_input = self.metadata.get_mVoc_aud(tr_id)
+            
+            if self.model_name == 'MERT':
+                if sampling_rate != 24000:
+                    n_samples = int(audio_input.size*24000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
+            elif self.model_name == 'w2v2_generic':
+                if sampling_rate != 48000:
+                    n_samples = int(audio_input.size*48000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
+            elif self.model_name == 'CLAP':
+                if sampling_rate != 48000:
+                    n_samples = int(audio_input.size*48000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
+            else:
+                if sampling_rate != 16000:
+                    n_samples = int(audio_input.size*16000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
+
+            
+            # needed only for Whisper...!
+            if 'whisper' in self.model_name:
+                bin_width = 20/1000.0   #20 ms for all layers except the very first...
+                audio_duration = self.metadata.get_mVoc_dur(tr_id)
+                sent_samples = int(np.ceil(round(audio_duration/bin_width, 3)))
+
+            self.translate(audio_input, grad = False)
+            for layer_ID in self.layer_IDs:
+                features[layer_ID][tr_id] = self.get_features(layer_ID)
+                if 'whisper' in self.model_name:
+                    ## whisper networks gives features for 30s long clip,
+                    ## extracting only the true initial samples...
+                    layer_name = self.get_layer_name(layer_ID)
+                    if layer_name == 'model.encoder.conv1':
+                        # sampling rate is 100 Hz for very first layer
+                        # and 50 Hz for all the other layers...
+                        feature_samples = 2*sent_samples
+                    else:
+                        feature_samples = sent_samples
+                    features[layer_ID][tr_id] = features[layer_ID][tr_id][:feature_samples]
+        return features
+
+
     def extract_DNN_features(self):
         """
         Returns raw features for all layers of the DNN..!
@@ -243,9 +311,21 @@ class DNNFeatureExtractor():
         print(f"Extracting raw features for {self.model_name}...!")
         features = {id:{} for id in self.layer_IDs}
         # self.audio_padding_duration = 0 # incase of no padding, 
-
+        sampling_rate = self.metadata.get_sampling_rate(mVocs=False)
         for sent_ID in self.metadata.sent_IDs:
             audio_input = self.metadata.stim_audio(sent_ID)
+            if self.model_name == 'MERT':
+                if sampling_rate != 24000:
+                    n_samples = int(audio_input.size*24000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
+            elif self.model_name == 'CLAP':
+                if sampling_rate != 48000:
+                    n_samples = int(audio_input.size*48000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
+            else:
+                if sampling_rate != 16000:
+                    n_samples = int(audio_input.size*16000/sampling_rate)
+                    audio_input = resample(audio_input, n_samples)
             
             # needed only for Whisper...!
             if 'whisper' in self.model_name:
@@ -341,7 +421,12 @@ class FeatureExtractorW2LSpect():
         Returns:
             input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
         """
-        input_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
+        # input_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
+        
+        spect = nl.features.auditory_spectrogram(aud, 16000, frame_len=10)
+        spect = resample(spect, 80, axis=1)
+
+        input_features = torch.tensor(spect, dtype=torch.float32).unsqueeze(dim=0)
         # with torch.no_grad():
         self.model.eval()
         input_features = input_features.to(self.device).transpose(1,2)
@@ -435,6 +520,86 @@ class FeatureExtractorW2L():
             for audio in audio_batch:
                 audio = audio.to(self.device)
                 predictions.append(label_normalizer(self.model.decode(audio)[0]))# 
+        return predictions
+    
+class FeatureExtractorW2V2Generic():
+    def __init__(self, device):
+
+        # model_identifier = "bilalhsp/wav2vec2-48KHz-audioset-natual-sounds"
+        model_identifier = "bilalhsp/wav2vec2-audioset-natual-sounds-v2"
+        print(f"Loading weights form model identifier: \n {model_identifier}")
+
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained(
+            model_identifier, 
+            cache_dir='/scratch/gilbreth/ahmedb/cache/huggingface/models/',
+            force_download=True,
+            )
+        self.model = AutoModel.from_pretrained(
+            model_identifier,
+            cache_dir='/scratch/gilbreth/ahmedb/cache/huggingface/models/',
+            force_download=True,
+            )
+        self.device = device
+        self.model = self.model.to(self.device)
+        # self.model = model 
+        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
+    def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        input = aud.astype(np.float64)
+        input_values = self.processor(input, sampling_rate=48000, return_tensors="pt", padding="longest").input_values  # Batch size 1
+        self.model.eval()
+        # with torch.no_grad():
+        input_values = input_values.to(self.device)
+        logits = self.model(input_values)
+
+        # input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
+        # input = input.unsqueeze(dim=0)
+        # input.requires_grad=True
+        # self.model.eval()
+        # out = self.model(input)
+        return logits
+    
+    def fwd_pass_tensor(self, aud_tensor):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (tensor): input tensor 'wav' input of shape (1, t) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        logits = self.model(aud_tensor)
+        return logits
+
+    def transcribe(self, aud):
+        """Transcribes speech audio."""
+        logits = self.fwd_pass(aud)
+        indexes = torch.argmax(logits, dim=-1)
+        return self.processor.batch_decode(indexes)
+        # self.processor.decode()
+
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            # audio, _, target_lens = batch
+            for audio in audio_batch:
+                audio = audio.to(self.device)
+                indexes = torch.argmax(self.model(audio).logits, dim=-1)
+                predictions.append(label_normalizer(self.processor.batch_decode(indexes)[0]))# 
         return predictions
 
 class FeatureExtractorW2V2():
@@ -571,6 +736,69 @@ class FeatureExtractorW2V2Audioset():
                 indexes = torch.argmax(self.model(audio).logits, dim=-1)
                 predictions.append(label_normalizer(self.processor.batch_decode(indexes)[0]))# 
         return predictions
+
+class FeatureExtractorMERT():
+    def __init__(self, device):
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained("m-a-p/MERT-v1-330M",trust_remote_code=True)
+        # loading our model weights
+        self.model = AutoModel.from_pretrained("m-a-p/MERT-v1-330M", trust_remote_code=True)
+        # loading the corresponding preprocessor config
+
+        self.device = device
+        self.model = self.model.to(self.device)
+        # self.model = model 
+        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
+    def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        input = aud.astype(np.float64)
+        input_values = self.processor(input, sampling_rate=24000, return_tensors="pt", padding="longest").input_values  # Batch size 1
+        self.model.eval()
+        # with torch.no_grad():
+        input_values = input_values.to(self.device)
+        out = self.model(input_values)
+
+        return out
+    
+
+class FeatureExtractorCLAP():
+    def __init__(self, device):
+        self.processor = ClapProcessor.from_pretrained("laion/larger_clap_general")
+        # loading our model weights
+        self.model = ClapModel.from_pretrained("laion/larger_clap_general")
+        # loading the corresponding preprocessor config
+
+        self.device = device
+        self.model = self.model.to(self.device)
+        # self.model = model 
+        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
+    def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        input = aud.astype(np.float32)
+        self.model.eval()
+        input_values = self.processor(audios=input, sampling_rate=48000, return_tensors="pt")
+        input_values = input_values.to(self.device)
+        out = self.model.get_audio_features(**input_values)
+
+        return out
+    
 
 class FeatureExtractorS2T():
     def __init__(self, device):

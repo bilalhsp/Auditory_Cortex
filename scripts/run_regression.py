@@ -49,6 +49,8 @@ def compute_and_save_regression(args):
     model_name = args.model_name
     shuffled = args.shuffled
     test_trial = args.test_trial
+    mVocs = args.mVocs
+    LPF = args.LPF
 
     # identifier = config['identifier']
     identifier = args.identifier
@@ -80,26 +82,29 @@ def compute_and_save_regression(args):
     else:
         print(f"Running Linear Regression for 'Trained' networks...")
 
-    ## read the sessions available in data_dir
-    sessions = np.array(os.listdir(data_dir))
-    sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
-    for s in bad_sessions:
-        sessions = np.delete(sessions, np.where(sessions == s))
-    sessions = np.sort(sessions)
+    # Deprecated
+    # ## read the sessions available in data_dir
+    # sessions = np.array(os.listdir(data_dir))
+    # sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
+    # for s in bad_sessions:
+    #     sessions = np.delete(sessions, np.where(sessions == s))
+    # sessions = np.sort(sessions)
 
-    # sessions = sessions[:20]
-    # sessions = sessions[20:]
+    # # sessions = sessions[:20]
+    # # sessions = sessions[20:]
 
     obj = models.Regression(
                 model_name=model_name, delay_features=delay_features, audio_zeropad=audio_zeropad
             )
+    
+    sessions = obj.dataloader.metadata.get_all_available_sessions()
     current_time = time.time()
     elapsed_time = current_time - START
     print(f"It takes {elapsed_time:.2f} seconds to load features...!")
     # sents = [12,13,32,43,56,163,212,218,287,308]
     for delay in delays:
         for bin_width in bin_widths:
-            # sessions = np.array(['200206'])
+            sessions = np.array(['200206'])
             # Session in data_dir that we do not have results for...
             if file_exists:
                 sessions_done = data[
@@ -114,30 +119,34 @@ def compute_and_save_regression(args):
             for session in subjects:
                 print(f"Working with '{session}'")
                 # obj = get_reg_obj(data_dir, sub)
+                if mVocs:
+                    excluded_sessions = ['190726', '200213']
+                    if session in excluded_sessions:
+                        print(f"Excluding session: {session}")
+                        continue
 
                 # norm = obj.get_normalizer(session, bin_width=bin_width, delay=delay,
                 #                         n=1 # normalizer not needed, will be updated later
                 #
                 ## normalizer not needed, will be updated later, fill in dummy values for now...
-                norm = np.zeros(obj.dataloader.get_num_channels(session=session))
+                # norm = np.zeros(obj.dataloader.get_num_channels(session=session))
                 for N_sents in dataset_sizes:
                     if delays_grid_search:
                         # # delays_grid = [-30,-25,-20,-15,-10,-5,0,5,10,15,20,25,30]
                         # delays_grid = [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100]
 
                         # delays_grid = [0,10,20,30,40,50,60,70,80,90,100] # for high bin_widths..
-                        delays_grid = [
-                            0, 20, 40, 60 ,80 ,100,
-                            150, 200, 250, 300,
-                            350, 400, 450, 500,
-                            ]
+                        delays_grid = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+                                       150, 200, 250, 300,
+                                       350, 400
+                                       ]
                         # delays_grid = [0, 20, 40, 60, 80, 100] # for wav2letter_spect...(untrained)
                         # delays_grid = [0] # Only for 1000 bin_width
                         corr_dict = obj.grid_search_CV(
                                 session, bin_width=bin_width, iterations=iterations,
                                 num_folds=k_folds_validation, N_sents=N_sents, return_dict=True,
                                 numpy=use_cpu, delays=delays_grid, third=third, layer_IDs=args.layer_IDs,
-                                shuffled=shuffled, test_trial=test_trial
+                                shuffled=shuffled, test_trial=test_trial, mVocs=mVocs, LPF=LPF
                             )
                     else:
                         corr_dict, optimal_lmbdas, lmbda_loss = obj.cross_validated_regression(
@@ -147,7 +156,7 @@ def compute_and_save_regression(args):
                                 shuffled=shuffled
                             )
 
-                    df = utils.write_to_disk(corr_dict, file_path, normalizer=norm)
+                    df = utils.write_to_disk(corr_dict, file_path, normalizer=None)
 
     END = time.time()
     print(f"Took {(END-START)/60:.2f} min., for bin_widths: '{bin_widths}' and delays: '{delays}'.")
@@ -200,8 +209,15 @@ def get_parser():
     parser.add_argument(
         '-t','--test_trial', dest='test_trial', type= int, action='store',
         default=None,
-        # choices=[],
         help="trial to test on."
+    )
+    parser.add_argument(
+        '-v','--mVocs', dest='mVocs', action='store_true', default=False,
+        help="Specify if spikes for mVocs are to be used."
+    )
+    parser.add_argument(
+        '-L','--LPF', dest='LPF', action='store_true', default=False,
+        help="Specify if features are to be low pass filtered."
     )
 
 
