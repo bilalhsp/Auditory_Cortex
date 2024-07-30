@@ -74,6 +74,7 @@ def scatter_WER_v_corr(
 		benchmark=None,
 		bin_width=50,
 		normalized = True,
+		mVocs=False,
 		trained_identifier = 'trained_all_bins', 
 		use_stat_inclusion = True,
 		inclusion_p_threshold = 0.01,
@@ -97,10 +98,11 @@ def scatter_WER_v_corr(
 		corr_obj_trained = Correlations(model_name+'_'+trained_identifier)
 		threshold= corr_obj_trained.get_normalizer_threshold(
 			bin_width=bin_width, poisson_normalizer=poisson_normalizer,
+			mVocs=mVocs,
 		)
 		data_dist_trained = corr_obj_trained.get_corr_all_layers_for_bin_width(
 				neural_area=area, bin_width=bin_width, delay=delay,
-				threshold=threshold, normalized=normalized,
+				threshold=threshold, normalized=normalized,mVocs=mVocs,
 				use_stat_inclusion=use_stat_inclusion,
 				inclusion_p_threshold=inclusion_p_threshold,
 				use_poisson_null=use_poisson_null,
@@ -151,7 +153,9 @@ def save_regression_correlations_all_networks():
 
 def plot_strf_baseline(            
 		area='all', bin_width=20, delay=0, alpha=0.1,
-		save_tikz=True, normalized=True,
+		save_tikz=True,
+		normalized=True,
+		mVocs=False,
 		display_dotted_lines=False,
 		display_inter_quartile_range=True,
 		lag=None,
@@ -172,6 +176,7 @@ def plot_strf_baseline(
 				display_dotted_lines=display_dotted_lines,
 				display_inter_quartile_range=display_inter_quartile_range,
 				normalized=normalized,
+				mVocs=mVocs,
 				model_identifier=model_identifier,
 				use_stat_inclusion=use_stat_inclusion,
 			)
@@ -186,10 +191,12 @@ def peak_layer_core_non_primary_areas(
 		bin_width=50,
 		trained_identifier='trained_all_bins',
 		baseline_identifier = f"STRF_freqs80_bw50",
+		plot_baseline=False,
 		untrained_identifiers=None,
 		p_threshold = 0.01,
 		offset_y=0.93,
 		normalized=True,
+		mVocs=False,
 		save_tikz=True,
 		use_stat_inclusion=True,
 		inclusion_p_threshold=0.01,
@@ -205,10 +212,12 @@ def peak_layer_core_non_primary_areas(
 			model_name=model_name,
 			area=area,
 			normalized=normalized,
+			mVocs=mVocs,
 			bin_width=bin_width,
 			trained_identifier=trained_identifier,
 			untrained_identifiers=untrained_identifiers,
 			baseline_identifier=baseline_identifier,
+			plot_baseline=plot_baseline,
 			indicate_significance=False,
 			save_tikz=False,
 			use_stat_inclusion=use_stat_inclusion,
@@ -235,6 +244,7 @@ def plot_trained_vs_shuffled_network_results(
 		baseline_identifier=None,
 		areas: list=None,
 		normalized=True,
+		mVocs=False,
 		plot_difference=False,
 		bin_width=20,
 		alpha=0.1,
@@ -276,6 +286,7 @@ def plot_trained_vs_shuffled_network_results(
 				bin_width=bin_width,
 				area=area,
 				normalized=normalized,
+				mVocs=mVocs,
 				alpha=alpha,
 				save_tikz=save_tikz,
 				sig_offset_x=sig_offset_x,
@@ -302,6 +313,8 @@ def plot_trained_vs_shuffled_network_results(
 # ------------------  Fig: Trained networks (best layer) at each bin width ----------------#
 
 def plot_best_layer_across_all_bin_widths(
+	model_names: list=None,
+	layer_ids: list=None,
 	identifier = 'trained_all_bins',
 	areas = None,
 	normalized = True, 
@@ -310,6 +323,9 @@ def plot_best_layer_across_all_bin_widths(
 	normalizer_filename = None,
 	display_inter_quartile_range=True,
 	display_dotted_lines=False,
+	norm_bin_width=None,
+	p_threshold = 0.01,
+	offset_y=0.93,
 	):
 	"""Plots and saves line plots for all networks, having correlation results
 	of trained network (plotted in the network specific color), at all the 
@@ -321,11 +337,18 @@ def plot_best_layer_across_all_bin_widths(
 		plot_difference: bool = plots dist of 'train - untrained' if True
 		display_inter_quartile_range: bool = display shaded regions of dist
 		plot_baseline: bool = 
+		norm_bin_width: int = If spikes are predicted at a fixed bin width,
+			and features are low pass filtered at different bin width (cut-off freq)
 	"""
 	if areas is None:
 		areas = ['all'] #['core', 'belt']
-	model_names = PlotterUtils.model_names
-	for model_name in model_names:
+	if model_names is None:
+		model_names = PlotterUtils.model_names
+	if layer_ids is None:
+		layer_ids = [None for _ in model_names]
+	else:
+		assert len(layer_ids)==len(model_names), f"len(layer_ids)={len(layer_ids)} not equal to len(model_names)={len(model_names)}"
+	for model_name, layer_id in zip(model_names, layer_ids):
 		for area in areas:
 			data_dist = RegPlotter.plot_best_layer_at_all_bin_width(
 				model_name=model_name,
@@ -337,7 +360,13 @@ def plot_best_layer_across_all_bin_widths(
 				normalizer_filename=normalizer_filename,
 				display_inter_quartile_range=display_inter_quartile_range,
 				display_dotted_lines=display_dotted_lines,
+				norm_bin_width=norm_bin_width,
+				layer_id=layer_id,
+				p_threshold=p_threshold,
+				offset_y=offset_y,
 			)
+			# RegPlotter.indicate_peak_and_similar_layers(
+			# data_dist, p_threshold=p_threshold, offset_y=offset_y)
 
 
 # ------------------  Fig: Trained networks (best layer) at each bin width  ----------------#
@@ -639,6 +668,7 @@ def get_peak_dist_diff_trained_and_untrained(
 		delay=0,
 		normalized=True,
 		column=None,
+		mVocs=False,
 		poisson_normalizer=True,
 		use_stat_inclusion=False,
 		inclusion_p_threshold = 0.01,
@@ -650,10 +680,11 @@ def get_peak_dist_diff_trained_and_untrained(
 	corr_obj_trained = Correlations(model_name+'_'+trained_identifier)
 	threshold= corr_obj_trained.get_normalizer_threshold(
 		bin_width=bin_width, poisson_normalizer=poisson_normalizer,
+		mVocs=mVocs,
 	)
 	data_dist_trained = corr_obj_trained.get_corr_all_layers_for_bin_width(
 			neural_area=area, bin_width=bin_width, delay=delay,
-			threshold=threshold, normalized=normalized,
+			threshold=threshold, normalized=normalized, mVocs=mVocs,
 			column=column, use_stat_inclusion=use_stat_inclusion,
 			inclusion_p_threshold=inclusion_p_threshold,
 			use_poisson_null=use_poisson_null,
@@ -666,7 +697,7 @@ def get_peak_dist_diff_trained_and_untrained(
 		corr_obj_shuffled = Correlations(model_name+'_'+untrained_identifier)
 		data_dist_shuffled_list.append(corr_obj_shuffled.get_corr_all_layers_for_bin_width(
 				neural_area=area, bin_width=bin_width, delay=delay,
-				threshold=threshold, normalized=normalized,
+				threshold=threshold, normalized=normalized, mVocs=mVocs,
 				column=column, use_stat_inclusion=use_stat_inclusion,
 				inclusion_p_threshold=inclusion_p_threshold,
 				use_poisson_null=use_poisson_null,
@@ -694,6 +725,7 @@ def plot_diff_of_peak_dist_core_vs_non_primary(
 		model_names=None,
 		bin_width=50,
 		normalized=True,
+		mVocs=False,
 		save_tikz=False,
 		p_threshold=0.05,
 		size=15,
@@ -715,6 +747,7 @@ def plot_diff_of_peak_dist_core_vs_non_primary(
 				area=area,
 				bin_width=bin_width,
 				normalized=normalized,
+				mVocs=mVocs,
 				)
 			distributions[area] = diff
 

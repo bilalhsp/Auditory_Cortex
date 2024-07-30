@@ -233,7 +233,7 @@ class DNNDataset:
         for sent in self.testing_sent_ids:
             # make sure to drop the partial sample at the end, 
             # this has already been done for repeated trials..
-            features_list.append(features[sent][:-1])
+            features_list.append(features[sent])
             repeated_spikes = self.dataloader.get_neural_data_for_repeated_trials(
                 session=self.session,
                 bin_width=self.bin_width,

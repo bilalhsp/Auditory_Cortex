@@ -16,6 +16,7 @@ import auditory_cortex.utils as utils
 # from auditory_cortex.dataset import NeuralData
 from auditory_cortex.neural_data import NeuralData
 import auditory_cortex.dataloader as dataloader
+from auditory_cortex import LPF_analysis_bw
 # from auditory_cortex.computational_models.feature_extractors import DNNFeatureExtractor
 
 # import GPU specific packages...
@@ -23,8 +24,8 @@ from auditory_cortex import hpc_cluster
 if hpc_cluster:
     import cupy as cp
 
-import tensorflow.compat.v2 as tf
-tf.enable_v2_behavior()
+# import tensorflow.compat.v2 as tf
+# tf.enable_v2_behavior()
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
@@ -77,41 +78,47 @@ class Regression():
 
 
     def unroll_features(
-            self, bin_width=20, sents = None, numpy=True,
+            self, stim_ids, bin_width=20, delay=0, numpy=True,
             return_dict=False, layer_IDs=None, third=None,
-            force_reload=False, shuffled=False
+            force_reload=False, shuffled=False, mVocs=False,
+            LPF=False
             ):
         """
         Unroll and concatenate time axis of extracted features.
 
         Args:
-            model_name: str = assigned name of DNN model of interest.
+            stim_ids (List of int ID's): ID's of stimuli
             bin_width: int = bin width in ms.
-            sents (List of int ID's): ID's of sentences 
+            delay: int = delay in ms. 
             layer_IDs (list): Layer of layer indices 
             third (int):    Default=None, section of sents to compute prediction corr.
+            LPF: bool = If true, low-pass-filters features to the bin width specified
+                and resamples again at predefined bin-width (e.g. 10ms)
 
         Returns:
-            dict: if return_dict=True, otherwise, return ndarray =(samples, ndim)
+            dict: if return_dict=True, otherwise, return ndarray =(layers, samples, ndim)
         """
-        if sents is None:
-            sents = self.dataloader.metadata.sent_IDs
         if layer_IDs is None:
             layer_IDs = self.dataloader.get_layer_IDs(self.model_name)
-        # sampled_features = self.dataloader.get_resampled_DNN_features(self.model_name, bin_width)
         feats = {}
         all_layer_features = self.dataloader.get_resampled_DNN_features(
                     self.model_name, bin_width=bin_width, force_reload=force_reload,
-                    shuffled=shuffled
+                    shuffled=shuffled, mVocs=mVocs, LPF=LPF
                     )
+        # Handling delay: Trimming the extra bins instead of zero padding 
+        if LPF:
+            bin_width = LPF_analysis_bw
+        trim = int(np.ceil(delay/bin_width))
         for layer_ID in layer_IDs:
-            # layer_feats = self.dataloader.get_DNN_layer_features(
-            #         self.model_name, layer_ID, bin_width=bin_width
-            #         )
+
             layer_feats = all_layer_features[layer_ID]
             if third is None:
                 # [:-1] is used to drop the partial bins at the end of each sequence.
-                feats[layer_ID] = np.concatenate([layer_feats[sent][:-1] for sent in sents], axis=0)
+                # Not using that anymore..
+                if trim !=0:
+                    feats[layer_ID] = np.concatenate([layer_feats[stim_id][:-trim] for stim_id in stim_ids], axis=0)
+                else:
+                    feats[layer_ID] = np.concatenate([layer_feats[stim_id] for stim_id in stim_ids], axis=0)
                 # feats[j] = np.concatenate([sampled_features[layer_ID][sent] for sent in sents], axis=0)
             else:
                 pass
@@ -133,284 +140,122 @@ class Regression():
         return self.dataloader.get_layer_IDs(self.model_name)
     
 
-
-
-
-##############################################################################
-##########      Moved to dataloader...
-#############################################################################
-
-    # def get_layer_index(self, layer_id):
-    #     """Returns layer index for layer ID (defined in config).
-    #     Calls instance method of 'self.model_extractor'
-    #     """
-    #     return self.model_extractor.get_layer_index(layer_id)
-
-
-    # def load_features(self, bin_width=20, resample= True, delay_features=False, audio_zeropad=False):
-    #     print(f"Loading raw ANN features..")
-    #     # if sents is None:
-    #     #     sents = self.sents
-    #     if delay_features:
-    #         print("Features Delay requested:")
-    #         print("- Delaying features by half of RF for each layer")
-
-    #         self.layer_delays = (np.array(self.receptive_fields)/(2.0*bin_width)).astype(int)
-    #         self.max_layer_delay = np.max(self.layer_delays)
-    #         print(f"Layer-wise delays (in samples) will be: {self.layer_delays} ")
-
-    #         if audio_zeropad:
-    #             self.audio_padding_duration = (self.max_layer_delay * bin_width)/1000.0
-    #             # max_layer_delay = 4
-    #             self.audio_padding_samples = (self.max_layer_delay * bin_width)*16 # sampling rate/1000
-                
-    #             print(f" - spikes trimming not needed. \n\
-    #                 (Zero-paddading audio by {self.audio_padding_duration*1000:.0f} ms, before extracting features)")
-
-    #             # in case of audio-zeropadding, no need to trim the spikes
-    #             self.features_delay_trim = None
-
-    #         else:
-    #             print(" - Trimming spikes by max feature delay (across all layers) ")
-    #             self.features_delay_trim = self.max_layer_delay
-    #             self.audio_padding_duration = 0
-
-    #     elif audio_zeropad:
-    #         ...
-    #         raise AttributeError(f"Invalid arguments: Features delay must for Audio zero-padding!!!")
-    #     # raw_features = self.extract_features(audio_zeropad=audio_zeropad)
-    #     raw_features = self.model_extractor.extract_features()
-    #     if not self.use_pca:
-    #         self.feature_dims = raw_features[0][1].shape[1]
-
-    #     # resample = False   # temporary change.....! 10/23/23
-    #     if resample:
-    #         self.sampled_features = self.resample(raw_features, bin_width, delay_features=delay_features)
-    #     else:
-    #         self.sampled_features = raw_features
-    #     # self.features = self.unroll_features(sents = sents, numpy=numpy, return_dict=True)
-
-
-    # def resample(self, raw_features, bin_width, delay_features=False):
-    #     """
-    #     resample all layer features to specific bin_width
-
-    #     Args:
-    #         bin_width (float): width of data samples in ms (1000/sampling_rate).
-
-    #     Returns:
-    #         List of dict: all layer features (resampled at required sampling_rate).
-    #     """
-    #     print(f"Resamping ANN features at bin-width: {bin_width}")
-    #     resampled_features = [{} for _ in range(len(self.layers))]
-    #     self.sent_sections = {}
-
-    #     bin_width = bin_width/1000 # ms
-    #     for sent in raw_features[0].keys():
-    #         # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
-    #         sent_duration = self.audio_padding_duration + self.dataset.duration(sent)
-    #         n = int(np.ceil(round(sent_duration/bin_width, 3)))
-
-    #         # save boundaries of sent thirds (3 sections of each sentence..)
-    #         one_third = int(n/3)
-    #         two_third = int(2*n/3)
-    #         self.sent_sections[sent] = [0, one_third, two_third, n]
-
-    #         for j, l in enumerate(self.layers):
-    #             # if 'whisper' in self.model_name:
-    #             #     ## whisper networks gives features for 30s long clip,
-    #             #     ## extracting only the true initial samples...
-                    
-    #             #     if l == 'model.encoder.conv1':
-    #             #         # sampling rate is 100 Hz for very first layer
-    #             #         # and 50 Hz for all the other layers...
-    #             #         samples = 2*n
-    #             #         tmp = raw_features[j][sent][:samples]
-    #             #         tmp = signal.resample(tmp, n, axis=0)
-    #             #     else:
-    #             #         tmp = raw_features[j][sent][:n]
-            
-    #             # else:
-    #             tmp = signal.resample(raw_features[j][sent], n, axis=0)
-    #             # mean = np.mean(tmp, axis=0)
-    #             # resampled_features[j][sent] = tmp #- mean
-    #             if delay_features:
-    #                 seq_len = tmp.shape[0]
-    #                 # delay by removing last samples, and trimming the extra length at the start..
-    #                 tmp =   tmp[self.max_layer_delay-self.layer_delays[j] : seq_len-self.layer_delays[j]]
-                    
-    #             resampled_features[j][sent] = tmp
-    #     return resampled_features
-
-    ####################################################
-    ###### neural dataset part...
-
-        # def get_neural_spikes(
-        #     self, session, bin_width=20, delay=0, sents=None, force_reload=False, numpy=False, third=None
-        # ):
-        # """Retrieves neural spikes for the argument session, loads spikes 
-        # if not already loaded or force_reload=True."""
-        # session = str(session)
-        # # check if session is already loaded, reuse it, otherwise clear all sessions to saved memory.
-        # if session not in self.list_loaded_sessions():
-        #     self.spike_datasets.clear()
-        #     gc.collect()
-        #     # de-allocation of memory ends here...
-
-        #     self.spike_datasets = {}
-        #     self.num_channels = {}
-        #     self._load_dataset_session(session)
-
-        #     self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
-        #     self.num_channels[session] = self.get_dataset_object(session).num_channels
-      
-        # elif force_reload:
-        #     self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
-
-        # spikes = self.spike_datasets[session].unroll_spikes(sents=sents, features_delay_trim=self.features_delay_trim, third=third)
-        # if not numpy:
-        #     spikes = cp.array(spikes)
-
-        # return spikes
-
-
-    #     def get_raw_neural_spikes(self, session, bin_width=20, delay=0):
-    #     """Returns neural spikes in the raw form (not unrolled)
-
-    #     Args:
-    #         session: = session ID 
-    #         bin_width: int = size of the binning window in ms.
-    #         delay: int: neural delay in ms.
-    #     Returns:
-    #         dict = dict of neural spikes with sent IDs as keys.
-    #     """
-    #     session = str(int(session))
-    #     # check if session is already loaded, reuse it, otherwise clear all sessions to saved memory.
-    #     if session not in self.list_loaded_sessions():
-    #         self.spike_datasets.clear()
-    #         gc.collect()
-    #         # de-allocation of memory ends here...
-
-    #         self.spike_datasets = {}
-    #         self.num_channels = {}
-    #         self._load_dataset_session(session)
-    #         self.get_dataset_object(session).extract_spikes(bin_width, delay)#, sents=sents)
-    #         self.num_channels[session] = self.get_dataset_object(session).num_channels
-    #     return self.get_dataset_object(session).raw_spikes
-
-
-    # def list_loaded_sessions(self):
-    #     """Returns the list of sessions for which neural data has
-    #     been loaded."""
-    #     return self.spike_datasets.keys()
-    
-    # def _load_dataset_session(self, session):
-    #     """Create dataset object for the 'session'"""
-    #     self.spike_datasets[session] = NeuralData(session)
-
-    # def get_dataset_object(self, session):
-    #     """Returns spike dataset object if neural data for the input 
-    #     session has already been loaded, otherwise return False."""
-    #     try:
-    #         return self.spike_datasets[session]
-    #     except:
-    #         raise AttributeError(f"Create dataset object for session-{session} before using it.")
-
-    # def get_normalizer(self, session, sents=None, bin_width=20, delay=0, n=1000):
-    #     """Compute dist. of normalizer for correlations (repeatability of neural
-    #     spikes), and return median."""
-    #     if session not in self.list_loaded_sessions():
-    #         self._load_dataset_session(session)
-    #         _ = self.get_dataset_object(session).extract_spikes(bin_width, delay, sents=sents)
-    #     return self.spike_datasets[session].get_normalizer(sents=sents, bin_width=bin_width, delay=delay, n=n)
-
-
-
-##############################################################################
-##########      Moved to Feature Extractor...
-#############################################################################
-
-    # def extract_features(self, audio_zeropad=False):
-    #     """
-    #     Returns all layer features for given 'sents'
-
-    #     Args:
-    #         sents (list, optional): List of sentence ID's to get the features for. 
-
-    #     Returns:
-    #         List of dict: List index corresponds to layer number carrying 
-    #                         dict of extracted features for all sentences. 
-    #     """
-    #     sents = self.sents
-    #     features = [{} for _ in range(self.num_layers)]
-    #     # self.audio_padding_duration = 0 # incase of no padding, 
-
-    #     for x, i in enumerate(sents):
-    #         if audio_zeropad:
-    #             audio_input = np.concatenate([
-    #                     np.zeros(self.audio_padding_samples),
-    #                     self.dataset.audio(i)
-    #                 ], axis=0)
-    #         else:
-    #             audio_input = self.dataset.audio(i)
-            
-    #         # needed only for Whisper...!
-    #         if 'whisper' in self.model_name:
-    #             bin_width = 20/1000.0   #20 ms for all layers except the very first...
-    #             sent_duration = self.audio_padding_duration + self.dataset.duration(i)
-    #             n = int(np.ceil(round(sent_duration/bin_width, 3)))
-
-    #         self.model_extractor.translate(audio_input, grad = False)
-    #         for j, l in enumerate(self.layers):
-    #             features[j][i] = self.model_extractor.get_features(j).cpu()
-    #             if 'whisper' in self.model_name:
-    #                 ## whisper networks gives features for 30s long clip,
-    #                 ## extracting only the true initial samples...
-    #                 if l == 'model.encoder.conv1':
-    #                     # sampling rate is 100 Hz for very first layer
-    #                     # and 50 Hz for all the other layers...
-    #                     samples = 2*n
-    #                 else:
-    #                     samples = n
-    #                 features[j][i] = features[j][i][:samples]
-         
-    #     return features
-
-
-############################################################################
-#####           Ends here...
-############################################################################
     ### Methods for the getting neural data (spikes)
 
 
-    def unroll_spikes(self, session, bin_width=20, delay=0, sents=None,
-                numpy=False):
+    def unroll_spikes(
+            self, session, stim_ids, bin_width=20, delay=0, 
+                numpy=False, mVocs=False, LPF=False):
         """
         Retrieves stimulus-wise neural spikes for the specified session, unrolls
         and concatenatess time axis of neural spikes.
 
         Args:
-            session: int = ID of recording site (session) 
+            session: int = ID of recording site (session)
+            sents (List of int ID's): ID's of stimuli  
             bin_width: int = bin width in ms.
             delay: int = neural delay in ms.
-            sents (List of int ID's): ID's of sentences 
             numpy: bool = Setting numpy=True would mean using CPU and not GPU.
+            mVocs: bool = If True, returns spikes for mVocs
 
         Returns:
             return ndarray =(samples, n_channels)
         """
-        if sents is None:
-            sents = self.dataloader.sent_IDs
-
         session = str(session)
-        raw_spikes = self.dataloader.get_session_spikes(session=session, bin_width=bin_width, delay=delay)
-        # [:-1] is used to drop the partial bins at the end of each sequence.
-        spikes = np.concatenate([raw_spikes[sent][:-1] for sent in sents], axis=0).astype(np.float32)
+        if LPF:
+            bin_width = LPF_analysis_bw
+
+        raw_spikes = self.dataloader.get_session_spikes(
+            session=session, bin_width=bin_width, delay=delay, mVocs=mVocs
+            )
+        # Handling delay: Trimming the extra bins instead of zero padding 
+        trim = int(np.ceil(delay/bin_width))
+        # Deprecated: [:-1] is used to drop the partial bins at the end of each sequence.
+        if trim !=0:
+            spikes = np.concatenate([raw_spikes[stim_id][:-trim] for stim_id in stim_ids], axis=0).astype(np.float32)
+        else:
+            spikes = np.concatenate([raw_spikes[stim_id] for stim_id in stim_ids], axis=0).astype(np.float32)
+
         if not numpy:
             spikes = cp.array(spikes)
         return spikes
+    
+    def get_test_data(
+            self, session, bin_width=20, delay=0, numpy=False,
+            layer_IDs=None, shuffled=False, mVocs=False,
+            LPF=False,
+        ):
+        """
+        Retrieves DNN features and all trials of neural spikes for held out sentences.
 
-    def get_held_out_spikes(
+        Args:
+            session: int = ID of recording site (session) 
+            bin_width: int = bin width in ms.
+            delay: int = neural delay in ms.
+            numpy: bool = Setting numpy=True would mean using CPU and not GPU.
+            mVocs: bool = If True, returns data for mVocs otherwise for timit stimuli.
+
+        Returns:
+            features: ndarray =(layers, samples, features)
+            repeated_trials: ndarray =(num_trials, samples, n_channels)
+        """
+        features_bw = bin_width
+        if LPF:
+            bin_width = LPF_analysis_bw
+
+        if mVocs:
+            stim_ids = []
+            mVocs_ids = self.dataloader.metadata.mVoc_test_stimIds
+            for mVoc_id in mVocs_ids:
+                # since we need tr id [0,780) and not mVocs id [1, 303]
+                # and only taking the first tr...
+                stim_ids.append(self.dataloader.metadata.get_mVoc_tr_id(mVoc_id)[0])
+            spikes_all_trials = self.get_test_mVocs_spikes(session, bin_width=bin_width, delay=delay, numpy=numpy)
+        else:
+            stim_ids = self.dataloader.test_sent_IDs
+            spikes_all_trials = self.get_test_sent_spikes(session, bin_width=bin_width, delay=delay, numpy=numpy)
+
+        features = self.unroll_features(
+            stim_ids, bin_width=features_bw, delay=delay, numpy=numpy,
+            layer_IDs=layer_IDs, shuffled=shuffled, mVocs=mVocs,
+            LPF=LPF
+            )
+        return features, spikes_all_trials
+
+    def get_test_mVocs_spikes(
+            self, session, bin_width=20, delay=0, numpy=False):
+        """
+        Retrieves all trials of neural spikes for held out mVocs.
+
+        Args:
+            session: int = ID of recording site (session) 
+            bin_width: int = bin width in ms.
+            delay: int = neural delay in ms.
+            numpy: bool = Setting numpy=True would mean using CPU and not GPU.
+
+        Returns:
+            return ndarray =(num_trials, samples, n_channels)
+        """
+        mVocs_spikes = {}
+        mVocs_ids = self.dataloader.metadata.mVoc_test_stimIds
+        for mVocs in mVocs_ids:
+            tr_ids = self.dataloader.metadata.get_mVoc_tr_id(mVocs)
+            all_trial_spikes = []
+            for tr in tr_ids:
+                all_trial_spikes.append(self.unroll_spikes(
+                    session, [tr], bin_width=bin_width, delay=delay, 
+                    numpy=numpy, mVocs=True
+                ))
+            mVocs_spikes[mVocs] = np.stack(all_trial_spikes, axis=0)
+        repeated_trials = np.concatenate([mVocs_spikes[mVocs] for mVocs in mVocs_ids], axis=1).astype(np.float32)
+        # if not numpy:
+        #     repeated_trials = cp.array(repeated_trials)
+        return repeated_trials
+
+
+
+
+    def get_test_sent_spikes(
             self, session, bin_width=20, delay=0, numpy=False):
         """
         Retrieves all trials of neural spikes for held out sentences.
@@ -424,10 +269,18 @@ class Regression():
         Returns:
             return ndarray =(num_trials, samples, n_channels)
         """
-
-        repeated_trials = self.dataloader.get_neural_data_for_repeated_trials(
-	        session, bin_width=bin_width, delay=delay
+        sent_spikes = {}
+        sent_ids = self.dataloader.test_sent_IDs
+        for sent in sent_ids:
+            sent_spikes[sent] = self.dataloader.get_neural_data_for_repeated_trials(
+	        session, bin_width=bin_width, delay=delay, stim_ids=[sent]
             )
+        trim = int(np.ceil(delay/bin_width))
+        # Deprecated: [:-1] is used to drop the partial bins at the end of each sequence.
+        if trim !=0:
+            repeated_trials = np.concatenate([sent_spikes[sent][:,:-trim,:] for sent in sent_ids], axis=1).astype(np.float32)
+        else:
+            repeated_trials = np.concatenate([sent_spikes[sent] for sent in sent_ids], axis=1).astype(np.float32)
         if not numpy:
             repeated_trials = cp.array(repeated_trials)
         return repeated_trials
@@ -473,14 +326,11 @@ class Regression():
         
 
 
-    ### Methods for the computing correlations and grid search for optimal delay.
-
-    def cross_validated_regression(
+    def cross_validated_regression_LPF_features(
             self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=8,
             iterations=10, N_sents=500, return_dict=False, numpy=False,
-            sents=None, test_sents=None, third=None, layer_IDs=None,
-            poisson=False, lr=0.6, max_iterations=50, shuffled=False,
-            test_trial=None
+            third=None, layer_IDs=None, poisson=False, lr=0.6,
+            max_iterations=50, shuffled=False, test_trial=None, mVocs=False
         ):
         """
         Returns distribution of correlations for all (12) layers and all channels
@@ -514,18 +364,35 @@ class Regression():
         if shuffled:
             print(f"Running regression for shuffled weights..")
 
-        if sents is None:
-            sents = self.dataloader.sent_IDs
-        if N_sents > len(sents):
-            N_sents = len(sents)
 
-        if test_sents is None:
-            test_sents = self.dataloader.test_sent_IDs
+        # if sents is None:
+        #     sents = self.dataloader.sent_IDs
+        # if N_sents > len(sents):
+        #     N_sents = len(sents)
+
+        # if test_sents is None:
+        #     test_sents = self.dataloader.test_sent_IDs
         
         # this creates a new dataset object and extracts the spikes
         session = str(session)
         # spikes = self.unroll_spikes(session, bin_width=bin_width, delay=delay)
-        num_channels = self.dataloader.get_num_channels(session)
+        raw_spikes = self.dataloader.get_session_spikes(session, bin_width=bin_width, delay=delay, mVocs=mVocs)
+        num_channels = self.dataloader.get_num_channels(session, mVocs=mVocs)
+
+        
+        if mVocs:
+            stim_ids = self.dataloader.metadata.mVocTrialIds
+            test_ids = self.dataloader.metadata.mVoc_test_trIds
+
+            # exclude the missing trial IDs from list of Ids
+            missing_trial_ids = self.dataloader.get_dataset_object(session=session).missing_trial_ids
+            stim_ids = stim_ids[np.isin(stim_ids, missing_trial_ids, invert=True)]
+            test_ids = test_ids[np.isin(test_ids, missing_trial_ids, invert=True)]
+
+        else:
+            stim_ids = self.dataloader.sent_IDs
+            test_ids = self.dataloader.test_sent_IDs
+        N_sents = len(stim_ids)
         # _ = self.get_neural_spikes(session, bin_width=bin_width, delay=delay)
         # num_channels = self.spike_datasets[session].num_channels
         if layer_IDs is None:
@@ -533,26 +400,30 @@ class Regression():
 
         # loading features for any one sent=12, to get feature_dims..
         feature_dims = self.unroll_features(
-            bin_width=bin_width, sents=[12], layer_IDs=layer_IDs, shuffled=shuffled
+            stim_ids=[12], bin_width=bin_width, delay=delay, layer_IDs=layer_IDs, shuffled=shuffled,
+            mVocs=mVocs
             ).shape[-1]
         
         # feature_dims = self.sampled_features[0].shape[1]
         # lmbdas = module.logspace(start=-7, stop=-1, num=num_lmbdas)
-        lmbdas = module.logspace(start=-12, stop=7, num=20)
+        lmbdas = module.logspace(start=-10, stop=10, num=21)
         
         # lmbdas = module.logspace(start=-num_lmbdas//4, stop=num_lmbdas, num=int(1.25*num_lmbdas)+1)
         # lmbdas = module.logspace(start=1, stop=8, num=7)
         # lmbdas = module.logspace(start=5, stop=6, num=2)
         B = module.zeros((len(layer_IDs), feature_dims, num_channels))
         corr_coeff = np.zeros((iterations, num_channels, len(layer_IDs)))
-        poiss_entropy = np.zeros((iterations, num_channels, len(layer_IDs)))
-        poiss_entropy_baseline = np.zeros((iterations, num_channels, len(layer_IDs)))
-        uncertainty_per_spike = np.zeros((iterations, num_channels, len(layer_IDs)))
-        bits_per_spike_NLB = np.zeros((iterations, num_channels, len(layer_IDs)))
+        corr_coeff_mVocs = np.zeros((iterations, num_channels, len(layer_IDs)))
+
+        # Deprecated
+        # poiss_entropy = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # poiss_entropy_baseline = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # uncertainty_per_spike = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # bits_per_spike_NLB = np.zeros((iterations, num_channels, len(layer_IDs)))
         corr_coeff_train = np.zeros((iterations, num_channels, len(layer_IDs)))
         # stimuli = np.array(list(self.raw_features[0].keys()))
 
-        stimuli = np.random.permutation(sents)[0:N_sents]
+        stimuli = np.random.permutation(stim_ids)[0:N_sents]
         # mapping_sents = int(N_sents*0.7) # 70% test set...!
         # size_of_chunk = int(mapping_sents/k)
         print(f"# of iterations requested: {iterations}, \n \
@@ -567,13 +438,9 @@ class Regression():
         
             np.random.shuffle(stimuli)
             
-            # if test_sents is None:
-            #     mapping_set = stimuli[:mapping_sents]
-            #     test_set = stimuli[mapping_sents:]
-            # else:
             # option to fix the test set..!
-            mapping_set = stimuli[np.isin(stimuli, test_sents, invert=True)]
-            test_set = test_sents
+            mapping_set = stimuli[np.isin(stimuli, test_ids, invert=True)]
+            test_set = test_ids
             
             # lmbda_loss = module.zeros(((len(lmbdas), num_channels, self.num_layers)))
             start_lmbda = time.time()
@@ -587,7 +454,7 @@ class Regression():
                 lmbda_loss = self.k_fold_CV(
                         session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
                         lmbdas=lmbdas, num_folds=num_folds, layer_IDs=layer_IDs,
-                        shuffled=shuffled
+                        shuffled=shuffled, mVocs=mVocs
                     )
             end_lmbda = time.time()
             time_lmbda += end_lmbda-start_lmbda
@@ -595,13 +462,16 @@ class Regression():
             start_map = time.time()
             # Loading Mapping set...!
             mapping_x = self.unroll_features(
-                bin_width=bin_width, sents=mapping_set, numpy=numpy, layer_IDs=layer_IDs,
-                shuffled=shuffled
+                stim_ids=mapping_set,
+                bin_width=bin_width, delay=delay, numpy=numpy,
+                layer_IDs=layer_IDs, shuffled=shuffled,
+                mVocs=mVocs
                 )
-            # mapping_x = module.stack([mapping_x[i] for i in range(self.num_layers)], axis=0)
-            # mapping_y = self.unroll_spikes(session, sents=mapping_set, numpy=numpy)
-            mapping_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
-                                    sents=mapping_set, numpy=numpy)
+            mapping_y = self.unroll_spikes(
+                session, stim_ids=mapping_set, 
+                bin_width=bin_width, delay=delay,
+                numpy=numpy, mVocs=mVocs
+                )
             
             # mapping_y = self.get_neural_spikes(session, bin_width=bin_width, sents=mapping_set, numpy=numpy)
             #computing betas
@@ -622,38 +492,87 @@ class Regression():
             del mapping_y
             gc.collect()
 
-            # Loading test set...!
-            test_x = self.unroll_features(
-                bin_width=bin_width, sents=test_set, numpy=numpy, third=third,
-                layer_IDs=layer_IDs, shuffled=shuffled
-                )
-            test_y = self.unroll_spikes(
-                session, bin_width=bin_width, delay=delay, sents=test_set, numpy=numpy
-                )
-            # test_y = self.get_neural_spikes(session, bin_width=bin_width, sents=test_set, numpy=numpy, third=third) 
-
-            test_pred = utils.predict(test_x, B)
-
-            if poisson:
-                corr_coeff[n] = utils.cc_norm(test_y, np.exp(test_pred))
+            if mVocs:
+                excluded_sessions = ['190726', '200213']
+                if session in excluded_sessions:
+                    print(f"Excluding session: {session} from testing on mVocs..")
+                    corr_coeff_mVocs[n] = np.zeros_like(corr_coeff[n])
+                else:
+                    # testing for mVocs responses...
+                    test_x, test_y_all_trials = self.get_test_data(
+                        session, bin_width=bin_width, delay=delay, numpy=numpy,
+                        layer_IDs=layer_IDs, shuffled=shuffled, mVocs=True,
+                        )
+                    test_pred = utils.predict(test_x, B)
+                    corr_coeff_mVocs[n] = utils.compute_avg_test_corr(
+                        test_y_all_trials, test_pred, test_trial, mVocs=True
+                        )
+                    corr_coeff[n] = np.zeros_like(corr_coeff_mVocs[n])
             else:
-                # computing avg test corr across all trials..
-                test_y_all_trials = self.get_held_out_spikes(
-            		session, bin_width=bin_width, delay=delay, numpy=numpy)
+                # print(f"mVocs is True..")
+                # testing for timit responses...
+                test_x, test_y_all_trials = self.get_test_data(
+                    session, bin_width=bin_width, delay=delay, numpy=numpy,
+                    layer_IDs=layer_IDs, shuffled=shuffled, mVocs=False,
+                    )
+                test_pred = utils.predict(test_x, B)
                 corr_coeff[n] = utils.compute_avg_test_corr(
-                    test_y_all_trials, test_pred, test_trial)
+                    test_y_all_trials, test_pred, test_trial, mVocs=False
+                    )
+                corr_coeff_mVocs[n] = np.zeros_like(corr_coeff[n])
+            
+
+            # 
+            # ##### Deprecated
+            #             # Loading test set...!
+            # test_x = self.unroll_features(
+            #     stim_ids=test_set,
+            #     bin_width=bin_width, delay=delay, numpy=numpy,
+            #     third=third, layer_IDs=layer_IDs, shuffled=shuffled,
+            #     mVocs=mVocs
+            #     )
+            # test_y = self.unroll_spikes(
+            #     session, stim_ids=test_set, bin_width=bin_width, delay=delay, numpy=numpy,
+            #     mVocs=mVocs
+            #     )
+            # # test_y = self.get_neural_spikes(session, bin_width=bin_width, sents=test_set, numpy=numpy, third=third) 
+
+            # test_pred = utils.predict(test_x, B)
+
+            # poiss_entropy[n] = utils.poisson_cross_entropy(test_y, test_pred)
+            
+            # Nsamples, Nchannels = test_y.shape
+            # data_sums = cp.asnumpy(np.sum(test_y, axis=0, keepdims=True))
+            # data_means = data_sums/Nsamples
+            # # using mean spikes as predicted means
+            # poiss_entropy_baseline[n] = utils.poisson_cross_entropy(test_y, np.log(data_means[...,None]))
+            # uncertainty_per_spike[n] = poiss_entropy[n]/(data_sums.T + 1.e-6)/np.log(2)
+            # bits_per_spike_NLB[n] = (poiss_entropy_baseline[n] - poiss_entropy[n])/(data_sums.T + 1.e-6)/np.log(2)
+
+            # if poisson:
+            #     corr_coeff[n] = utils.cc_norm(test_y, np.exp(test_pred))
+            # else:
+            #     if mVocs:
+            #         print(f"mVocs is True..")
+            #         test_x, test_y_all_trials = self.get_test_data(
+            #             session, bin_width=bin_width, delay=delay, numpy=numpy,
+            #             layer_IDs=layer_IDs, shuffled=shuffled, mVocs=mVocs,
+            #             )
+            #         test_pred = utils.predict(test_x, B)
+            #         corr_coeff[n] = utils.compute_avg_test_corr(
+            #             test_y_all_trials, test_pred, test_trial, mVocs=mVocs
+            #             )
+
+            #     else:
+            #         # computing avg test corr across all trials..
+            #         test_y_all_trials = self.get_test_sent_spikes(
+            #             session, bin_width=bin_width, delay=delay, numpy=numpy)
+                        
+            #         corr_coeff[n] = utils.compute_avg_test_corr(
+            #             test_y_all_trials, test_pred, test_trial, mVocs=mVocs
+            #             )
                 # previous implementation...
                 # corr_coeff[n] = utils.cc_norm(test_y, test_pred)
-            poiss_entropy[n] = utils.poisson_cross_entropy(test_y, test_pred)
-            
-            Nsamples, Nchannels = test_y.shape
-            data_sums = cp.asnumpy(np.sum(test_y, axis=0, keepdims=True))
-            data_means = data_sums/Nsamples
-            # using mean spikes as predicted means
-            poiss_entropy_baseline[n] = utils.poisson_cross_entropy(test_y, np.log(data_means[...,None]))
-            uncertainty_per_spike[n] = poiss_entropy[n]/(data_sums.T + 1.e-6)/np.log(2)
-            bits_per_spike_NLB[n] = (poiss_entropy_baseline[n] - poiss_entropy[n])/(data_sums.T + 1.e-6)/np.log(2)
-
             end_map = time.time()
             end_itr = time.time()
             time_map += end_map - start_map
@@ -666,14 +585,16 @@ class Regression():
         print(f"It takes (on avg.) {time_itr/(iterations*60):.2f} minutes/iteration...!")
 
         # incoming: corr_coeff = (itr, ch, layers), transposed: (itr, layers, ch) 
+        corr_coeff_mVocs = cp.asnumpy(corr_coeff_mVocs.transpose((0,2,1)))
+        corr_coeff_mVocs = np.median(corr_coeff_mVocs, axis=0)
         corr_coeff = cp.asnumpy(corr_coeff.transpose((0,2,1)))
         corr_coeff = np.median(corr_coeff, axis=0)
         # same as corr_coeff
-        poiss_entropy = poiss_entropy.transpose((0,2,1))
-        poiss_entropy = np.median(poiss_entropy, axis=0)
-        poiss_entropy_baseline = np.median(poiss_entropy_baseline, axis=0)
-        uncertainty_per_spike = np.median(uncertainty_per_spike, axis=0).transpose((1,0))
-        bits_per_spike_NLB = np.median(bits_per_spike_NLB, axis=0).transpose((1,0))
+        # poiss_entropy = poiss_entropy.transpose((0,2,1))
+        # poiss_entropy = np.median(poiss_entropy, axis=0)
+        # poiss_entropy_baseline = np.median(poiss_entropy_baseline, axis=0)
+        # uncertainty_per_spike = np.median(uncertainty_per_spike, axis=0).transpose((1,0))
+        # bits_per_spike_NLB = np.median(bits_per_spike_NLB, axis=0).transpose((1,0))
 
         corr_coeff_train = cp.asnumpy(corr_coeff_train.transpose((0,2,1)))
         lmbda_loss = lmbda_loss.transpose((0,2,1))
@@ -684,6 +605,7 @@ class Regression():
             # saving results in a dictionary..
             corr_coeff_train = np.median(corr_coeff_train, axis=0)
             corr = {'test_cc_raw': corr_coeff,
+                    'mVocs_test_cc_raw': corr_coeff_mVocs,
                     'train_cc_raw': corr_coeff_train,
                     'win': bin_width,
                     'delay': delay, 
@@ -693,20 +615,331 @@ class Regression():
                     'layer_ids': layer_IDs,
                     'opt_delays': None,
                     'opt_lmbdas': optimal_lmbdas,
-                    'poiss_entropy': poiss_entropy,
-                    'uncertainty_per_spike': uncertainty_per_spike,
-                    'bits_per_spike_NLB': bits_per_spike_NLB,
+
+                    #Deprecated
+                    # 'poiss_entropy': poiss_entropy,
+                    # 'uncertainty_per_spike': uncertainty_per_spike,
+                    # 'bits_per_spike_NLB': bits_per_spike_NLB,
                     }
             return corr, optimal_lmbdas, lmbda_loss
         # return test_y, test_pred, B, optimal_lmbdas, lmbda_loss
-        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, optimal_lmbdas 
+        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set, corr_coeff_mVocs, optimal_lmbdas
+    
+
+
+
+    ### Methods for the computing correlations and grid search for optimal delay.
+
+    def cross_validated_regression(
+            self, session, bin_width=20, delay=0, num_folds=5, num_lmbdas=8,
+            iterations=10, N_sents=500, return_dict=False, numpy=False,
+            third=None, layer_IDs=None, poisson=False, lr=0.6,
+            max_iterations=50, shuffled=False, test_trial=None,
+            mVocs=False, LPF=False
+        ):
+        """
+        Returns distribution of correlations for all (12) layers and all channels
+
+        Args:
+            session:                session id (int or str) 
+            bin_width (int):        bin width in ms.
+            delay (int):            delay (ms) (post onset time) to extract neural activity
+            k (int):                k-fold cross validation parameter
+            lmbdas (list):          list of lmbdas to consider for cross-validation
+            N (int):                Number of iterations of cross-validation (to get the distribution)
+            load_features (bool):   flag for loading features (required if features and spikes not already loaded)
+            return_dict (bool):     flag to return dict (ready to save format) when true, otherewise return 
+                                    distribution of correlations computed.
+
+            third (int) [1,2,3]:    Default: None, section of test sents to compute corr for.  
+            poisson: bool =         Choose type of regression, poisson if True else: linear
+
+        Returns:
+            corr_coeff (3d-array):  distribution of correlations for all layers and channels (if return_dict=False)
+            corr (dict):  median(corr_coeff) stored in dict, along with other details, ready to save (if return_dict=True)
+        """
+        if poisson:
+            numpy=True
+
+        if numpy:
+            module = np
+        else:
+            module = cp
+
+        if shuffled:
+            print(f"Running regression for shuffled weights..")
+
+
+        # if sents is None:
+        #     sents = self.dataloader.sent_IDs
+        # if N_sents > len(sents):
+        #     N_sents = len(sents)
+
+        # if test_sents is None:
+        #     test_sents = self.dataloader.test_sent_IDs
+        
+        # this creates a new dataset object and extracts the spikes
+        session = str(session)
+        # spikes = self.unroll_spikes(session, bin_width=bin_width, delay=delay)
+        raw_spikes = self.dataloader.get_session_spikes(session, bin_width=bin_width, delay=delay, mVocs=mVocs)
+        num_channels = self.dataloader.get_num_channels(session, mVocs=mVocs)
+
+        
+        if mVocs:
+            stim_ids = self.dataloader.metadata.mVocTrialIds
+            test_ids = self.dataloader.metadata.mVoc_test_trIds
+
+            # exclude the missing trial IDs from list of Ids
+            missing_trial_ids = self.dataloader.get_dataset_object(session=session).missing_trial_ids
+            stim_ids = stim_ids[np.isin(stim_ids, missing_trial_ids, invert=True)]
+            test_ids = test_ids[np.isin(test_ids, missing_trial_ids, invert=True)]
+
+        else:
+            stim_ids = self.dataloader.sent_IDs
+            test_ids = self.dataloader.test_sent_IDs
+        N_sents = len(stim_ids)
+        # _ = self.get_neural_spikes(session, bin_width=bin_width, delay=delay)
+        # num_channels = self.spike_datasets[session].num_channels
+        if layer_IDs is None:
+            layer_IDs = self.get_layer_IDs()
+
+        # loading features for any one sent=12, to get feature_dims..
+        feature_dims = self.unroll_features(
+            stim_ids=[12], bin_width=bin_width, delay=delay, layer_IDs=layer_IDs, shuffled=shuffled,
+            mVocs=mVocs, LPF=LPF
+            ).shape[-1]
+        
+        # feature_dims = self.sampled_features[0].shape[1]
+        # lmbdas = module.logspace(start=-7, stop=-1, num=num_lmbdas)
+        lmbdas = module.logspace(start=-10, stop=10, num=21)
+        
+        # lmbdas = module.logspace(start=-num_lmbdas//4, stop=num_lmbdas, num=int(1.25*num_lmbdas)+1)
+        # lmbdas = module.logspace(start=1, stop=8, num=7)
+        # lmbdas = module.logspace(start=5, stop=6, num=2)
+        B = module.zeros((len(layer_IDs), feature_dims, num_channels))
+        corr_coeff = np.zeros((iterations, num_channels, len(layer_IDs)))
+        corr_coeff_mVocs = np.zeros((iterations, num_channels, len(layer_IDs)))
+
+        # Deprecated
+        # poiss_entropy = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # poiss_entropy_baseline = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # uncertainty_per_spike = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # bits_per_spike_NLB = np.zeros((iterations, num_channels, len(layer_IDs)))
+        corr_coeff_train = np.zeros((iterations, num_channels, len(layer_IDs)))
+        # stimuli = np.array(list(self.raw_features[0].keys()))
+
+        stimuli = np.random.permutation(stim_ids)[0:N_sents]
+        # mapping_sents = int(N_sents*0.7) # 70% test set...!
+        # size_of_chunk = int(mapping_sents/k)
+        print(f"# of iterations requested: {iterations}, \n \
+                # of lambda samples per iteration: {len(lmbdas)}")
+        time_itr = 0
+        time_lmbda = 0
+        time_map = 0
+        # time_fold = 0
+        for n in range(iterations): 
+            print(f"Itr: {n+1}:")
+            start_itr = time.time()
+        
+            np.random.shuffle(stimuli)
+            
+            # option to fix the test set..!
+            mapping_set = stimuli[np.isin(stimuli, test_ids, invert=True)]
+            test_set = test_ids
+            
+            # lmbda_loss = module.zeros(((len(lmbdas), num_channels, self.num_layers)))
+            start_lmbda = time.time()
+            if poisson:
+                lmbda_loss = self.k_fold_CV_poisson_regression(
+                        session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
+                        lmbdas=lmbdas, num_folds=num_folds, layer_IDs=layer_IDs,
+                        lr = lr, max_iterations=max_iterations, shuffled=shuffled
+                    )
+            else:
+                lmbda_loss = self.k_fold_CV(
+                        session, bin_width=bin_width, delay=delay, mapping_set=mapping_set,
+                        lmbdas=lmbdas, num_folds=num_folds, layer_IDs=layer_IDs,
+                        shuffled=shuffled, mVocs=mVocs, LPF=LPF
+                    )
+            end_lmbda = time.time()
+            time_lmbda += end_lmbda-start_lmbda
+            optimal_lmbdas = lmbdas[np.argmin(lmbda_loss, axis=0)]
+            start_map = time.time()
+            # Loading Mapping set...!
+            mapping_x = self.unroll_features(
+                stim_ids=mapping_set,
+                bin_width=bin_width, delay=delay, numpy=numpy,
+                layer_IDs=layer_IDs, shuffled=shuffled,
+                mVocs=mVocs, LPF=LPF
+                )
+            mapping_y = self.unroll_spikes(
+                session, stim_ids=mapping_set, 
+                bin_width=bin_width, delay=delay,
+                numpy=numpy, mVocs=mVocs, LPF=LPF
+                )
+            
+            # mapping_y = self.get_neural_spikes(session, bin_width=bin_width, sents=mapping_set, numpy=numpy)
+            #computing betas
+            for l in range(len(layer_IDs)):
+                for ch in range(num_channels):
+                    B[l,:,ch] = self.regression(
+                        mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l],
+                        lr, max_iterations,
+                        poisson=poisson,
+                        )
+                    # B[l,:,ch] = utils.reg(mapping_x[l,:,:], mapping_y[:,ch], optimal_lmbdas[ch,l])
+            # self.B[session] = cp.asnumpy(self.B[session])
+            
+            train_pred = utils.predict(mapping_x, B)
+            corr_coeff_train[n] = utils.cc_norm(mapping_y, train_pred)
+
+            del mapping_x
+            del mapping_y
+            gc.collect()
+
+            if mVocs:
+                excluded_sessions = ['190726', '200213']
+                if session in excluded_sessions:
+                    print(f"Excluding session: {session} from testing on mVocs..")
+                    corr_coeff_mVocs[n] = np.zeros_like(corr_coeff[n])
+                else:
+                    # testing for mVocs responses...
+                    test_x, test_y_all_trials = self.get_test_data(
+                        session, bin_width=bin_width, delay=delay, numpy=numpy,
+                        layer_IDs=layer_IDs, shuffled=shuffled, mVocs=True,
+                        LPF=LPF
+                        )
+                    test_pred = utils.predict(test_x, B)
+                    corr_coeff_mVocs[n] = utils.compute_avg_test_corr(
+                        test_y_all_trials, test_pred, test_trial, mVocs=True
+                        )
+                    corr_coeff[n] = np.zeros_like(corr_coeff_mVocs[n])
+            else:
+                # print(f"mVocs is True..")
+                # testing for timit responses...
+                test_x, test_y_all_trials = self.get_test_data(
+                    session, bin_width=bin_width, delay=delay, numpy=numpy,
+                    layer_IDs=layer_IDs, shuffled=shuffled, mVocs=False,
+                    LPF=LPF,
+                    )
+                test_pred = utils.predict(test_x, B)
+                corr_coeff[n] = utils.compute_avg_test_corr(
+                    test_y_all_trials, test_pred, test_trial, mVocs=False
+                    )
+                corr_coeff_mVocs[n] = np.zeros_like(corr_coeff[n])
+            
+
+            # 
+            # ##### Deprecated
+            #             # Loading test set...!
+            # test_x = self.unroll_features(
+            #     stim_ids=test_set,
+            #     bin_width=bin_width, delay=delay, numpy=numpy,
+            #     third=third, layer_IDs=layer_IDs, shuffled=shuffled,
+            #     mVocs=mVocs
+            #     )
+            # test_y = self.unroll_spikes(
+            #     session, stim_ids=test_set, bin_width=bin_width, delay=delay, numpy=numpy,
+            #     mVocs=mVocs
+            #     )
+            # # test_y = self.get_neural_spikes(session, bin_width=bin_width, sents=test_set, numpy=numpy, third=third) 
+
+            # test_pred = utils.predict(test_x, B)
+
+            # poiss_entropy[n] = utils.poisson_cross_entropy(test_y, test_pred)
+            
+            # Nsamples, Nchannels = test_y.shape
+            # data_sums = cp.asnumpy(np.sum(test_y, axis=0, keepdims=True))
+            # data_means = data_sums/Nsamples
+            # # using mean spikes as predicted means
+            # poiss_entropy_baseline[n] = utils.poisson_cross_entropy(test_y, np.log(data_means[...,None]))
+            # uncertainty_per_spike[n] = poiss_entropy[n]/(data_sums.T + 1.e-6)/np.log(2)
+            # bits_per_spike_NLB[n] = (poiss_entropy_baseline[n] - poiss_entropy[n])/(data_sums.T + 1.e-6)/np.log(2)
+
+            # if poisson:
+            #     corr_coeff[n] = utils.cc_norm(test_y, np.exp(test_pred))
+            # else:
+            #     if mVocs:
+            #         print(f"mVocs is True..")
+            #         test_x, test_y_all_trials = self.get_test_data(
+            #             session, bin_width=bin_width, delay=delay, numpy=numpy,
+            #             layer_IDs=layer_IDs, shuffled=shuffled, mVocs=mVocs,
+            #             )
+            #         test_pred = utils.predict(test_x, B)
+            #         corr_coeff[n] = utils.compute_avg_test_corr(
+            #             test_y_all_trials, test_pred, test_trial, mVocs=mVocs
+            #             )
+
+            #     else:
+            #         # computing avg test corr across all trials..
+            #         test_y_all_trials = self.get_test_sent_spikes(
+            #             session, bin_width=bin_width, delay=delay, numpy=numpy)
+                        
+            #         corr_coeff[n] = utils.compute_avg_test_corr(
+            #             test_y_all_trials, test_pred, test_trial, mVocs=mVocs
+            #             )
+                # previous implementation...
+                # corr_coeff[n] = utils.cc_norm(test_y, test_pred)
+            end_map = time.time()
+            end_itr = time.time()
+            time_map += end_map - start_map
+            time_itr += (end_itr - start_itr)
+        
+        #         print(f"itr-{n}: It takes {(end_itr - start_itr):.2f} seconds for all lambdas")
+        # print(f"It takes (on avg.) {time_fold/(k*N*len(lmbdas)):.2f} sec for each step of cross validation (1 fold)")
+        print(f"It takes (on avg.) {time_lmbda/(iterations):.2f} sec (all lmbdas). (time for {num_folds}-folds)")
+        print(f"It takes (on avg.) {time_map/(iterations):.2f} sec/mapping.")
+        print(f"It takes (on avg.) {time_itr/(iterations*60):.2f} minutes/iteration...!")
+
+        # incoming: corr_coeff = (itr, ch, layers), transposed: (itr, layers, ch) 
+        corr_coeff_mVocs = cp.asnumpy(corr_coeff_mVocs.transpose((0,2,1)))
+        corr_coeff_mVocs = np.median(corr_coeff_mVocs, axis=0)
+        corr_coeff = cp.asnumpy(corr_coeff.transpose((0,2,1)))
+        corr_coeff = np.median(corr_coeff, axis=0)
+        # same as corr_coeff
+        # poiss_entropy = poiss_entropy.transpose((0,2,1))
+        # poiss_entropy = np.median(poiss_entropy, axis=0)
+        # poiss_entropy_baseline = np.median(poiss_entropy_baseline, axis=0)
+        # uncertainty_per_spike = np.median(uncertainty_per_spike, axis=0).transpose((1,0))
+        # bits_per_spike_NLB = np.median(bits_per_spike_NLB, axis=0).transpose((1,0))
+
+        corr_coeff_train = cp.asnumpy(corr_coeff_train.transpose((0,2,1)))
+        lmbda_loss = lmbda_loss.transpose((0,2,1))
+        optimal_lmbdas = np.log10(cp.asnumpy(optimal_lmbdas.transpose((1,0))))
+        if return_dict:
+            # deallocate the memory of Neural data for current session, this will save memory used.
+            # del self.spike_datasets[session]
+            # saving results in a dictionary..
+            corr_coeff_train = np.median(corr_coeff_train, axis=0)
+            corr = {'test_cc_raw': corr_coeff,
+                    'mVocs_test_cc_raw': corr_coeff_mVocs,
+                    'train_cc_raw': corr_coeff_train,
+                    'win': bin_width,
+                    'delay': delay, 
+                    'session': session,
+                    'model': self.model_name,
+                    'N_sents': N_sents,
+                    'layer_ids': layer_IDs,
+                    'opt_delays': None,
+                    'opt_lmbdas': optimal_lmbdas,
+
+                    #Deprecated
+                    # 'poiss_entropy': poiss_entropy,
+                    # 'uncertainty_per_spike': uncertainty_per_spike,
+                    # 'bits_per_spike_NLB': bits_per_spike_NLB,
+                    }
+            return corr, optimal_lmbdas, lmbda_loss
+        # return test_y, test_pred, B, optimal_lmbdas, lmbda_loss
+        return corr_coeff, B, np.min(lmbda_loss, axis=0), test_set, corr_coeff_mVocs, optimal_lmbdas
+    # Deprecated
+    #, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, optimal_lmbdas 
 
 
 
     def k_fold_CV(
             self, session, bin_width, delay, mapping_set, lmbdas,
             layer_IDs=None, num_folds=5, use_cpu=False,
-            shuffled=False
+            shuffled=False, mVocs=False, LPF=False
         ):
         """Return MSE loss (avg.) for k-fold CV regression.
 
@@ -716,13 +949,14 @@ class Regression():
             lmbdas (float): Range of regularization paramters to compare
             num_folds (int): # of folds
             use_cpu (bool): default 'False', use numpy or cupy? 
+            mVocs: bool = If True, uses features and spikes for mVocs
 
         Returns:
             avg. MSE loss for validation set.     
         """
         print(f"{num_folds}_fold CV for session: {session}")
         # num_channels = self.spike_datasets[session].num_channels
-        num_channels = self.dataloader.get_num_channels(session)
+        num_channels = self.dataloader.get_num_channels(session, mVocs=mVocs)
         if layer_IDs is None:
             layer_IDs = self.get_layer_IDs()
 
@@ -741,11 +975,16 @@ class Regression():
 
             # load features and spikes using the sent ids.
             train_x = self.unroll_features(
-                bin_width=bin_width, sents=train_set, numpy=use_cpu, layer_IDs=layer_IDs,
-                shuffled=shuffled
+                stim_ids=train_set,
+                bin_width=bin_width, delay=delay, numpy=use_cpu,
+                layer_IDs=layer_IDs, shuffled=shuffled, mVocs=mVocs,
+                LPF=LPF
                 )
-            train_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
-                                    sents=train_set, numpy=use_cpu)
+            train_y = self.unroll_spikes(
+                session, stim_ids=train_set, bin_width=bin_width,
+                delay=delay, numpy=use_cpu, mVocs=mVocs,
+                LPF=LPF
+                )
 
             # computing Betas for lmbdas and removing train_x, train_y to manage memory..
             Betas = {}
@@ -759,11 +998,15 @@ class Regression():
             # train_y = self.get_neural_spikes(session, bin_width=bin_width, sents=train_set, numpy=use_cpu)
 
             val_x = self.unroll_features(
-                bin_width=bin_width, sents=val_set, numpy=use_cpu, layer_IDs=layer_IDs,
-                shuffled=shuffled
+                stim_ids=val_set,
+                bin_width=bin_width, delay=delay, numpy=use_cpu,
+                layer_IDs=layer_IDs, shuffled=shuffled,
+                mVocs=mVocs, LPF=LPF
                 )
-            val_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
-                                    sents=val_set, numpy=use_cpu)
+            val_y = self.unroll_spikes(
+                session, stim_ids=val_set, bin_width=bin_width,
+                delay=delay, numpy=use_cpu, mVocs=mVocs, LPF=LPF
+                )
 
             # val_y = self.get_neural_spikes(session, bin_width=bin_width, sents=val_set, numpy=use_cpu)
 
@@ -831,20 +1074,26 @@ class Regression():
 
             # load features and spikes using the sent ids.
             train_x = self.unroll_features(
-                bin_width=bin_width, sents=train_set, numpy=True, layer_IDs=layer_IDs,
-                shuffled=shuffled
+                stim_ids=train_set,
+                bin_width=bin_width, delay=delay, numpy=True,
+                layer_IDs=layer_IDs, shuffled=shuffled
                 )
-            train_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
-                                    sents=train_set, numpy=True)
+            train_y = self.unroll_spikes(
+                session, stim_ids=train_set, bin_width=bin_width,
+                delay=delay, numpy=True
+                )
             train_x = train_x.astype(np.float32)
             train_y = train_y.astype(np.float32)
 
             val_x = self.unroll_features(
-                            bin_width=bin_width, sents=val_set, numpy=True, layer_IDs=layer_IDs,
-                            shuffled=shuffled
-                            )
-            val_y = self.unroll_spikes(session, bin_width=bin_width, delay=delay,
-                                    sents=val_set, numpy=True)
+                stim_ids=val_set,
+                bin_width=bin_width, delay=delay, numpy=True,
+                layer_IDs=layer_IDs, shuffled=shuffled
+                )
+            val_y = self.unroll_spikes(
+                session, stim_ids=val_set, bin_width=bin_width,
+                delay=delay, numpy=True
+                )
 
             val_x = val_x.astype(np.float32)
             val_y = val_y.astype(np.float32)
@@ -961,22 +1210,27 @@ class Regression():
             third=None,
             shuffled=False,
             test_trial=None,
+            mVocs=False,
+            LPF=False,
         ):
         
         if delays is None:
             delays = [0, 10, 20, 30] 
             
-        num_channels = self.dataloader.get_num_channels(session)
         if layer_IDs is None:
             layer_IDs = self.get_layer_IDs()   
 
         corr_coeffs = []
+        corr_coeffs_mVocs = []
         losses = []
         opt_lmbdas_all_delays = []
-        poiss_entropies = []
-        uncertainty_per_spike_list = []
-        bits_per_spike_NLB_list = []
+        # Deprecated
+        # poiss_entropies = []
+        # uncertainty_per_spike_list = []
+        # bits_per_spike_NLB_list = []
         session = str(session)
+        if LPF:
+            print(f"Grid search for low-pass-fitered features, predicting at {LPF_analysis_bw}ms")
 
         for i, delay in enumerate(delays):
 
@@ -985,43 +1239,55 @@ class Regression():
             # _ = self.get_neural_spikes(
             #         session, bin_width=bin_width, delay=delay, force_reload=True
             #     )
-            corr_coeff, _, loss, _, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, opt_lmbdas = self.cross_validated_regression(
-                    session, bin_width=bin_width, delay=delay,layer_IDs=layer_IDs,
-                    num_folds=num_folds, iterations=iterations, num_lmbdas=num_lmbdas,
-                    return_dict=False, numpy=numpy, N_sents=N_sents, sents=sents, third=third,
-                    test_sents=self.dataloader.test_sent_IDs, shuffled=shuffled,
-                    test_trial=test_trial
-                )
+
+            # Deprecated
+            # corr_coeff, _, loss, _, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, opt_lmbdas
+            
+            corr_coeff, _, loss, _, corr_coeff_mVocs, opt_lmbdas = self.cross_validated_regression(
+                session, bin_width=bin_width, delay=delay,layer_IDs=layer_IDs,
+                num_folds=num_folds, iterations=iterations, num_lmbdas=num_lmbdas,
+                return_dict=False, numpy=numpy, N_sents=N_sents, third=third,
+                shuffled=shuffled, test_trial=test_trial, mVocs=mVocs, LPF=LPF
+            )
             corr_coeffs.append(corr_coeff)
+            corr_coeffs_mVocs.append(corr_coeff_mVocs)
             losses.append(loss)
-            poiss_entropies.append(poiss_entropy)
-            uncertainty_per_spike_list.append(uncertainty_per_spike)
-            bits_per_spike_NLB_list.append(bits_per_spike_NLB)
+            # Deprecated
+            # poiss_entropies.append(poiss_entropy)
+            # uncertainty_per_spike_list.append(uncertainty_per_spike)
+            # bits_per_spike_NLB_list.append(bits_per_spike_NLB)
             opt_lmbdas_all_delays.append(opt_lmbdas)
 
         corr_coeffs = np.array(corr_coeffs)
+        corr_coeffs_mVocs = np.array(corr_coeffs_mVocs)
         losses = np.array(losses)
         delays = np.array(delays)
-        poiss_entropies = np.array(poiss_entropies)
-        uncertainty_per_spike_list = np.array(uncertainty_per_spike_list)
-        bits_per_spike_NLB_list = np.array(bits_per_spike_NLB_list)
+        # Deprecated
+        # poiss_entropies = np.array(poiss_entropies)
+        # uncertainty_per_spike_list = np.array(uncertainty_per_spike_list)
+        # bits_per_spike_NLB_list = np.array(bits_per_spike_NLB_list)
         opt_lmbdas_all_delays = np.array(opt_lmbdas_all_delays)
         # num_channels = self.spike_datasets[session].num_channels
 
+        num_channels = self.dataloader.get_num_channels(session, mVocs=mVocs)
         opt_delay_indices = np.argmin(losses, axis=0)
         opt_delays = delays[opt_delay_indices]
         corr_coeffs_opt_delay = corr_coeffs[
                 opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
             ]
-        poiss_entropy_opt_delay = poiss_entropies[
-            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
-        ]
-        uncertainty_per_spike_opt_delay = uncertainty_per_spike_list[
-            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
-        ]
-        bits_per_spike_NLB_opt_delay = bits_per_spike_NLB_list[
-            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
-        ]
+        corr_coeffs_mVocs_opt_delay = corr_coeffs_mVocs[
+                opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+            ]
+        # Deprecated
+        # poiss_entropy_opt_delay = poiss_entropies[
+        #     opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        # ]
+        # uncertainty_per_spike_opt_delay = uncertainty_per_spike_list[
+        #     opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        # ]
+        # bits_per_spike_NLB_opt_delay = bits_per_spike_NLB_list[
+        #     opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        # ]
         opt_lmbdas_opt_delays = opt_lmbdas_all_delays[
             opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
         ]
@@ -1032,6 +1298,7 @@ class Regression():
             # saving results in a dictionary..
             corr_dict = {
                     'test_cc_raw': corr_coeffs_opt_delay,
+                    'mVocs_test_cc_raw': corr_coeffs_mVocs_opt_delay,
                     'train_cc_raw': np.zeros_like(corr_coeffs_opt_delay),
                     'win': bin_width,
                     'delay': 0, 
@@ -1041,9 +1308,130 @@ class Regression():
                     'layer_ids': layer_IDs,
                     'opt_delays': opt_delays,
                     'opt_lmbdas': opt_lmbdas_opt_delays,
-                    'poiss_entropy': poiss_entropy_opt_delay,
-                    'uncertainty_per_spike': uncertainty_per_spike_opt_delay, 
-                    'bits_per_spike_NLB': bits_per_spike_NLB_opt_delay,
+                    # Deprecated.
+                    # 'poiss_entropy': poiss_entropy_opt_delay,
+                    # 'uncertainty_per_spike': uncertainty_per_spike_opt_delay, 
+                    # 'bits_per_spike_NLB': bits_per_spike_NLB_opt_delay,
+                    }
+            return corr_dict
+        # optimal_delays = delays[np.argmin(losses, axis=0)]
+        return corr_coeffs_opt_delay, opt_delays
+    
+
+    def grid_search_CV_LPF_features(self,
+            session,
+            bin_width=20,
+            delays=None,
+            layer_IDs=None,
+            num_lmbdas=10,
+            N_sents=500,
+            iterations=1,
+            num_folds=5, 
+            sents=None,
+            numpy=False,
+            return_dict=False,
+            third=None,
+            shuffled=False,
+            test_trial=None,
+            mVocs=False,
+        ):
+        
+        if delays is None:
+            delays = [0, 10, 20, 30] 
+            
+        if layer_IDs is None:
+            layer_IDs = self.get_layer_IDs()   
+
+        corr_coeffs = []
+        corr_coeffs_mVocs = []
+        losses = []
+        opt_lmbdas_all_delays = []
+        # Deprecated
+        # poiss_entropies = []
+        # uncertainty_per_spike_list = []
+        # bits_per_spike_NLB_list = []
+        session = str(session)
+
+        for i, delay in enumerate(delays):
+
+            # force reload spikes at the desired delay...
+            print(f"Loading neural spikes with delay: {delay}ms")
+            # _ = self.get_neural_spikes(
+            #         session, bin_width=bin_width, delay=delay, force_reload=True
+            #     )
+
+            # Deprecated
+            # corr_coeff, _, loss, _, poiss_entropy, uncertainty_per_spike, bits_per_spike_NLB, opt_lmbdas
+            
+            corr_coeff, _, loss, _, corr_coeff_mVocs, opt_lmbdas = self.cross_validated_regression_LPF_features(
+                session, bin_width=bin_width, delay=delay,layer_IDs=layer_IDs,
+                num_folds=num_folds, iterations=iterations, num_lmbdas=num_lmbdas,
+                return_dict=False, numpy=numpy, N_sents=N_sents, third=third,
+                shuffled=shuffled, test_trial=test_trial, mVocs=mVocs
+            )
+            corr_coeffs.append(corr_coeff)
+            corr_coeffs_mVocs.append(corr_coeff_mVocs)
+            losses.append(loss)
+            # Deprecated
+            # poiss_entropies.append(poiss_entropy)
+            # uncertainty_per_spike_list.append(uncertainty_per_spike)
+            # bits_per_spike_NLB_list.append(bits_per_spike_NLB)
+            opt_lmbdas_all_delays.append(opt_lmbdas)
+
+        corr_coeffs = np.array(corr_coeffs)
+        corr_coeffs_mVocs = np.array(corr_coeffs_mVocs)
+        losses = np.array(losses)
+        delays = np.array(delays)
+        # Deprecated
+        # poiss_entropies = np.array(poiss_entropies)
+        # uncertainty_per_spike_list = np.array(uncertainty_per_spike_list)
+        # bits_per_spike_NLB_list = np.array(bits_per_spike_NLB_list)
+        opt_lmbdas_all_delays = np.array(opt_lmbdas_all_delays)
+        # num_channels = self.spike_datasets[session].num_channels
+
+        num_channels = self.dataloader.get_num_channels(session, mVocs=mVocs)
+        opt_delay_indices = np.argmin(losses, axis=0)
+        opt_delays = delays[opt_delay_indices]
+        corr_coeffs_opt_delay = corr_coeffs[
+                opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+            ]
+        corr_coeffs_mVocs_opt_delay = corr_coeffs_mVocs[
+                opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+            ]
+        # Deprecated
+        # poiss_entropy_opt_delay = poiss_entropies[
+        #     opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        # ]
+        # uncertainty_per_spike_opt_delay = uncertainty_per_spike_list[
+        #     opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        # ]
+        # bits_per_spike_NLB_opt_delay = bits_per_spike_NLB_list[
+        #     opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        # ]
+        opt_lmbdas_opt_delays = opt_lmbdas_all_delays[
+            opt_delay_indices, np.arange(len(layer_IDs))[:, None], np.arange(num_channels)
+        ]
+ 
+        if return_dict:
+            # deallocate the memory of Neural data for current session, this will save memory used.
+            # del self.spike_datasets[session]
+            # saving results in a dictionary..
+            corr_dict = {
+                    'test_cc_raw': corr_coeffs_opt_delay,
+                    'mVocs_test_cc_raw': corr_coeffs_mVocs_opt_delay,
+                    'train_cc_raw': np.zeros_like(corr_coeffs_opt_delay),
+                    'win': bin_width,
+                    'delay': 0, 
+                    'session': session,
+                    'model': self.model_name,
+                    'N_sents': N_sents,
+                    'layer_ids': layer_IDs,
+                    'opt_delays': opt_delays,
+                    'opt_lmbdas': opt_lmbdas_opt_delays,
+                    # Deprecated.
+                    # 'poiss_entropy': poiss_entropy_opt_delay,
+                    # 'uncertainty_per_spike': uncertainty_per_spike_opt_delay, 
+                    # 'bits_per_spike_NLB': bits_per_spike_NLB_opt_delay,
                     }
             return corr_dict
         # optimal_delays = delays[np.argmin(losses, axis=0)]
@@ -1709,8 +2097,9 @@ class Regression():
             ndarray : (time, ch, layers) Prdicted neural activity 
         """
         features = self.unroll_features(
-            bin_width=bin_width, sents=sents, layer_IDs=layer_IDs,
-            force_reload=force_reload, shuffled=shuffled
+            stim_ids=sents,
+            bin_width=bin_width, delay=delay, 
+            layer_IDs=layer_IDs, force_reload=force_reload, shuffled=shuffled
             )
         # features = np.stack([dict_feats[i] for i in range(12)], axis=0)
         beta = self.get_betas(

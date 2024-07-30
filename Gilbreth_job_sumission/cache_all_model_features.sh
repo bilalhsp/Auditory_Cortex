@@ -4,6 +4,8 @@
 # ./cache_all_model_features.sh "-s"
 # For loading features of pretrained networks
 # ./cache_all_model_features.sh
+# For loading features for mVocs
+# ./cache_all_model_features.sh "-v"
 
 # # Define the sets of additional arguments for each submission
 args_sets=(
@@ -13,6 +15,7 @@ args_sets=(
     "-i 3"
     "-i 4"
     "-i 5"
+    "-i 7"
 )
 # # Replace the placeholder with the actual base identifier
 

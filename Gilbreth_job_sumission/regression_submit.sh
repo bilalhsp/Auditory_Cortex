@@ -3,7 +3,8 @@
 # --output=./result_regression_w2l_spect.out
 
 #SBATCH	-A standby
-#SBATCH --constraint=F|G|I|K|D|B|H|J
+#SBATCH --constraint=F|G|I|K|D|B
+#F|G|I|K|D|B|H|J
 #F|G|I|K|D|B
 
 # High Mem GPUs: F|G|I|K|D|B
@@ -12,7 +13,8 @@
 # Slow GPUs: E
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=6
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=0
 #SBATCH --time=4:00:00
 
@@ -27,5 +29,5 @@ module load conda-env/wav2letter-py3.8.5
 #module load conda-env/wav2letter_pretrained-py3.8.5
 
 
-python ../scripts/run_regression.py $@
+srun python ../scripts/run_regression.py $@
 # python deepspeech2_testing.py

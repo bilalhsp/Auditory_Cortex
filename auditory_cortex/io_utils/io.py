@@ -50,25 +50,35 @@ def write_significant_sessions_and_channels(
 
 #-----------      Null distribution using poisson sequences    -----------#
 
-def read_normalizer_null_distribution_using_poisson(bin_width, spike_rate):
+def read_normalizer_null_distribution_using_poisson(bin_width, spike_rate, mVocs=False):
     """Retrieves null distribution of correlations computed using poisson sequences."""
     bin_width = int(bin_width)
     # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
-    path_dir = os.path.join(normalizers_dir, 'null_distribution')
+    if mVocs:
+        parent_dir = os.path.join(normalizers_dir, 'mVocs')
+        post_str = ' (mVocs)'
+    else:
+        parent_dir = normalizers_dir
+        post_str = ''
+    path_dir = os.path.join(parent_dir, 'null_distribution')
     file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F: 
             norm_null_dist = pickle.load(F)
         return norm_null_dist
     else:
-        print(f"Null dist. not found: for bin-width {bin_width}ms and {spike_rate}Hz spike rate.")
+        print(f"Null dist.{post_str} not found: for bin-width {bin_width}ms and {spike_rate}Hz spike rate.")
         return None
 
-def write_normalizer_null_distribution_using_poisson(bin_width, spike_rate, null_dist_poisson):
+def write_normalizer_null_distribution_using_poisson(bin_width, spike_rate, null_dist_poisson, mVocs=False):
     """Writes null distribution of correlations computed using poisson sequences for the given selection."""
     bin_width = int(bin_width)
     # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
-    path_dir = os.path.join(normalizers_dir, 'null_distribution')
+    if mVocs:
+        parent_dir = os.path.join(normalizers_dir, 'mVocs')
+    else:
+        parent_dir = normalizers_dir
+    path_dir = os.path.join(parent_dir, 'null_distribution')
     if not os.path.exists(path_dir):
         print(f"Path not found, creating directories...")
         os.makedirs(path_dir)
@@ -136,7 +146,7 @@ def write_normalizer_null_distribution_using_random_shifts(
 #-----------  Normalizer distribution using all possible pairs of trials  ----------#
 
 def read_normalizer_distribution(
-        bin_width, delay, method='app'
+        bin_width, delay, method='app', mVocs=False
         ):
     """Retrieves distribution of normalizers for the given selection."""
     bin_width = int(bin_width)
@@ -145,7 +155,13 @@ def read_normalizer_distribution(
         subdir = 'all_possible_pairs'
     else:
         subdir = 'random_pairs'
-    path_dir = os.path.join(normalizers_dir, subdir)
+
+    if mVocs:
+        parent_dir = os.path.join(normalizers_dir, 'mVocs')
+    else:
+        parent_dir = normalizers_dir
+
+    path_dir = os.path.join(parent_dir, subdir)
     file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F: 
@@ -156,8 +172,8 @@ def read_normalizer_distribution(
         return None
 
 def write_normalizer_distribution(
-        session, bin_width, delay, normalizer_dist, method='app',
-                                    ):
+        session, bin_width, delay, normalizer_dist, method='app', mVocs=False
+        ):
     """Writes distribution of normalizers for the given selection."""
     bin_width = int(bin_width)
     delay = int(delay)
@@ -166,13 +182,18 @@ def write_normalizer_distribution(
     else:
         subdir = 'random_pairs'
     # path_dir = os.path.join(results_dir, 'normalizer', subdir)
-    path_dir = os.path.join(normalizers_dir, subdir)
+    if mVocs:
+        parent_dir = os.path.join(normalizers_dir, 'mVocs')
+    else:
+        parent_dir = normalizers_dir
+
+    path_dir = os.path.join(parent_dir, subdir)
     if not os.path.exists(path_dir):
         print(f"Path not found, creating directories...")
         os.makedirs(path_dir)
     file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
     norm_dict_all_sessions = read_normalizer_distribution(
-        bin_width, delay, method=method)
+        bin_width, delay, method=method, mVocs=mVocs)
     
     if norm_dict_all_sessions is None:
         norm_dict_all_sessions = {}
@@ -542,7 +563,7 @@ def delete_saved_RDM(model_name, identifier, bin_width):
         print(f"File does not exist.")
 
 
-def read_cached_features(model_name, contextualized=False, shuffled=False):
+def read_cached_features(model_name, contextualized=False, shuffled=False, mVocs=False):
     """Retrieves cached features from the cache_dir, returns None if 
     features not cached already. 
 
@@ -551,9 +572,6 @@ def read_cached_features(model_name, contextualized=False, shuffled=False):
             ['wav2letter_modified', 'wav2vec2', 'speech2text',
             'deepspeech2', 'whiper_tiny', 'whisper_base', 'whisper_small']
     """
-    # model_choices = ['wav2letter_modified', 'wav2vec2', 'speech2text',
-    #         'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small',
-    #         'wav2letter_spect']
     assert model_name in valid_model_names, f"Invalid model name '{model_name}' specified!"
 
     
@@ -562,11 +580,16 @@ def read_cached_features(model_name, contextualized=False, shuffled=False):
         file_name = f"{model_name}_raw_features_contextualized.pkl"
     else:
         file_name = f"{model_name}_raw_features.pkl"
+    
+    if mVocs:
+        directory = os.path.join(cache_dir, 'mVocs')
+    else:
+        directory = cache_dir
 
     if shuffled:
-        file_path = os.path.join(cache_dir, model_name, 'shuffled', file_name)
+        file_path = os.path.join(directory, model_name, 'shuffled', file_name)
     else:
-        file_path = os.path.join(cache_dir, model_name, file_name)
+        file_path = os.path.join(directory, model_name, file_name)
 
     if os.path.exists(file_path):
         print(f"Reading raw features from {file_path}")
@@ -576,7 +599,9 @@ def read_cached_features(model_name, contextualized=False, shuffled=False):
     else:
         return None
 
-def write_cached_features(model_name, features, verbose=True, contextualized=False, shuffled=False):
+def write_cached_features(
+        model_name, features, verbose=True, contextualized=False, shuffled=False,
+        mVocs=False):
     """Writes features to the cache_dir,
 
     Args:
@@ -596,10 +621,15 @@ def write_cached_features(model_name, features, verbose=True, contextualized=Fal
     else:
         file_name = f"{model_name}_raw_features.pkl"
     # file_name = f"{model_name}_raw_features.pkl"
-    if shuffled:
-        file_path = os.path.join(cache_dir, model_name, 'shuffled', file_name)
+    if mVocs:
+        directory = os.path.join(cache_dir, 'mVocs')
     else:
-        file_path = os.path.join(cache_dir, model_name, file_name)
+        directory = cache_dir
+
+    if shuffled:
+        file_path = os.path.join(directory, model_name, 'shuffled', file_name)
+    else:
+        file_path = os.path.join(directory, model_name, file_name)
     # make sure directory structure is in place...
     if not os.path.exists(os.path.dirname(file_path)):
         os.makedirs(os.path.dirname(file_path))

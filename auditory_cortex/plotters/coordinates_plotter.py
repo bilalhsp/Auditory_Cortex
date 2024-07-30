@@ -11,6 +11,16 @@ class CoordinatesPlotter:
     locations of sessions."""
     def __init__(self) -> None:
         self.m_data = NeuralMetaData(RecordingConfig)
+        color_options = ['red', 'green', 'blue', 'brown']
+        area_options = self.m_data.get_area_choices()
+        self.area_wise_colors = {area: color for area, color in zip(area_options, color_options)}
+
+    def get_session_color(self, session):
+        """Picks the color assigned to the session based
+        on neural area it came from"""
+        area = self.m_data.get_session_area(session)
+        return self.area_wise_colors[area]
+
 
     def _get_session_coordinates(self, session):
         """Returns the coordinates of recording site (session)."""
@@ -156,6 +166,31 @@ class CoordinatesPlotter:
             filepath = os.path.join(results_dir, 'tikz_plots', f"recording_sites_{subject}.tex")
             PlotterUtils.save_tikz(filepath)
 
+        return ax
+
+    def display_session_coordinates(
+            self, sessions, ax=None, annotate=True,
+            sess_special_colors=None
+            ):
+        """Plots the given list of sessions on 2d coordinates,"""
+        if ax is None:
+            fig, ax = plt.subplots()
+        self.plot_background(ax)
+        x_coords = []
+        y_coords = []
+        colors = []
+        for sess in sessions:
+            cx, cy = self._get_session_coordinates(sess)
+            x_coords.append(cx)
+            y_coords.append(cy)
+            if sess in sess_special_colors.keys():
+                colors.append(sess_special_colors[sess])
+            else:
+                colors.append(self.get_session_color(sess))
+
+            if annotate:
+                ax.annotate(sess, (cx-0.2, cy+0.05))
+        ax.scatter(x_coords, y_coords, color=colors)
         return ax
 
 

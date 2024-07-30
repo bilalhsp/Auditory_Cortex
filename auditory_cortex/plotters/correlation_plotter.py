@@ -382,7 +382,9 @@ class RegPlotter:
 
 	def plot_strf_baseline(
 			area='all', bin_width=20, delay=0, alpha=0.1,
-			save_tikz=True, normalized=True,
+			save_tikz=True,
+			normalized=True,
+			mVocs=False,
 			ax=None, lag=None,
 			display_dotted_lines=False,
 			display_inter_quartile_range=True,
@@ -394,14 +396,14 @@ class RegPlotter:
 		# identifier = f'freqs80_100ms'
 		corr_obj = STRFCorrelations(model_identifier)
 		threshold= corr_obj.get_normalizer_threshold(
-			bin_width=bin_width, poisson_normalizer=True
+			bin_width=bin_width, poisson_normalizer=True, mVocs=mVocs,
 		)
 		xticks = [0,1]
 		xtick_labels = []
 		baseline_dist = corr_obj.get_correlations_for_bin_width( #get_corr_for_area
 					neural_area=area, bin_width=bin_width, delay=delay,
-					threshold=threshold, normalized=normalized, lag=None,
-					use_stat_inclusion=use_stat_inclusion
+					threshold=threshold, normalized=normalized, mVocs=mVocs,
+					lag=None, use_stat_inclusion=use_stat_inclusion
 				)
 
 		print(f"Number of samples in distribution: {baseline_dist.size}")           
@@ -525,6 +527,7 @@ class RegPlotter:
 		plot_difference=False,
 		tikz_indicator=None,
 		column=None,
+		mVocs=False,
 		indicate_significance=True,
 		indicate_architecture=True,
 		poisson_normalizer=True,
@@ -551,13 +554,14 @@ class RegPlotter:
 		# trained_network...
 		# identifier='_bins_corrected_100'
 		corr_obj_trained = Correlations(model_name+'_'+trained_identifier)
-		threshold= corr_obj_trained.get_normalizer_threshold(
+		threshold = corr_obj_trained.get_normalizer_threshold(
 			bin_width=bin_width, poisson_normalizer=poisson_normalizer,
+			mVocs=mVocs
 		)
 		data_dist_trained = corr_obj_trained.get_corr_all_layers_for_bin_width(
 				neural_area=area, bin_width=bin_width, delay=delay,
 				threshold=threshold, normalized=normalized,
-				column=column, use_stat_inclusion=use_stat_inclusion,
+				column=column, mVocs=mVocs, use_stat_inclusion=use_stat_inclusion,
 				inclusion_p_threshold=inclusion_p_threshold,
 				use_poisson_null=use_poisson_null,
 
@@ -572,7 +576,7 @@ class RegPlotter:
 			data_dist_shuffled_list.append(corr_obj_shuffled.get_corr_all_layers_for_bin_width(
 					neural_area=area, bin_width=bin_width, delay=delay,
 					threshold=threshold, normalized=normalized,
-					column=column, use_stat_inclusion=use_stat_inclusion,
+					column=column, mVocs=mVocs, use_stat_inclusion=use_stat_inclusion,
 					inclusion_p_threshold=inclusion_p_threshold,
 					use_poisson_null=use_poisson_null,
 				))
@@ -654,12 +658,15 @@ class RegPlotter:
 				if baseline_identifier is None:
 					baseline_identifier = 'STRF_freqs80_all_lags'
 				strf_obj = STRFCorrelations(baseline_identifier)
-				threshold= strf_obj.get_normalizer_threshold(
-					bin_width=bin_width, poisson_normalizer=True
-				)
+                # Deprecated.
+				# threshold= strf_obj.get_normalizer_threshold(
+				# 	bin_width=bin_width, poisson_normalizer=True,
+				# 	mVocs=mVocs
+				# )
 				baseline_dist = strf_obj.get_correlations_for_bin_width(
 					neural_area=area, bin_width=bin_width, delay=delay,
-					threshold=threshold, normalized=normalized, lag=None,   # saying lag=0.3
+					threshold=threshold, normalized=normalized, mVocs=mVocs,
+					lag=None,   # saying lag=0.3
 					use_stat_inclusion=use_stat_inclusion,
 					inclusion_p_threshold=inclusion_p_threshold,
 					use_poisson_null=use_poisson_null,
@@ -705,9 +712,13 @@ class RegPlotter:
 			RegPlotter.indicate_layer_architecture(
 				ax, architecture_specific_ids, arch_ind_offset, arch_ind_lw
 			)
+		if mVocs:
+			post_title = ', test: mVocs'
+		else:
+			post_title = ', test: timit'
 
 		## formatting the plot...
-		plt.title(f"{model_name}")
+		plt.title(f"{model_name}{post_title}")
 		plt.xlabel(f"layer IDs")
 
 		# get rid of the bounding boxes...
@@ -1028,9 +1039,17 @@ class RegPlotter:
 				normalized=True, normalizer_filename=None,
 				display_inter_quartile_range=True,
 				display_dotted_lines=False,
+				norm_bin_width=None,
+                layer_id=None,
+				p_threshold = 0.01,
+	            offset_y=0.93,
 		):
 		"""Plots best layers at each bin width for the model name specified,
 		uses threshold method for selecting the 'tuned' neurons.
+		
+		Args:
+            layer_id: int = If specified, returns dist for layer_id,
+                    else returns the for layer with peak median.
 		"""
 		
 		corr_obj = Correlations(
@@ -1044,7 +1063,8 @@ class RegPlotter:
 			data_dist[bin_width] = corr_obj.get_layer_dist_with_peak_median(
 				bin_width=bin_width, 
 				neural_area=area, delay=delay,
-				normalized=normalized, poisson_normalizer=poisson_normalizer
+				normalized=normalized, poisson_normalizer=poisson_normalizer,
+				norm_bin_width=norm_bin_width, layer_id=layer_id
 			)
 
 		color = PlotterUtils.get_model_specific_color(model_name)
@@ -1053,6 +1073,9 @@ class RegPlotter:
 			display_inter_quartile_range=display_inter_quartile_range,
 			display_dotted_lines=display_dotted_lines,
 			)
+		
+		RegPlotter.indicate_peak_and_similar_layers(
+			data_dist, p_threshold=p_threshold, offset_y=offset_y)
 
 		if labels:
 			plt.title(f"Regression: {model_name}, peak_median_layer, area-{area}")
@@ -1314,7 +1337,8 @@ class RegPlotter:
 		dist1 = layerwise_dist[peak_median_layer]
 
 		statistically_same_layers = []
-		for layer in range(len(layerwise_dist)):
+		colors = []
+		for layer in layerwise_dist.keys():
 			if layer != peak_median_layer:
 				dist2 = layerwise_dist[layer]
 				p_value = scipy.stats.wilcoxon(
@@ -1326,7 +1350,7 @@ class RegPlotter:
 				if p_value > p_threshold:
 					# means distributions are statistically the same.
 					statistically_same_layers.append(layer)
-
+					
 		statistically_same_layers = np.array(statistically_same_layers)
 		indicator_heights = np.ones_like(statistically_same_layers)*offset_y
 		plt.scatter(statistically_same_layers, indicator_heights, c='k')

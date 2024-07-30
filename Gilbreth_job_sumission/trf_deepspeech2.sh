@@ -1,5 +1,5 @@
 #!/bin/bash
-## Usage example: ./trf_all_models.sh "-s -b 20 -i trained_all_bins"
+## Usage example: ./trf_deepspeech2.sh "-s -b 50 -i trf_300"
 # Check if the number of command-line arguments is correct
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <shuffle or not> <bin_width> <results identifier>"

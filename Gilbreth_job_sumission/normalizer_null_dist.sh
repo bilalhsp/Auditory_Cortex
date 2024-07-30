@@ -25,7 +25,6 @@ module load anaconda/2020.11-py38
 module load use.own
 module load conda-env/wav2letter-py3.8.5
 
-
-
-python ../scripts/normalizer_null_dist_random_shifts.py $@
+# python ../scripts/normalizer_null_dist_random_shifts.py $@
+python ../scripts/normalizer_null_dist_poisson.py $@
 

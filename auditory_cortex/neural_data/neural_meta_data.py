@@ -1,7 +1,10 @@
 import os
 import numpy as np
 from scipy import io
+from scipy.signal import resample
 import fnmatch
+import pickle
+import wave
 
 from auditory_cortex import neural_data_dir, config
 # from auditory_cortex.neural_data.config import RecordingConfig
@@ -28,9 +31,20 @@ class NeuralMetaData:
         self.sent_IDs = np.arange(1,500)
         self.test_sent_IDs = np.array([12,13,32,43,56,163,212,218,287,308])
 
-    def get_sampling_rate(self):
+        # mVoc metadata..
+        self.mVocId_to_trialId, self.mVoc_test_stimIds, self.mVoc_test_trIds = self.get_mVoc_metadata()
+        self.mVocAud, self.mVocDur, self.mVocRate = NeuralMetaData.read_mVoc_stim_details()
+        self.mVocTrialIds = np.array(list(self.mVocAud.keys()))
+        self.mVoc_silence_dur = 0.0 # seconds
+
+
+
+    def get_sampling_rate(self, mVocs=False):
         """Returns the sampling rate of the audio stimuli."""
-        return self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
+        if mVocs:
+             return self.mVocRate
+        else:
+            return self.sentdet[0].soundf   #since fs is the same for all sentences, using fs for the first sentence
 
 
     def phoneme(self, sent=1):
@@ -75,11 +89,16 @@ class NeuralMetaData:
         n_samples = int(np.ceil(round(self.stim_duration(sent)/bin_width, 3)))
         return n_samples
     
-    def get_total_test_duration(self):
+    def get_total_test_duration(self, mVocs=False):
         """Returns combined duration (seconds) of test set stimuli."""
         duration = 0
-        for sent in self.test_sent_IDs:
-            duration += self.stim_duration(sent)
+        if mVocs:
+            for mVoc_id in self.mVoc_test_stimIds:
+                tr_id = self.get_mVoc_tr_id(mVoc_id)[0]
+                duration += self.get_mVoc_dur(tr_id)
+        else:
+            for sent in self.test_sent_IDs:
+                duration += self.stim_duration(sent)
         return duration
 
 
@@ -215,11 +234,14 @@ class NeuralMetaData:
     def get_all_available_sessions(self):
         """Retrieves the session IDs for which data is available in 'neural_data_dir'"""  
         bad_sessions = config['bad_sessions']
-        sessions = np.array(os.listdir(neural_data_dir))
-        sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
-        for s in bad_sessions:
-            sessions = np.delete(sessions, np.where(sessions == s))
-        sessions = np.sort(sessions)
+        # sessions = np.array(os.listdir(neural_data_dir))
+        # sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
+        # for s in bad_sessions:
+        #     sessions = np.delete(sessions, np.where(sessions == s))
+        # Ex
+        all_sessions = get_subdirectories(neural_data_dir)
+        sessions = all_sessions[np.isin(all_sessions, bad_sessions, invert=True)]
+        sessions = np.sort(sessions.astype(str))
         return sessions
     
 
@@ -230,4 +252,261 @@ class NeuralMetaData:
         channel_filenames = np.array(os.listdir(session_dir)) 
         valid_channels = fnmatch.filter(channel_filenames,'*Ch*MUspk.mat')
         return len(valid_channels)
+    
+
+    #########################################################################
+    #################  mVoc specific methods
+    def get_mVoc_metadata(self):
+        """Read mVoc stim codes file and returns test stim IDs, test trial IDs,
+        and dictionary that gives trial Ids for stim IDs.
+        """
+        mat_file = 'SqMoPhys_MVOCStimcodes.mat'
+        sqm_data = io.loadmat(os.path.join(neural_data_dir, mat_file), struct_as_record = False, squeeze_me = True, )
+
+        mVocId_to_trialId = {}
+        mVocStimCodes = np.unique(sqm_data['mVocsStimCodes'])
+        mVoc_test_stimIds = []
+        mVoc_test_trIds = []
+
+        test_trial_repetitions = 15 
+        for stimCode in mVocStimCodes:
+            mVocId_to_trialId[stimCode] = np.where(sqm_data['mVocsStimCodes']==stimCode)[0]
+            if (mVocId_to_trialId[stimCode].size == test_trial_repetitions):
+                mVoc_test_stimIds.append(stimCode)
+                mVoc_test_trIds.append(mVocId_to_trialId[stimCode])
+
+        mVoc_test_trIds = np.concatenate(mVoc_test_trIds)
+        return mVocId_to_trialId, mVoc_test_stimIds, mVoc_test_trIds
+
+    def get_mVoc_aud(self, tr_id):
+        """Return mVoc aud for the tr_id, resampled at 16kHz"""
+        return self.mVocAud[tr_id]
+    
+        # dur = self.get_mVoc_dur(tr_id)
+        # samples = int(self.mVocRate*dur)
+        # aud = self.mVocAud[tr_id][:samples]
+        # # resample at 16000 Hz instead of 41000 Hz
+        # # This is required because, DNN expect inputs at 16000 Hz 
+        # # e.g. wav2vec2 and wav2vec2_audioset.
+        # n = int(dur*16000)
+        # aud_res = resample(aud, n)
+        # return aud_res
+
+    
+    def get_mVoc_dur(self, tr_id):
+        """Return mVoc aud for the tr_id, subtracts silence
+        duration from the total trial dur."""
+        # silence_dur = 0.3   # seconds
+        return self.mVocDur[tr_id] #- self.mVoc_silence_dur
+    
+    def get_mVoc_sampling_rate(self):
+        """Return mVoc aud for the tr_id"""
+        return self.mVocRate
+    
+    def get_mVoc_tr_id(self, stim_id):
+        """Returns trial id for given stim_id"""
+        return self.mVocId_to_trialId[stim_id]
         
+
+    @staticmethod
+    def extract_mVoc_stimuli_info():
+        """Reads the wav file and extracts the following 
+        information from the wav file,
+        - trial_ID:
+            - audio wavform
+            - stim duration
+            - stimOnset
+        - sampling rate
+        """
+        # read wav file..
+        file_name = 'MonkVocs_15Blocks.wav'
+        file_path = os.path.join(neural_data_dir, file_name)
+        audio_data, sampling_rate = read_wav_file(file_path)
+        num_frames = audio_data.shape[0]
+        # get pulse start samples
+        pulse_starts,*_ = extract_pulse_info(audio_data[:,1])
+
+        # getting the stim durations from the stimOnsets
+        durations = np.diff(pulse_starts)
+        # manually adding duration for last trial..
+        last_duration = np.array(num_frames - pulse_starts[-1])
+        durations = np.concatenate([durations, last_duration[None]])
+
+        # convert duration in sample to duration in seconds.
+        time_durations = durations/sampling_rate
+
+        # sent wise stim waveform
+        mVoc_wavforms = {}
+        num_presentations = pulse_starts.shape[0]
+        for i, strt in enumerate(pulse_starts):
+            # last presentation
+            if i == num_presentations - 1:
+                mVoc_wavforms[i] = audio_data[strt:,0]
+            else:
+                pulse_end = pulse_starts[i+1]
+                mVoc_wavforms[i] = audio_data[strt:pulse_end ,0]
+
+        return mVoc_wavforms, time_durations, sampling_rate
+    
+    @staticmethod
+    def write_mVoc_stim_details(new_sampling_rate=16000):
+        """Extract mVoc stim details and write to disk."""
+        filename = 'mVoc_stim_details.pkl'
+        mVoc_filepath = os.path.join(neural_data_dir, filename)
+        mVoc_wavforms, mVoc_durations, sampling_rate = NeuralMetaData.extract_mVoc_stimuli_info()
+        # resample, clip silence, normalize
+        mVoc_wavforms, mVoc_durations, sampling_rate = NeuralMetaData.pre_process_mVocs(
+            mVoc_wavforms, sampling_rate, new_sampling_rate)
+
+        print(f"Writing back to disk...")
+        mVoc_stim_dict = {
+            'stim_audios': mVoc_wavforms,
+            'stim_durations':  mVoc_durations,
+            'sampling_rate': sampling_rate
+        }
+
+        with open(mVoc_filepath, 'wb') as F:
+            pickle.dump(mVoc_stim_dict, F)
+
+        print(f"mVoc stim details saved to {mVoc_filepath}")
+
+    @staticmethod
+    def read_mVoc_stim_details():
+        """Extract mVoc stim details and write to disk."""
+        filename = 'mVoc_stim_details.pkl'
+        mVoc_filepath = os.path.join(neural_data_dir, filename)
+
+        if os.path.exists(mVoc_filepath):
+            with open(mVoc_filepath, 'rb') as F:
+                mVoc_stim_dict = pickle.load(F)
+            return mVoc_stim_dict['stim_audios'], mVoc_stim_dict['stim_durations'], mVoc_stim_dict['sampling_rate']		
+        else:
+            raise FileNotFoundError(f"{mVoc_filepath} does not exist.")
+        
+    @staticmethod
+    def pre_process_mVocs(mVoc_wavforms, sampling_rate, new_sampling_rate=16000):
+        """Processes the mVoc wavforms, to get the followings:
+            - Normalized amplitudes (-1, 1)
+            - Resampled at 16Khz
+            - Clips-off silence at the end of each trial waveform.
+        Args:
+            mVoc_wavforms: dict = mVoc waveforms for all 780 presentations
+            sampling_rate: int = existing sampling rate of mVoc waveforms
+
+        Returns:
+            mVoc_wavforms: dict = mVoc waveforms for all 780 presentations
+                with silence period clipped-off
+            durations: list = duration in seconds (for all 780 presentations)
+            sampling_rate: int = existing sampling rate of mVoc waveforms
+        """
+        # new_sampling_rate = 16000
+        silence_threshold = 1e-3
+        consecutive_samples = 4100	# samples worth 100 ms
+        processed_mVoc_wavforms = {}
+        durations = []
+        print(f"Resampling at {new_sampling_rate}Hz and normalizing and clipping silence...")
+        for tr, wav in mVoc_wavforms.items():
+
+            # normalize and clip-silence...
+            wav_norm = wav/30000
+            sil_start = detect_silence(wav_norm, silence_threshold, consecutive_samples)
+            wav_norm = wav_norm[:sil_start]
+
+            # resample
+            if new_sampling_rate != sampling_rate:
+                n = int(wav_norm.size*new_sampling_rate/sampling_rate)
+                wav_norm = resample(wav_norm, n)
+
+            durations.append(wav_norm.size/new_sampling_rate)
+            processed_mVoc_wavforms[tr] = wav_norm
+
+        return processed_mVoc_wavforms, durations, new_sampling_rate
+        
+
+
+
+        
+
+
+        
+    
+def get_subdirectories(directory):
+    # List to store the names of subdirectories
+    subdirectories = []
+    
+    # Walk through the directory
+    for entry in os.scandir(directory):
+        # Check if the entry is a directory
+        if entry.is_dir():
+            subdirectories.append(entry.name)
+    return np.array(subdirectories)
+
+
+def extract_pulse_info(data):
+	"""Given a list containing pulses within, extracts pulse start
+	points, end points and durations (in terms of samples)
+	"""
+	# Find where the data changes from zero to non-zero or non-zero to zero
+	changes = np.diff((data != 0).astype(int))
+
+	# Starting indices of each pulse (non-zero values)
+	pulse_starts = np.where(changes == 1)[0] + 1
+
+	# Ending indices of each pulse (non-zero values)
+	pulse_ends = np.where(changes == -1)[0] + 1
+
+	# Handle case where a pulse ends at the last element
+	if data[-1] != 0:
+		pulse_ends = np.append(pulse_ends, len(data))
+
+	# Lengths of each pulse
+	pulse_lengths = pulse_ends - pulse_starts
+
+	# First trial starts with 3 onset pulses,
+	#  getting rid of 2nd and 3rd pulses
+	first_start = pulse_starts[0]
+	pulse_starts = pulse_starts[2:]
+	pulse_starts[0] = first_start
+
+	return pulse_starts, pulse_ends, pulse_lengths
+
+
+def read_wav_file(file_path):
+	"""Reads the wav file and returns audio data and sampling rate"""
+	# Open the WAV file
+	with wave.open(file_path, 'rb') as wav_file:
+		# Get the file parameters
+		num_channels = wav_file.getnchannels()
+		sample_width = wav_file.getsampwidth()
+		frame_rate = wav_file.getframerate()
+		num_frames = wav_file.getnframes()
+
+		print(f'Frame rate (sample rate): {frame_rate} Hz')
+		# Read all frames from the WAV file
+		frames = wav_file.readframes(num_frames)
+
+	# Convert the bytes data to a numpy array
+	if sample_width == 1:  # 8-bit audio
+		dtype = np.uint8  # unsigned 8-bit
+	elif sample_width == 2:  # 16-bit audio
+		dtype = np.int16  # signed 16-bit
+	elif sample_width == 4:  # 32-bit audio
+		dtype = np.int32  # signed 32-bit
+	else:
+		raise ValueError("Unsupported sample width")
+
+	audio_data = np.frombuffer(frames, dtype=dtype)
+
+	# If the audio has multiple channels, reshape the array to [num_frames, num_channels]
+	if num_channels > 1:
+		audio_data = np.reshape(audio_data, (num_frames, num_channels))
+
+	return audio_data, frame_rate
+
+def detect_silence(waveform, threshold, consecutive_samples=1600):
+	"""Detects the start of silence and returns the index of first sample"""
+	# Find the index where the silence starts
+	below_threshold = np.abs(waveform) < threshold
+	silence_start = np.argmax(np.convolve(below_threshold, np.ones(consecutive_samples, dtype=int), 'valid') == consecutive_samples)
+	return silence_start
+

@@ -17,6 +17,7 @@ from scipy import linalg, signal
 from auditory_cortex.neural_data import NeuralData, NeuralMetaData
 from auditory_cortex.analyses import Correlations
 from auditory_cortex.computational_models.feature_extractors import DNNFeatureExtractor
+from auditory_cortex import LPF_analysis_bw
 
 from auditory_cortex.io_utils.io import read_cached_spikes, write_cached_spikes
 from auditory_cortex.io_utils.io import read_cached_features, write_cached_features
@@ -47,6 +48,13 @@ class DataLoader:
         self.DNN_shuffled_feature_dict = {}
         # self.raw_DNN_features = {}
 
+    def get_stim_aud(self, stim_id, mVocs=False):
+        """Return audio for stimulus (timit or mVocs) id, resampled at 16kHz"""
+        if mVocs:
+            return self.metadata.get_mVoc_aud(stim_id)
+        else:
+            return self.metadata.stim_audio(stim_id)
+
     def _create_DNN_obj(self, model_name='waveletter_modified', shuffled=False):
         """Creates DNN feature extractor for the given model_name"""
         # self.DNN_models[model_name] = Regression(model_name, load_features=False)
@@ -61,6 +69,39 @@ class DataLoader:
         if model_name not in self.DNN_models.keys():
             self._create_DNN_obj(model_name=model_name, shuffled=shuffled)
         return self.DNN_models[model_name]
+    
+
+    def get_raw_DNN_features_for_mVocs(
+            self, model_name, force_reload=False, contextualized=False, shuffled=False
+        ):
+        """Retrieves raw features for the 'model_name', starts by
+        attempting to read cached features, if not found, extract
+        features and also cache them, for future use.
+
+        Args:
+            model_name: str = assigned name of DNN model of interest.
+            force_reload: bool = Force reload features, even if cached already..Default=False.
+        Returns:
+            raw_features: list of dict = 
+        """
+        raw_DNN_features = read_cached_features(
+            model_name, contextualized=contextualized, shuffled=shuffled, mVocs=True)
+        if raw_DNN_features is None or force_reload:
+            # self.get_DNN_obj(model_name).load_features(resample=False)
+            # self.raw_DNN_features[model_name] = self.get_DNN_obj(model_name).sampled_features
+
+            if contextualized:
+                ...
+            else:
+                raw_DNN_features = self.get_DNN_obj(
+                    model_name, shuffled=shuffled
+                    ).extract_DNN_features_for_mVocs()
+            # cache features for future use...
+            write_cached_features(
+                model_name, raw_DNN_features, contextualized=contextualized,
+                shuffled=shuffled, mVocs=True
+                )
+        return raw_DNN_features
 
     def get_raw_DNN_features(
             self, model_name, force_reload=False, contextualized=False, shuffled=False
@@ -98,7 +139,10 @@ class DataLoader:
             write_cached_features(model_name, raw_DNN_features, contextualized=contextualized, shuffled=shuffled)
         return raw_DNN_features
         
-    def get_resampled_DNN_features(self, model_name, bin_width, force_reload=False, shuffled=False):
+    def get_resampled_DNN_features(
+            self, model_name, bin_width, force_reload=False, 
+            shuffled=False, mVocs=False, LPF=False
+        ):
         """
         Retrieves resampled all DNN layer features to specific bin_width
 
@@ -106,7 +150,10 @@ class DataLoader:
             model_name: str = assigned name of DNN model of interest.
             bin_width (float): width of data samples in ms (1000/sampling_rate).
             force_reload: bool = Force reload features, even if cached already..Default=False.
-
+            shuffled: bool = If True, loads features for shuffled network
+            mVocs: bool=If true, loads features for mVocs
+            LPF: bool = If true, low-pass-filters features to the bin width specified
+                and resamples again at predefined bin-width (e.g. 10ms)
         Returns:
             List of dict: all layer features (resampled at required sampling_rate).
         """
@@ -115,80 +162,62 @@ class DataLoader:
         else:
             DNN_feature_dict = self.DNN_feature_dict
 
+        if mVocs:
+            features_key = 'mVocs_'+model_name
+        else:
+            features_key = model_name
+        
+        if LPF:
+            features_key = features_key+'_LPF'
 
-        if model_name not in DNN_feature_dict.keys():
-            DNN_feature_dict[model_name] = {}
+        if features_key not in DNN_feature_dict.keys():
+            DNN_feature_dict[features_key] = {}
 
-
-        model_features = DNN_feature_dict[model_name]
+        model_features = DNN_feature_dict[features_key]
         if bin_width not in model_features.keys() or force_reload:
-            raw_features = self.get_raw_DNN_features(
-                model_name, force_reload=force_reload, shuffled=shuffled
-                )
+            if mVocs:
+                raw_features = self.get_raw_DNN_features_for_mVocs(
+                    model_name, force_reload=force_reload, shuffled=shuffled
+                    )
+            else:
+                raw_features = self.get_raw_DNN_features(
+                    model_name, force_reload=force_reload, shuffled=shuffled
+                    )
             # num_layers = len(raw_features)
             resampled_features = {layer_id:{} for layer_id in raw_features.keys()}
             
             layer_IDs = list(raw_features.keys())
             # reads first 'value' to get list of sent_IDs
-            sent_IDs = raw_features[layer_IDs[0]].keys()
+            stim_IDs = raw_features[layer_IDs[0]].keys()
 
             print(f"Resamping ANN features at bin-width: {bin_width}")
             bin_width_sec = bin_width/1000 # ms
-            for sent_ID in sent_IDs:
+            for stim_ID in stim_IDs:
                 # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
-                sent_duration = self.metadata.stim_duration(sent_ID)
-                n = int(np.ceil(round(sent_duration/bin_width_sec, 3)))
+                if mVocs:
+                    duration = self.metadata.get_mVoc_dur(stim_ID)
+                else:
+                    duration = self.metadata.stim_duration(stim_ID)
+                n = int(np.ceil(round(duration/bin_width_sec, 3)))
+                if LPF:
+                    LPF_analysis_bw = 10
+                    analysis_bw_sec = LPF_analysis_bw/1000
+                    n_final = int(np.ceil(round(duration/analysis_bw_sec, 3)))
+                    
 
                 for layer_ID in layer_IDs:
                     if bin_width == 1000:
                         # treat this as a special case, and sum all samples across time...
-                        tmp = np.sum(raw_features[layer_ID][sent_ID].numpy(), axis=0)[None, :]
+                        tmp = np.sum(raw_features[layer_ID][stim_ID].numpy(), axis=0)[None, :]
                     else:
-                        tmp = signal.resample(raw_features[layer_ID][sent_ID], n, axis=0)
-                    # mean = np.mean(tmp, axis=0)
-                    # resampled_features[j][sent] = tmp #- mean
-                        
-                    resampled_features[layer_ID][sent_ID] = tmp
-            DNN_feature_dict[model_name][bin_width] = resampled_features
-        return DNN_feature_dict[model_name][bin_width]
+                        tmp = signal.resample(raw_features[layer_ID][stim_ID], n, axis=0)
 
+                        if LPF:
+                            tmp = signal.resample(tmp, n_final, axis=0)
 
-        # if model_name not in self.DNN_feature_dict.keys():
-        #     self.DNN_feature_dict[model_name] = {}
-
-
-
-        # model_features = self.DNN_feature_dict[model_name]
-        # if bin_width not in model_features.keys() or force_reload:
-        #     raw_features = self.get_raw_DNN_features(
-        #         model_name, force_reload=force_reload, shuffled=shuffled
-        #         )
-        #     # num_layers = len(raw_features)
-        #     resampled_features = {layer_id:{} for layer_id in raw_features.keys()}
-            
-        #     layer_IDs = list(raw_features.keys())
-        #     # reads first 'value' to get list of sent_IDs
-        #     sent_IDs = raw_features[layer_IDs[0]].keys()
-
-        #     print(f"Resamping ANN features at bin-width: {bin_width}")
-        #     bin_width_sec = bin_width/1000 # ms
-        #     for sent_ID in sent_IDs:
-        #         # 'self.audio_padding_duration' will be non-zero in case of audio-zeropadding
-        #         sent_duration = self.metadata.stim_duration(sent_ID)
-        #         n = int(np.ceil(round(sent_duration/bin_width_sec, 3)))
-
-        #         for layer_ID in layer_IDs:
-        #             if bin_width == 1000:
-        #                 # treat this as a special case, and sum all samples across time...
-        #                 tmp = np.sum(raw_features[layer_ID][sent_ID].numpy(), axis=0)[None, :]
-        #             else:
-        #                 tmp = signal.resample(raw_features[layer_ID][sent_ID], n, axis=0)
-        #             # mean = np.mean(tmp, axis=0)
-        #             # resampled_features[j][sent] = tmp #- mean
-                        
-        #             resampled_features[layer_ID][sent_ID] = tmp
-        #     self.DNN_feature_dict[model_name][bin_width] = resampled_features
-        # return self.DNN_feature_dict[model_name][bin_width]
+                    resampled_features[layer_ID][stim_ID] = tmp
+            DNN_feature_dict[features_key][bin_width] = resampled_features
+        return DNN_feature_dict[features_key][bin_width]
     
     def get_DNN_layer_features(self, model_name, layer_ID, bin_width=20):
         """Retrieves layer features, sampled according to bin_width,
@@ -273,7 +302,7 @@ class DataLoader:
         #     raise AttributeError(f"Create dataset object for session-{session} before using it.")
 
     # def get_raw_neural_spikes(self, session, bin_width=20, delay=0):
-    def _extract_session_spikes(self, session, bin_width=20, delay=0):
+    def _extract_session_spikes(self, session, bin_width=20, delay=0, mVocs=False):
         """Returns neural spikes in the raw form (not unrolled),
         for individual recording site (session).
 
@@ -281,13 +310,16 @@ class DataLoader:
             session: = recording site (session) ID 
             bin_width: int = size of the binning window in ms.
             delay: int: neural delay in ms.
+            mVocs: bool = If True, returns mVocs spikes
         Returns:
             dict = dict of neural spikes with sent IDs as keys.
         """
         print(f"DataLoader: Extracting spikes for session-{session}...", end='\n')
         session = str(int(session))
-        # extracting spikes for all sentences...
-        return self.get_dataset_object(session).extract_spikes(bin_width, delay)
+        if mVocs:
+            return self.get_dataset_object(session).extract_mVocs_spikes(bin_width, delay)
+        else:
+            return self.get_dataset_object(session).extract_spikes(bin_width, delay)
         # combination of session, bin_width and delay becomes the key self.neural_spikes
         # spikes_key = f"{int(session):06d}-{bin_width:04d}-{delay:04d}"
         # if spikes_key not in self.neural_spikes.keys():
@@ -300,7 +332,7 @@ class DataLoader:
         # print(f"Done.")
         # return self.neural_spikes[spikes_key]
     
-    def get_session_spikes(self, session, bin_width=50, delay=0):
+    def get_session_spikes(self, session, bin_width=50, delay=0, mVocs=False):
         """Reads neural spikes from the cache directiory, extracts again
         if not found there.
 
@@ -310,6 +342,7 @@ class DataLoader:
                 1000 ms is treated as special case, where total number of
                 spikes for each sentence are returned.
             delay: int: neural delay in ms.
+            mVocs: bool = If True, returns mVocs spikes
         Returns:
             dict = dict of neural spikes with sent IDs as keys."""
         session = str(int(session))
@@ -317,6 +350,9 @@ class DataLoader:
         # stop caching to memory, to avoid unnessary complexity...
         force_redo = True
         spikes_key = f"{int(session):06d}-{bin_width:04d}-{delay:04d}"
+        if mVocs:
+            spikes_key = "mVocs_"+spikes_key
+
         if spikes_key not in self.neural_spikes.keys():
             # if bin_width == 1000:
             #     # treat this as a special case, where all samples are summed across time.
@@ -324,8 +360,9 @@ class DataLoader:
             #     sum_spikes = True
             # # session_wise_spikes = read_cached_spikes_session_wise(bin_width=bin_width, delay=delay)
             # if session_wise_spikes is None or session not in session_wise_spikes.keys():
-            spikes = self._extract_session_spikes(session, bin_width=bin_width,
-                                                    delay=delay)
+            spikes = self._extract_session_spikes(
+                session, bin_width=bin_width, delay=delay, mVocs=mVocs
+                )
             #     write_cached_spikes_session_wise(
             #         spikes, session=session, bin_width=bin_width, delay=delay
             #         )
@@ -338,14 +375,15 @@ class DataLoader:
             #         sent_id: np.sum(spike_signal, axis=0)[None, :] for sent_id, spike_signal in self.neural_spikes[spikes_key].items()
             #         }
         # saving num of channels for the session..
-        self.num_channels[session] = next(iter(self.neural_spikes[spikes_key].values())).shape[-1]
+        # self.num_channels[session] = next(iter(self.neural_spikes[spikes_key].values())).shape[-1]
+        self.num_channels[session] = self.get_dataset_object(session).num_channels
         return self.neural_spikes[spikes_key]
     
-    def get_num_channels(self, session):
+    def get_num_channels(self, session, mVocs=False):
         """Returns the number of channels in the dataset."""
         session = str(int(session))
         if session not in self.num_channels.keys():
-            _ = self.get_session_spikes(session=session)
+            _ = self.get_session_spikes(session=session, mVocs=mVocs)
         return self.num_channels[session]
 
     
@@ -457,13 +495,22 @@ class DataLoader:
         print("Done.")
         return z_stim
     
-    def get_neural_data_for_repeated_trials(self, session, bin_width=20, delay=0, sent_IDs: list=None):
+    def get_neural_data_for_repeated_trials(
+            self, session, bin_width=20, delay=0, stim_ids: list=None, mVocs=False
+            ):
         """Retrieves neural data only for sent-stimuli with repeated
         trials i.e. test_sent_IDs"""
-        if sent_IDs is None:
-            sent_IDs = self.test_sent_IDs
-        return self.get_dataset_object(session=session).get_repeated_trials(
-            sents=sent_IDs, bin_width=bin_width, delay=delay)
+        if mVocs:
+            if stim_ids is None:
+                stim_ids = self.metadata.mVoc_test_stimIds
+            return self.get_dataset_object(session=session).get_repeated_mVoc_trials(
+                    stim_ids, bin_width=bin_width, delay=delay
+                    )
+        else:
+            if stim_ids is None:
+                stim_ids = self.test_sent_IDs
+            return self.get_dataset_object(session=session).get_repeated_trials(
+                sents=stim_ids, bin_width=bin_width, delay=delay)
     
 
     def get_stimulus_audio_with_history(self, stim_number=12, num_previous_stimuli=9, session = '180613'):
