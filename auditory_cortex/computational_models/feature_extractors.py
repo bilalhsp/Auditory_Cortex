@@ -15,6 +15,10 @@ from transformers import Wav2Vec2FeatureExtractor
 from transformers import ClapModel, ClapProcessor
 from transformers import AutoModel
 
+from transformers import Wav2Vec2ForPreTraining
+from transformers import Wav2Vec2Config
+import json
+
 # local
 from auditory_cortex.neural_data import NeuralMetaData
 from auditory_cortex import config_dir, results_dir, aux_dir
@@ -78,6 +82,8 @@ class DNNFeatureExtractor():
             self.extractor = FeatureExtractorW2V2Audioset(self.device)
         elif model_name == 'w2v2_generic':
             self.extractor = FeatureExtractorW2V2Generic(self.device)
+        elif model_name == 'spect2vec':
+            self.extractor = FeatureExtractorS2V(self.device)
         elif model_name == 'MERT':
             self.extractor = FeatureExtractorMERT(self.device)
         elif model_name == 'CLAP':
@@ -142,19 +148,30 @@ class DNNFeatureExtractor():
         #     return None
 
     def create_hooks(self):
-        def fn(layer, _, output):
+        def fn(layer, inp, output):
             if 'rnn' in layer.__name__:
-               output = output[0].data
+               features = output[0].data
                 # output = output[1][0][1].squeeze()  # reading the 2nd half of data (only backward RNNs)
             elif 'audio' in layer.__name__:
-                output = output[0]
+                features = output[0]
             else:
                 output = output.squeeze()
                 if 'conv' in layer.__name__:
                     if output.ndim > 2:
                         output = output.reshape(output.shape[0]*output.shape[1], -1)
                     output = output.transpose(0,1)
-            self.features[layer.__name__] = output
+                features = output
+                # Deprecated...Not needed anymore...!
+                # print(inp[0].shape)
+                # inp = inp[0].squeeze()
+                # if 'conv' in layer.__name__:
+                #     if inp.ndim > 2:
+                #         inp = inp.reshape(inp.shape[0]*inp.shape[1], -1)
+                #     features = inp.transpose(0,1)
+                # else:
+                #     features = output.squeeze()
+                
+            self.features[layer.__name__] = features
         return fn
     
     # def get_layer_index(self, layer_id):
@@ -264,7 +281,7 @@ class DNNFeatureExtractor():
                 if sampling_rate != 24000:
                     n_samples = int(audio_input.size*24000/sampling_rate)
                     audio_input = resample(audio_input, n_samples)
-            elif self.model_name == 'w2v2_generic':
+            elif self.model_name == 'w2v2_generic' or self.model_name == 'spect2vec':
                 if sampling_rate != 48000:
                     n_samples = int(audio_input.size*48000/sampling_rate)
                     audio_input = resample(audio_input, n_samples)
@@ -524,21 +541,35 @@ class FeatureExtractorW2L():
     
 class FeatureExtractorW2V2Generic():
     def __init__(self, device):
+        # Replace with your model's repository and the specific revision (e.g., checkpoint)
+        # cache_dir = '/scratch/gilbreth/ahmedb/cache/huggingface/models/'
+        # # repo_id = 'wav2vec2-audioset-natual-sounds-v59'
+        # repo_id = 'wav2vec2-48KHz-audioset-natual-sounds-v1'
+        # revision = 'checkpoint-24860'
+        # local_dir = os.path.join(cache_dir, repo_id, revision)
 
-        # model_identifier = "bilalhsp/wav2vec2-48KHz-audioset-natual-sounds"
-        model_identifier = "bilalhsp/wav2vec2-audioset-natual-sounds-v2"
-        print(f"Loading weights form model identifier: \n {model_identifier}")
+        cache_dir = '/scratch/gilbreth/ahmedb/cache/huggingface/models/old_checkpoints'
+        repo_id = 'wav2vec2-48KHz-audioset-natual-sounds-v1'
+        local_dir = os.path.join(cache_dir, repo_id)    
+        print(f"Loading model from local repo: {local_dir}")
+        # Load the model
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained(local_dir)
+        self.model = AutoModel.from_pretrained(local_dir, use_safetensors=True)
 
-        self.processor = Wav2Vec2FeatureExtractor.from_pretrained(
-            model_identifier, 
-            cache_dir='/scratch/gilbreth/ahmedb/cache/huggingface/models/',
-            force_download=True,
-            )
-        self.model = AutoModel.from_pretrained(
-            model_identifier,
-            cache_dir='/scratch/gilbreth/ahmedb/cache/huggingface/models/',
-            force_download=True,
-            )
+        # model_identifier = "bilalhsp/wav2vec2-48KHz-audioset-natual-sounds-v1"
+        # model_identifier = "bilalhsp/wav2vec2-audioset-natual-sounds-v53"
+        # print(f"Loading weights form model identifier: \n {model_identifier}")
+
+        # self.processor = Wav2Vec2FeatureExtractor.from_pretrained(
+        #     model_identifier, 
+        #     cache_dir=cache_dir,
+        #     force_download=True,
+        #     )
+        # self.model = AutoModel.from_pretrained(
+        #     model_identifier,
+        #     cache_dir=cache_dir,
+        #     force_download=True,
+        #     )
         self.device = device
         self.model = self.model.to(self.device)
         # self.model = model 
@@ -994,3 +1025,68 @@ class FeatureExtractorW2V():
         # transcription = self.processor.batch_decode(predicted_ids)
         return c
 
+class FeatureExtractorS2V():
+    def __init__(self, device):
+        config_file = '/home/ahmedb/projects/Wav2Letter/hugging_face/config/spect2vec_config.json'
+
+        with open(config_file, "r") as F:
+            config_dict = json.load(F)
+
+        # creating an instance of Wav2Vec2Config
+        wav2vec_config = Wav2Vec2Config(**config_dict)
+        model = Wav2Vec2ForPreTraining(wav2vec_config)
+        self.num_freqs = 80
+        conv_layer = torch.nn.Conv1d(
+            in_channels=self.num_freqs, out_channels=512,
+            kernel_size=3, stride=2, padding=1, bias=False
+            )
+        model.wav2vec2.feature_extractor.conv_layers[0].conv = conv_layer
+
+        self.model = model
+
+        self.device = device
+        self.model = self.model.to(self.device)
+        # self.model = model 
+        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
+    def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        spect = nl.features.auditory_spectrogram(aud, 48000, frame_len=10)
+        spect = resample(spect, self.num_freqs, axis=1)
+        input_values = torch.tensor(spect).transpose(1, 0).unsqueeze(0)
+
+        input_values = input_values.to(self.device)
+        # wav2vec2 forward pass customized...
+        extract_features = self.model.wav2vec2.feature_extractor.conv_layers[0](input_values.float())
+        extract_features = self.model.wav2vec2.feature_extractor.conv_layers[1](extract_features)
+        mask_time_indices = None
+        attention_mask = None
+        output_hidden_states = None
+        return_dict = None
+        output_attentions = None
+
+        extract_features = extract_features.transpose(1, 2)
+        hidden_states, extract_features = self.model.wav2vec2.feature_projection(extract_features)
+
+        hidden_states = self.model.wav2vec2._mask_hidden_states(
+            hidden_states, mask_time_indices=mask_time_indices, attention_mask=attention_mask
+        )
+
+        encoder_outputs = self.model.wav2vec2.encoder(
+            hidden_states,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        return encoder_outputs

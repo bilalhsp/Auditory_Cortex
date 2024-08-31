@@ -208,7 +208,7 @@ class BaseCorrelations(ABC):
     def get_normalizer_threshold(
             self, bin_width=20, poisson_normalizer=True, mVocs=False
         ):
-        """Retrieves significance threshold, 95th percentile of the NULL distribution
+        """Retrieves significance threshold, 90th percentile of the NULL distribution
         of normalizer.
 
         Args:
@@ -227,7 +227,7 @@ class BaseCorrelations(ABC):
         if poisson_normalizer:
             null_dist = self.norm_obj.get_normalizer_null_dist_using_poisson(
                 bin_width=bin_width, mVocs=mVocs)
-            threshold = np.percentile(null_dist, 95)    
+            threshold = np.percentile(null_dist, 90)    
             # threshold = self.norm_obj.compute_normalizer_threshold_using_poisson(bin_width=bin_width)[0]
         else:
             threshold = self.norm_obj.compute_normalizer_threshold(bin_width=bin_width)[0]
@@ -358,9 +358,9 @@ class STRFCorrelations(BaseCorrelations):
 
 
 
-    def get_significant_data_using_app(
+    def get_significant_data_using_statistical_inclusion(
                 self, bin_width, sessions: list=None, delay=None, lag=None,
-                inclusion_p_threshold=0.01, use_poisson_null=True,
+                inclusion_p_threshold=0.01, use_poisson_null=True, mVocs=False
         ):
         """Retrieves selected data based on provided arguments. 
         If an argument if 'None', no filter is applied on that column.
@@ -389,11 +389,11 @@ class STRFCorrelations(BaseCorrelations):
 
         if use_poisson_null:
             sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_poisson_null(
-                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                bin_width=bin_width, p_threshold = inclusion_p_threshold, mVocs=mVocs
                 )
         else:
             sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_shifts_null(
-                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                bin_width=bin_width, p_threshold = inclusion_p_threshold, mVocs=mVocs
                 )
 
         if sessions is None:
@@ -472,10 +472,11 @@ class STRFCorrelations(BaseCorrelations):
         
         column='test_cc_raw'
         if normalized:
-            if use_stat_inclusion:
-                column = 'corr_normalized_app'
-            else:
-                column = 'normalized_test_cc'
+            # Deprecated...
+            # if use_stat_inclusion:
+            #     column = 'corr_normalized_app'
+            # else:
+            column = 'normalized_test_cc'
 
         if mVocs:
             column = 'mVocs_'+column
@@ -484,10 +485,10 @@ class STRFCorrelations(BaseCorrelations):
 
         area_sessions = self.metadata.get_all_sessions(neural_area)
         if use_stat_inclusion:
-            selected_data = self.get_significant_data_using_app(
+            selected_data = self.get_significant_data_using_statistical_inclusion(
                 sessions=area_sessions, bin_width=bin_width, delay=delay,
                 lag=lag, inclusion_p_threshold=inclusion_p_threshold,
-                use_poisson_null=use_poisson_null,
+                use_poisson_null=use_poisson_null, mVocs=mVocs
             )
         else:
             selected_data = self.get_selected_data(
@@ -829,10 +830,10 @@ class Correlations(BaseCorrelations):
     #     print(f"Normalizers updated using normalizer (app) dist , writing back now...")
     #     self.write_back()
 
-    def get_significant_data_using_app(
+    def get_significant_data_using_statistical_inclusion(
                 self, bin_width, sessions: list=None, delay=None,
                 N_sents=499, layer=None, inclusion_p_threshold=0.01,
-                use_poisson_null=True,
+                use_poisson_null=True, mVocs=False
         ):
         """Retrieves selected data based on provided arguments. 
         If an argument if 'None', no filter is applied on that column.
@@ -849,7 +850,7 @@ class Correlations(BaseCorrelations):
         Returns:
             pandas DataFrame
         """
-        print(f"Retrieving significant data using APP normalizers and ", end='')
+        print(f"Retrieving significant data using statistical inclusion and ", end='')
         select_data = self.data
         select_data = select_data[select_data['bin_width']==float(bin_width)]
         
@@ -871,15 +872,13 @@ class Correlations(BaseCorrelations):
         if use_poisson_null:
             print(f"Poisson Null...")
             sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_poisson_null(
-                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                bin_width=bin_width, p_threshold = inclusion_p_threshold, mVocs=mVocs
                 )
         else:
             print(f"Random shifts Null...")
             sig_sess_n_chs = self.norm_obj.get_significant_sessions_and_channels_using_shifts_null(
-                bin_width=bin_width, p_threshold = inclusion_p_threshold,
+                bin_width=bin_width, p_threshold = inclusion_p_threshold, mVocs=mVocs
                 )
-
-
 
         if sessions is None:
             sessions = list(sig_sess_n_chs.keys())
@@ -1339,10 +1338,11 @@ class Correlations(BaseCorrelations):
         assert neural_area in area_choices, print(f"Unknown neural area '{neural_area}' specified.")
         if column is None:
             if normalized:
-                if use_stat_inclusion:
-                    column = 'corr_normalized_app'
-                else:
-                    column = 'normalized_test_cc'
+                # Deprecated...
+                # if use_stat_inclusion:
+                    # column = 'corr_normalized_app'
+                # else:
+                column = 'normalized_test_cc'
             else:
                 column = 'test_cc_raw'
             if mVocs:
@@ -1352,10 +1352,10 @@ class Correlations(BaseCorrelations):
 
         area_sessions = self.metadata.get_all_sessions(neural_area)
         if use_stat_inclusion:
-            select_data = self.get_significant_data_using_app(
+            select_data = self.get_significant_data_using_statistical_inclusion(
                 bin_width=bin_width, sessions=area_sessions, delay=delay,
                 inclusion_p_threshold=inclusion_p_threshold,
-                use_poisson_null=use_poisson_null
+                use_poisson_null=use_poisson_null, mVocs=mVocs
             )
         else:
             select_data = self.get_selected_data(

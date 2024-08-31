@@ -155,6 +155,7 @@ def plot_strf_baseline(
 		area='all', bin_width=20, delay=0, alpha=0.1,
 		save_tikz=True,
 		normalized=True,
+		threshold=None,
 		mVocs=False,
 		display_dotted_lines=False,
 		display_inter_quartile_range=True,
@@ -176,6 +177,7 @@ def plot_strf_baseline(
 				display_dotted_lines=display_dotted_lines,
 				display_inter_quartile_range=display_inter_quartile_range,
 				normalized=normalized,
+				threshold=threshold,
 				mVocs=mVocs,
 				model_identifier=model_identifier,
 				use_stat_inclusion=use_stat_inclusion,
@@ -196,6 +198,7 @@ def peak_layer_core_non_primary_areas(
 		p_threshold = 0.01,
 		offset_y=0.93,
 		normalized=True,
+		threshold=None,
 		mVocs=False,
 		save_tikz=True,
 		use_stat_inclusion=True,
@@ -212,6 +215,7 @@ def peak_layer_core_non_primary_areas(
 			model_name=model_name,
 			area=area,
 			normalized=normalized,
+			threshold=threshold,
 			mVocs=mVocs,
 			bin_width=bin_width,
 			trained_identifier=trained_identifier,
@@ -244,6 +248,7 @@ def plot_trained_vs_shuffled_network_results(
 		baseline_identifier=None,
 		areas: list=None,
 		normalized=True,
+		threshold=None,
 		mVocs=False,
 		plot_difference=False,
 		bin_width=20,
@@ -259,6 +264,7 @@ def plot_trained_vs_shuffled_network_results(
 		plot_baseline=True,
 		display_inter_quartile_range=True,
 		display_dotted_lines=False,
+		indicate_significance=True,
 		tikz_indicator=None,
 		use_stat_inclusion=False,
 		inclusion_p_threshold=0.01,
@@ -286,6 +292,7 @@ def plot_trained_vs_shuffled_network_results(
 				bin_width=bin_width,
 				area=area,
 				normalized=normalized,
+				threshold=threshold,
 				mVocs=mVocs,
 				alpha=alpha,
 				save_tikz=save_tikz,
@@ -299,6 +306,7 @@ def plot_trained_vs_shuffled_network_results(
 				plot_baseline=plot_baseline,
 				display_inter_quartile_range=display_inter_quartile_range,
 				display_dotted_lines=display_dotted_lines,
+				indicate_significance=indicate_significance,
 				trained_identifier=trained_identifier,
 				untrained_identifiers=untrained_identifiers,
 				baseline_identifier=baseline_identifier,
@@ -554,7 +562,7 @@ def plot_spectrogram_spike_count_pair(
 	# # getting all trials...
 	all_trials_spike_counts = dataloader.get_neural_data_for_repeated_trials(
 			session, bin_width=bin_width,
-			sent_IDs=sent_ids
+			stim_ids=sent_ids
 		)
 
 	### getting predictions using the model..
@@ -566,7 +574,7 @@ def plot_spectrogram_spike_count_pair(
 		layer = layers[model_name]
 		reg_obj = Regression(model_name)
 		saved_predictions[model_name] = reg_obj.neural_prediction(
-			session, bin_width=bin_width, sents=sent_ids, layer_IDs=[layer],
+			session, bin_width=bin_width, delay=0, sents=sent_ids, layer_IDs=[layer],
 			force_reload=force_reload
 			)
 	if prediction_color is None:
@@ -650,7 +658,7 @@ def plot_spike_counts(
 	# setting xtick labels...
 	xtick_label_step_samples = int(xtick_label_step_ms/bin_width)
 	xticks = np.arange(0, total_bins, xtick_label_step_samples)
-	xtick_labels = xticks*xtick_label_step_samples
+	xtick_labels = xticks*bin_width
 	ax.set_xticks(xticks, xtick_labels)
 
 	ax.set_xlabel("time (ms)")

@@ -9,7 +9,7 @@ from auditory_cortex import valid_model_names
 
 #-----------      Null distribution using poisson sequences    -----------#
 
-def read_significant_sessions_and_channels(bin_width, p_threshold, use_poisson_null=True):
+def read_significant_sessions_and_channels(bin_width, p_threshold, use_poisson_null=True, mVocs=False):
     """Retrieves significant sessions and channels at the specified bin width."""
 
     if use_poisson_null:
@@ -17,8 +17,12 @@ def read_significant_sessions_and_channels(bin_width, p_threshold, use_poisson_n
     else:
         subdir = 'using_shifts_null'
     # path_dir = os.path.join(results_dir, 'normalizers', 'significant_neurons', subdir)
-    path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
+    if mVocs:
+        path_dir = os.path.join(normalizers_dir, 'significant_neurons', 'mVocs', subdir)
+    else:
+        path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
     file_path = os.path.join(path_dir, f"significant_sessions_and_channels_bw_{bin_width}ms_pvalue_{p_threshold}.pkl")
+    print(f"Reading sig sessions/channels from: {file_path}")
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F: 
             significant_sessions_and_channels = pickle.load(F)
@@ -29,7 +33,7 @@ def read_significant_sessions_and_channels(bin_width, p_threshold, use_poisson_n
 
 def write_significant_sessions_and_channels(
         bin_width, p_threshold, significant_sessions_and_channels,
-        use_poisson_null=True):
+        use_poisson_null=True, mVocs=False):
     """Writes significant sessions and channels at the specified bin width."""
     if use_poisson_null:
         subdir = 'using_poisson_null'
@@ -37,7 +41,11 @@ def write_significant_sessions_and_channels(
         subdir = 'using_shifts_null'
 
     # path_dir = os.path.join(results_dir, 'normalizers', 'significant_neurons', subdir)
-    path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
+    # path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
+    if mVocs:
+        path_dir = os.path.join(normalizers_dir, 'significant_neurons', 'mVocs', subdir)
+    else:
+        path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
     if not os.path.exists(path_dir):
         print(f"Path not found, creating directories...")
         os.makedirs(path_dir)

@@ -748,6 +748,18 @@ def cc_single_channel(y, y_hat):
 #     B = linalg.lstsq(X, y)[0]
 #     return B
 def reg(X,y, lmbda=0):
+    """Fits linear regression parameters using the given data.
+    Depending on the type of X and y, it uses numpy or cupy for computation.
+    For linear model y = XB, it solves for B using the equation X^T X B = X^T y.
+    
+    Args:
+        X (ndarray): (M,N) or (L,M,N) left-hand side array
+        y (adarray): (M,) or (M,K) right-hand side array
+        lmbda (float): regularization parameter (default=0)
+
+    Returns:
+        B (ndarray): (N,) or (N,K) or (L,N) or (L,N,K)
+    """
 
     #check if incoming array is np or cp,
     #and decide which module to use...!

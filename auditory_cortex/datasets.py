@@ -138,7 +138,11 @@ class BaselineDataset:
 class DNNDataset:
     def __init__(
             self, session, bin_width, model_name, layer_ID,
-            shuffled=False, force_reload=False):
+            mVocs=False,
+            shuffled=False,
+            force_reload=False,
+            
+            ):
         """
         Args:
             model_name:
@@ -156,17 +160,58 @@ class DNNDataset:
         self.shuffled = shuffled
         self.force_reload = force_reload
         self.layer_ID = layer_ID
+        self.mVocs=mVocs
         self.dataloader = DataLoader()
 
-        self.fs = self.dataloader.metadata.get_sampling_rate()
+        if self.mVocs:
+            print(f"{self.session}: creating DNNDataset for mVocs data..")
+        else:
+            print(f"{self.session}: creating DNNDataset for timit data..")
+        self.fs = self.dataloader.metadata.get_sampling_rate(mVocs=mVocs)
 
-        sent_IDs = self.dataloader.sent_IDs
-        self.testing_sent_ids = self.dataloader.test_sent_IDs
-        self.training_sent_ids = sent_IDs[np.isin(sent_IDs, self.testing_sent_ids, invert=True)]
+        #Deprecated..
+        # sent_IDs = self.dataloader.sent_IDs
+        # self.testing_sent_ids = self.dataloader.test_sent_IDs
+        # self.training_sent_ids = sent_IDs[np.isin(sent_IDs, self.testing_sent_ids, invert=True)]
+
+        self.training_sent_ids = self.get_training_stim_ids(mVocs=self.mVocs)
 
         # self.session_bw_cache = {}
         self.data_cache, self.num_channels = self.load_sent_wise_features_and_spikes()
 
+    def get_training_stim_ids(self, mVocs=False):
+        """Returns the stim ids for training set.
+        
+        Args:
+            mVocs: bool = If True, returns ids for mVocs,
+                otherwise for timit stimuli.
+        """
+        if mVocs:
+            stim_ids = self.dataloader.metadata.mVocTrialIds
+            # exclude the missing trial IDs from list of Ids
+            missing_trial_ids = self.dataloader.get_dataset_object(session=self.session).missing_trial_ids
+            stim_ids = stim_ids[np.isin(stim_ids, missing_trial_ids, invert=True)]
+            test_ids = self.dataloader.metadata.mVoc_test_trIds
+            training_stim_ids = stim_ids[np.isin(stim_ids, test_ids, invert=True)]
+        else:
+            sent_IDs = self.dataloader.sent_IDs
+            testing_sent_ids = self.dataloader.test_sent_IDs
+            training_stim_ids = sent_IDs[np.isin(sent_IDs, testing_sent_ids, invert=True)]
+        return training_stim_ids
+
+    def get_testing_stim_ids(self, mVocs=False):
+        """Returns the stim ids for testing set.
+        
+        Args:
+            session: int = session ID, needed ONLY if mVocs=True.
+            mVocs: bool = If True, returns ids for mVocs,
+                otherwise for timit stimuli.
+        """
+        if mVocs:
+            testing_stim_ids = self.dataloader.metadata.mVoc_test_stimIds
+        else:
+            testing_stim_ids = self.dataloader.test_sent_IDs
+        return testing_stim_ids
 
 
     def load_sent_wise_features_and_spikes(self):
@@ -177,12 +222,13 @@ class DNNDataset:
         raw_spikes = self.dataloader.get_session_spikes(
             session=self.session,
             bin_width=self.bin_width,
-            delay=0
+            delay=0,
+            mVocs=self.mVocs
             )
 
         all_layer_features = self.dataloader.get_resampled_DNN_features(
 			self.model_name, bin_width=self.bin_width, force_reload=self.force_reload,
-			shuffled=self.shuffled
+			shuffled=self.shuffled, mVocs=self.mVocs
 			)
         layer_features = all_layer_features[self.layer_ID]
 
@@ -194,21 +240,21 @@ class DNNDataset:
         return data_cache, num_channels
 
 
-    def get_data(self, sent_IDs=None):
+    def get_data(self, stim_ids=None):
         """Returns spectral-features, spikes pair for the 
         given sent IDs.
         """
-        if sent_IDs is None:
-            sent_IDs = self.training_sent_ids
+        if stim_ids is None:
+            stim_ids = self.get_training_stim_ids(mVocs=self.mVocs)
         
         features = self.data_cache['features']
         spikes = self.data_cache['spikes']
         features_list = []
         spikes_list = []
 
-        for sent in sent_IDs:
-            features_list.append(features[sent])
-            spikes_list.append(spikes[sent])
+        for stim in stim_ids:
+            features_list.append(features[stim])
+            spikes_list.append(spikes[stim])
         
         return features_list, spikes_list
 
@@ -218,27 +264,31 @@ class DNNDataset:
         for the test sent IDs, given session.
             
         Returns:
-            spect_list: list = each entry of list is a spect 
+            features_list: list = [(time, channels)] each entry of list is a feature for on stim_id. 
                 for a sent audio.
-            repeated_spikes_list: list of lists = 11 lists 
-                corresponding to 11 trials and each one having
-                entries equal to number of sentences in test set.
+            repeated_spikes_list: ndarray = (num_repeats, time, channels) all trials concatenated along time axis.
+
 
         """
         features_list = []
         # repeated_spikes_list = {i: [] for i in range(11)}
         all_sent_spikes = []
-
+        testing_stim_ids = self.get_testing_stim_ids(mVocs=self.mVocs)
         features = self.data_cache['features']
-        for sent in self.testing_sent_ids:
+        for stim in testing_stim_ids:
             # make sure to drop the partial sample at the end, 
             # this has already been done for repeated trials..
-            features_list.append(features[sent])
+            if self.mVocs:
+                tr_id = self.dataloader.metadata.get_mVoc_tr_id(stim)[0]
+                features_list.append(features[tr_id])
+            else:
+                features_list.append(features[stim])
             repeated_spikes = self.dataloader.get_neural_data_for_repeated_trials(
                 session=self.session,
                 bin_width=self.bin_width,
                 delay=0,
-                sent_IDs=[sent]
+                stim_ids=[stim],
+                mVocs=self.mVocs
                 )
             all_sent_spikes.append(repeated_spikes)
         all_sent_spikes = np.concatenate(all_sent_spikes, axis=1)

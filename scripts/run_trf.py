@@ -27,7 +27,7 @@ def compute_and_save_regression(args):
     shuffled = args.shuffled
     test_trial = args.test_trial
     identifier = args.identifier
-
+    mVocs = args.mVocs
     # fixed parameters..
     
     tmin=0
@@ -36,7 +36,7 @@ def compute_and_save_regression(args):
     num_workers=16
     num_folds=3
     
-    lags=None
+    lags=[300]
     use_nonlinearity=False
 
     csv_file_name = 'corr_results.csv'
@@ -58,16 +58,16 @@ def compute_and_save_regression(args):
 
     metadata = NeuralMetaData()
     sessions = metadata.get_all_available_sessions()
-    ################################################################
-    # list of significant sessions only...
-    sig_sessions = np.array([180613., 180627., 180719., 180720., 180728., 180730., 180731.,
-						180807., 180808., 180814., 190606., 191113., 191121., 191125.,
-						191206., 191210., 200205., 200206., 200207., 200213., 200219.])
+    # ################################################################
+    # # list of significant sessions only...
+    # sig_sessions = np.array([180613., 180627., 180719., 180720., 180728., 180730., 180731.,
+	# 					180807., 180808., 180814., 190606., 191113., 191121., 191125.,
+	# 					191206., 191210., 200205., 200206., 200207., 200213., 200219.])
 
-    sessions = sig_sessions.astype(int)
+    # sessions = sig_sessions.astype(int)
     ###############################################################
     sessions = np.sort(sessions)
-
+    sessions = sessions[args.start_ind:args.end_ind]
     # sessions = sessions[:20]
     # sessions = sessions[20:]
     current_time = time.time()
@@ -87,9 +87,16 @@ def compute_and_save_regression(args):
             subjects = sessions
 
         for session in subjects:
+            if mVocs:
+                excluded_sessions = ['190726', '200213']
+                if session in excluded_sessions:
+                    print(f"Excluding session: {session}")
+                    continue
             print(f"Working with '{session}'")
 
-            dataset = DNNDataset(session, bin_width, model_name, layer_ID)
+            dataset = DNNDataset(
+                session, bin_width, model_name, layer_ID, mVocs=mVocs
+                )
             trf_obj = TRF(model_name, dataset)
 
             corr, opt_lag, opt_lmbda = trf_obj.grid_search_CV(
@@ -99,8 +106,17 @@ def compute_and_save_regression(args):
                     test_trial=test_trial
                 )
             
+            if mVocs:
+                mVocs_corr = corr
+                timit_corr = np.zeros_like(corr)
+            else:
+                mVocs_corr = np.zeros_like(corr)
+                timit_corr = corr
+
+
             corr_dict = {
-                'test_cc_raw': corr[None,...],
+                'test_cc_raw': timit_corr[None,...],
+                'mVocs_test_cc_raw': mVocs_corr[None,...],
                 'win': bin_width,
                 'delay': delay, 
                 'session': session,
@@ -165,10 +181,26 @@ def get_parser():
         help="Specify if shuffled network to be used."
     )
     parser.add_argument(
+        '-v','--mVocs', dest='mVocs', action='store_true', default=False,
+        help="Specify if spikes for mVocs are to be used."
+    )
+    parser.add_argument(
         '-t','--test_trial', dest='test_trial', type= int, action='store',
         default=None,
         # choices=[],
         help="trial to test on."
+    )
+    parser.add_argument(
+        '--start', dest='start_ind', type=int, action='store', 
+        default=0,
+        # choices=[],
+        help="Choose sessions starting index to compute results at."
+    )
+    parser.add_argument(
+        '--end', dest='end_ind', type=int, action='store', 
+        default=41,
+        # choices=[],
+        help="Choose sessions ending index to compute results at."
     )
 
 

@@ -384,6 +384,7 @@ class RegPlotter:
 			area='all', bin_width=20, delay=0, alpha=0.1,
 			save_tikz=True,
 			normalized=True,
+			threshold=None,
 			mVocs=False,
 			ax=None, lag=None,
 			display_dotted_lines=False,
@@ -395,9 +396,10 @@ class RegPlotter:
 		):
 		# identifier = f'freqs80_100ms'
 		corr_obj = STRFCorrelations(model_identifier)
-		threshold= corr_obj.get_normalizer_threshold(
-			bin_width=bin_width, poisson_normalizer=True, mVocs=mVocs,
-		)
+		if threshold is None:
+			threshold= corr_obj.get_normalizer_threshold(
+				bin_width=bin_width, poisson_normalizer=True, mVocs=mVocs,
+			)
 		xticks = [0,1]
 		xtick_labels = []
 		baseline_dist = corr_obj.get_correlations_for_bin_width( #get_corr_for_area
@@ -509,6 +511,7 @@ class RegPlotter:
 	def plot_all_layers_trained_and_shuffled(
 		model_name, area='all', bin_width=20, delay=0, alpha=0.1,
 		save_tikz=True, normalized=True,
+		threshold=None,
 		# identifier='_bins_corrected_100',
 		sig_offset_x=0,
 		sig_offset_y=0.93,
@@ -535,7 +538,7 @@ class RegPlotter:
 		inclusion_p_threshold = 0.01,
 		use_poisson_null=True,
 		):
-
+		print(f"Plotting trained and shuffled distributions for {model_name}")
 		if untrained_identifiers is None:
 			untrained_identifiers = [
 				'reset_weights0', 'reset_weights1', 'reset_weights2', 'reset_weights3'
@@ -554,10 +557,11 @@ class RegPlotter:
 		# trained_network...
 		# identifier='_bins_corrected_100'
 		corr_obj_trained = Correlations(model_name+'_'+trained_identifier)
-		threshold = corr_obj_trained.get_normalizer_threshold(
-			bin_width=bin_width, poisson_normalizer=poisson_normalizer,
-			mVocs=mVocs
-		)
+		if threshold is None:
+			threshold = corr_obj_trained.get_normalizer_threshold(
+				bin_width=bin_width, poisson_normalizer=poisson_normalizer,
+				mVocs=mVocs
+			)
 		data_dist_trained = corr_obj_trained.get_corr_all_layers_for_bin_width(
 				neural_area=area, bin_width=bin_width, delay=delay,
 				threshold=threshold, normalized=normalized,
@@ -566,6 +570,8 @@ class RegPlotter:
 				use_poisson_null=use_poisson_null,
 
 			)
+		
+		print(f"Number of channels returned: {data_dist_trained[0].shape}")
 		
 		# weights shuffled ...
 		# identifier='_weights_shuffled'
@@ -584,12 +590,6 @@ class RegPlotter:
 			distributions = list([dist[key] for dist in data_dist_shuffled_list])
 			data_dist_shuffled[key] = np.stack(distributions, axis=0)
 			data_dist_shuffled[key] = np.mean(data_dist_shuffled[key], axis=0)
-		
-		# # get baseline results..        
-		# baseline_dist = corr_obj_shuffled.get_baseline_corr_for_area(
-		#     neural_area=area, bin_width=bin_width, delay=delay,
-		#     threshold=threshold, normalized=normalized
-		# )
 		
 		# plot trained network results...
 		color = PlotterUtils.get_model_specific_color(model_name)
@@ -658,11 +658,7 @@ class RegPlotter:
 				if baseline_identifier is None:
 					baseline_identifier = 'STRF_freqs80_all_lags'
 				strf_obj = STRFCorrelations(baseline_identifier)
-                # Deprecated.
-				# threshold= strf_obj.get_normalizer_threshold(
-				# 	bin_width=bin_width, poisson_normalizer=True,
-				# 	mVocs=mVocs
-				# )
+
 				baseline_dist = strf_obj.get_correlations_for_bin_width(
 					neural_area=area, bin_width=bin_width, delay=delay,
 					threshold=threshold, normalized=normalized, mVocs=mVocs,
@@ -671,11 +667,6 @@ class RegPlotter:
 					inclusion_p_threshold=inclusion_p_threshold,
 					use_poisson_null=use_poisson_null,
 				)
-
-				# baseline_dist = strf_obj.get_corr_for_area(
-				#     neural_area=area, bin_width=bin_width, delay=delay,
-				#     threshold=threshold, normalized=normalized, lag=None,   # saying lag=0.3
-				# )
 
 				# simply repeating baseline dist for all layers to allow for comparison....
 				baseline_dist_all_layer = {key: baseline_dist.values for key in data_dist_trained.keys()}
@@ -1040,16 +1031,16 @@ class RegPlotter:
 				display_inter_quartile_range=True,
 				display_dotted_lines=False,
 				norm_bin_width=None,
-                layer_id=None,
+				layer_id=None,
 				p_threshold = 0.01,
-	            offset_y=0.93,
+				offset_y=0.93,
 		):
 		"""Plots best layers at each bin width for the model name specified,
 		uses threshold method for selecting the 'tuned' neurons.
 		
 		Args:
-            layer_id: int = If specified, returns dist for layer_id,
-                    else returns the for layer with peak median.
+			layer_id: int = If specified, returns dist for layer_id,
+					else returns the for layer with peak median.
 		"""
 		
 		corr_obj = Correlations(
@@ -1075,7 +1066,8 @@ class RegPlotter:
 			)
 		
 		RegPlotter.indicate_peak_and_similar_layers(
-			data_dist, p_threshold=p_threshold, offset_y=offset_y)
+			data_dist, p_threshold=p_threshold, offset_y=offset_y,
+			ax=ax)
 
 		if labels:
 			plt.title(f"Regression: {model_name}, peak_median_layer, area-{area}")
@@ -1321,7 +1313,13 @@ class RegPlotter:
 			# )
 
 	@staticmethod
-	def indicate_peak_and_similar_layers(layerwise_dist, p_threshold=0.01, offset_y=0.93):
+	def indicate_peak_and_similar_layers(
+		layerwise_dist,
+		p_threshold=0.01,
+		offset_y=0.93,
+		indicate_similar_layers=False,
+		indicate_peak_layer=True,
+		ax=None):
 		"""Indicates (in the existing figure) the peak layer (red star) 
 		and all other layers statistcally not different from the peak leyer (black circles)
 		
@@ -1331,6 +1329,8 @@ class RegPlotter:
 			offset_y: int = vertical height of indicators (stars), default=0.93.
 
 		"""
+		if ax is None:
+			ax = plt.gca()
 		medians = np.array([np.median(values) for values in layerwise_dist.values()])
 		peak_median_layer = list(layerwise_dist.keys())[np.argmax(medians)]
 
@@ -1353,9 +1353,10 @@ class RegPlotter:
 					
 		statistically_same_layers = np.array(statistically_same_layers)
 		indicator_heights = np.ones_like(statistically_same_layers)*offset_y
-		plt.scatter(statistically_same_layers, indicator_heights, c='k')
-
-		plt.scatter([peak_median_layer], [offset_y], marker='*', c='r', s=100)
+		if indicate_similar_layers:
+			ax.scatter(statistically_same_layers, indicator_heights, c='k')
+		if indicate_peak_layer:
+			plt.scatter(peak_median_layer, offset_y, c='r')
 			
 
 	@staticmethod

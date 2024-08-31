@@ -1,5 +1,5 @@
 #!/bin/bash
-## Usage example: ./trf_deepspeech2.sh "-s -b 50 -i trf_300"
+## Usage example: ./trf_deepspeech2.sh "-s -v -b 50 -i trf_300"
 # Check if the number of command-line arguments is correct
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <shuffle or not> <bin_width> <results identifier>"
@@ -28,11 +28,7 @@ do
     # $base_args+"_extended"
     suff=""
     # Append different suffixes based on the index of the current set of arguments
-    case $idx in
-
-        0)
-            suff="_l0"
-            ;;        
+    case $idx in      
         1)
             suff="_l1"
             ;;
