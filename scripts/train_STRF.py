@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.linear_model import RidgeCV, ElasticNetCV
 
 # local
+from auditory_cortex.neural_data import NeuralMetaData
 from auditory_cortex import utils, config, saved_corr_dir
 from auditory_cortex.io_utils.io import write_model_parameters
 from auditory_cortex.computational_models import baseline
@@ -32,10 +33,11 @@ def compute_and_save_STRF_baseline(args):
     num_alphas = 8
     num_folds=3
     third = None
-    lags = [5, 10, 20, 40, 80, 160, 320]
+    lags = [300] #[5, 10, 20, 40, 80, 160, 320]
     test_trial=None
     use_nonlinearity=args.non_linearity
     mVocs = args.mVocs
+    mel_spectrogram = args.mel_spectrogram
 
     if identifier != '':
         identifier = identifier + '_'
@@ -52,12 +54,14 @@ def compute_and_save_STRF_baseline(args):
         data = pd.read_csv(file_path)
         file_exists = True
 
-    ## read the sessions available in data_dir
-    sessions = np.array(os.listdir(data_dir))
-    sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
-    for s in bad_sessions:
-        sessions = np.delete(sessions, np.where(sessions == s))
-    sessions = np.sort(sessions)
+    metadata = NeuralMetaData()
+    sessions = metadata.get_all_available_sessions()
+    # ## read the sessions available in data_dir
+    # sessions = np.array(os.listdir(data_dir))
+    # sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
+    # for s in bad_sessions:
+    #     sessions = np.delete(sessions, np.where(sessions == s))
+    # sessions = np.sort(sessions)
 
     sessions = sessions[args.start_ind:args.end_ind]
 
@@ -67,7 +71,7 @@ def compute_and_save_STRF_baseline(args):
     else:
         subjects = sessions
 
-    strf_model = baseline.STRF()
+    strf_model = baseline.STRF(mel_spectrogram=mel_spectrogram)
     # subjects = np.array(['200206'])
     for session in subjects:
         if mVocs:
@@ -151,7 +155,7 @@ def get_parser():
     )
     parser.add_argument(
         '-e','--end', dest='end_ind', type=int, action='store', 
-        default=45,
+        default=41,
         # choices=[],
         help="Choose sessions ending index to compute results at."
     )
@@ -173,6 +177,12 @@ def get_parser():
         '-v','--mVocs', dest='mVocs', action='store_true', default=False,
         help="Specify if spikes for mVocs are to be used."
     )
+    parser.add_argument(
+        '--mel', dest='mel_spectrogram', action='store_true', default=False,
+        help="Specify if mel_spectrogram to be used as baseline."
+    )
+
+    
     return parser
 
 

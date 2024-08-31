@@ -3,7 +3,7 @@
 # --output=./result_regression_w2l_spect.out
 
 #SBATCH	-A standby
-#SBATCH --constraint=F|G|I|K|D|B|H|J
+#SBATCH --constraint=F|G|I|K|D|B|H|J|N
 #F|G|I|K|D|B
 
 # High Mem GPUs: F|G|I|K|D|B
@@ -12,8 +12,8 @@
 # Slow GPUs: E
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=2
-#SBATCH --cpus-per-task=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=0
 #SBATCH --time=4:00:00
 

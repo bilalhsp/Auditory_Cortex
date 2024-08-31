@@ -2,37 +2,37 @@ use_pca: False
 # shuffle_weights: False
 layers:
 
-- layer_name: 'audio_model.audio_encoder.layers.0.blocks.0'   
+- layer_name: 'audio_model.audio_encoder.layers.0.blocks.0.layernorm_after'   
   layer_id: 0
   layer_type: transformer
   RF: 0   # RF is in ms.
-- layer_name: 'audio_model.audio_encoder.layers.0.blocks.1'   
+- layer_name: 'audio_model.audio_encoder.layers.0.blocks.1.layernorm_after'   
   layer_id: 1
   layer_type: transformer
   RF: 0   # RF is in ms.
-- layer_name: 'audio_model.audio_encoder.layers.1.blocks.0'    
+- layer_name: 'audio_model.audio_encoder.layers.1.blocks.0.layernorm_after'    
   layer_id: 2
   layer_type: transformer
   RF: 0   # RF is in ms.
-- layer_name: 'audio_model.audio_encoder.layers.1.blocks.1'     
+- layer_name: 'audio_model.audio_encoder.layers.1.blocks.1.layernorm_after'     
   layer_id: 3
   layer_type: transformer
   RF: 0   # RF is in ms.
-- layer_name: 'audio_model.audio_encoder.layers.2.blocks.0'   
+- layer_name: 'audio_model.audio_encoder.layers.2.blocks.0.layernorm_after'   
   layer_id: 4
   layer_type: transformer
   RF: 0   # RF is in ms.
-- layer_name: 'audio_model.audio_encoder.layers.2.blocks.1'    
+- layer_name: 'audio_model.audio_encoder.layers.2.blocks.1.layernorm_after'    
   layer_id: 5
   layer_type: transformer
   RF: 0   # RF is in ms.
 
-- layer_name: 'audio_model.audio_encoder.layers.3.blocks.0'    # this is right before the conv-pos-embedding
+- layer_name: 'audio_model.audio_encoder.layers.3.blocks.0.layernorm_after'    
   layer_id: 6
   layer_type: transformer
   RF: 0   # RF is irrelevant for transformer layer
 
-- layer_name: 'audio_model.audio_encoder.layers.3.blocks.1'    # this is the output of conv-pos-embedding
+- layer_name: 'audio_model.audio_encoder.layers.3.blocks.1.layernorm_after'   
   layer_id: 7
   layer_type: transformer
   RF: 0   # RF is irrelevant for transformer layer

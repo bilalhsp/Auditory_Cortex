@@ -20,6 +20,7 @@ valid_model_names = [
         'MERT',                     # 8
         'CLAP',                     # 9
         'w2v2_generic',             # 10
+        'spect2vec',             # 11    
     ]
 
  

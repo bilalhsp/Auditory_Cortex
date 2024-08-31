@@ -42,11 +42,7 @@ do
     # $base_args+"_extended"
     suff=""
     # Append different suffixes based on the index of the current set of arguments
-    case $idx in
-        # deepspeech2
-        0)
-            suff="_l0"
-            ;;        
+    case $idx in     
         1)
             suff="_l1"
             ;;

@@ -11,12 +11,8 @@ from sklearn.linear_model import RidgeCV, ElasticNet, Ridge, PoissonRegressor
 from transformers import Speech2TextProcessor
 
 
-
-
-
-
 class STRF:
-    def __init__(self, num_freqs=80):
+    def __init__(self, num_freqs=80, mel_spectrogram=False):
         """
         Args:
             num_freqs (int): Number of frequency channels on spectrogram
@@ -25,7 +21,12 @@ class STRF:
         data_dir = config['neural_data_dir']
         # self.dataset = NeuralData(data_dir, session)
         # self.dataset.extract_spikes(bin_width=self.bin_width, delay=0)
-        
+        self.mel_spectrogram = mel_spectrogram
+        if self.mel_spectrogram:
+            print(F"Using mel-spectrogram for STRF.")
+        else:
+            print(F"Using wavelet-spectrogram for STRF.")
+
         self.processor = Speech2TextProcessor.from_pretrained("facebook/s2t-large-librispeech-asr")
         # self.fs = self.dataset.fs
         self.dataloader = DataLoader()
@@ -35,8 +36,12 @@ class STRF:
     def get_spectrogram(self, aud, sampling_rate):
         """Transforms the given audio into the spectrogram"""
         # Getting the spectrogram at 10 ms and then resample to match the bin_width
-        # spect = nl.features.auditory_spectrogram(aud, sampling_rate, frame_len=10)
-        spect = self.processor(aud, padding=True, sampling_rate=sampling_rate).input_features[0]
+        if self.mel_spectrogram:
+            n_new = int(aud.size*16000/sampling_rate)
+            aud = resample(aud, n_new)
+            spect = self.processor(aud, padding=True, sampling_rate=16000).input_features[0]
+        else:
+            spect = nl.features.auditory_spectrogram(aud, sampling_rate, frame_len=10)
         return spect
     def get_training_stim_ids(self, session=None, mVocs=False):
         """Returns the stim ids for training set.

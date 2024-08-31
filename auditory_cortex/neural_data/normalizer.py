@@ -351,7 +351,7 @@ class Normalizer:
         return null_dist_poisson
 
     def _compute_significant_sessions_and_channels_using_poisson_null(
-            self, bin_width = 50, spike_rate = 50, p_threshold = 0.01,
+            self, bin_width = 50, spike_rate = 50, p_threshold = 0.01, mVocs=False
         ):
         """Computes significant channels for all the sessions, using
         two-sample Welch's t-test (assumes unqual variances).
@@ -371,12 +371,12 @@ class Normalizer:
         sessions = self.metadata.get_all_available_sessions()
         significant_sessions_and_channels = {}
         null_dist = self.get_normalizer_null_dist_using_poisson(
-            bin_width=bin_width, spike_rate=spike_rate
+            bin_width=bin_width, spike_rate=spike_rate, mVocs=mVocs
             )
         null_dist = np.array(null_dist)
         for session in sessions:
             norm_dist = self.get_normalizer_for_session_random_pairs(
-                session=session, bin_width=bin_width 
+                session=session, bin_width=bin_width, mVocs=mVocs 
             )
             num_channels = self.metadata.get_num_channels(session)
             for ch in range(num_channels):
@@ -398,7 +398,8 @@ class Normalizer:
         return significant_sessions_and_channels
 
     def get_significant_sessions_and_channels_using_poisson_null(
-            self, bin_width = 50, spike_rate=50, p_threshold=0.05, force_redo=False
+            self, bin_width = 50, spike_rate=50, p_threshold=0.05, force_redo=False,
+            mVocs=False
         ):
         """Retrieves significant channels for all the sessions, using
         two-sample Welch's t-test (assumes unqual variances).
@@ -411,18 +412,19 @@ class Normalizer:
             dict: {session: np.array([ch, ch])}
         """
         significant_sessions_and_channels = io.read_significant_sessions_and_channels(
-            bin_width=bin_width, p_threshold=p_threshold
+            bin_width=bin_width, p_threshold=p_threshold, mVocs=mVocs
             )
         
         if significant_sessions_and_channels is None or force_redo:
             significant_sessions_and_channels = self._compute_significant_sessions_and_channels_using_poisson_null(
-                bin_width=bin_width, spike_rate=spike_rate, p_threshold=p_threshold
+                bin_width=bin_width, spike_rate=spike_rate, p_threshold=p_threshold, mVocs=mVocs
             )
 
             io.write_significant_sessions_and_channels(
                 bin_width=bin_width,
                 p_threshold=p_threshold,
-                significant_sessions_and_channels=significant_sessions_and_channels
+                significant_sessions_and_channels=significant_sessions_and_channels,
+                mVocs=mVocs
             )
         return significant_sessions_and_channels
 
