@@ -11,9 +11,8 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
 from transformers import AutoProcessor, WhisperForConditionalGeneration
 from transformers import AutoProcessor, AutoModelForPreTraining
-from transformers import Wav2Vec2FeatureExtractor
 from transformers import ClapModel, ClapProcessor
-from transformers import AutoModel
+from transformers import AutoModel, Wav2Vec2FeatureExtractor
 
 from transformers import Wav2Vec2ForPreTraining
 from transformers import Wav2Vec2Config
@@ -21,7 +20,7 @@ import json
 
 # local
 from auditory_cortex.neural_data import NeuralMetaData
-from auditory_cortex import config_dir, results_dir, aux_dir
+from auditory_cortex import config_dir, results_dir, aux_dir, cache_dir
 from wav2letter.models import Wav2LetterRF, Wav2LetterSpect
 
 # import GPU specific packages...
@@ -37,7 +36,9 @@ if hpc_cluster:
 class DNNFeatureExtractor():
     def __init__(self, model_name = 'wav2letter_modified',
                 saved_checkpoint=None,
-                shuffled=False):
+                shuffled=False,
+                scale_factor=None
+                ):
         
         self.metadata = NeuralMetaData()
         self.model_name = model_name
@@ -49,6 +50,7 @@ class DNNFeatureExtractor():
         self.features_delay = []        # features delay needed to compensate for the RFs
         self.features = {}
         self.shuffled = shuffled
+        self.scale_factor = scale_factor
         # self.model = model
 
 
@@ -130,8 +132,10 @@ class DNNFeatureExtractor():
 
         # self.shuffled = self.config['shuffle_weights']
         if self.shuffled:
-            # self.shuffle_weights()
-            layers = self.reset_model_parameters()
+            self.shuffle_weights()
+            # layers = self.reset_model_parameters()
+            if self.scale_factor is not None:
+                self.scale_weights()
             # self.randomly_reinitialize_weights(uniform=True)
 
         #############################################################
@@ -256,6 +260,28 @@ class DNNFeatureExtractor():
                     param.data = torch.rand_like(param)
                 else:
                     param.data = torch.randn_like(param)
+
+    def scale_weights(self):
+        """Randomly initialize weights of all the layers of the model.
+        """
+        print(f"Scalling weights by factor: {self.scale_factor}")
+        with torch.no_grad():
+            for param in self.extractor.model.parameters():
+                param.data = param.data*self.scale_factor
+
+    def save_state_dist(self):
+        """Saves the state_dict of the model to cache dir."""
+        if self.scale_factor is None:
+            weights_factor = 1 
+        else:
+            weights_factor = self.scale_factor
+        state_dict_path = os.path.join(
+            cache_dir, self.model_name, 'shuffled', f'shuffled_weights_factor_{weights_factor}.pth')
+        state_dict = self.extractor.model.state_dict()
+        for k,v in state_dict.items():
+            state_dict[k] = v.cpu().numpy()
+        torch.save(state_dict, state_dict_path)
+        print(f"State_dict saved at: {state_dict_path}, with scale_factor: {weights_factor}")
                 
     #############################################################
     ###########      Moved from Regression to here      #########

@@ -86,28 +86,28 @@ args_sets=(
     "-m wav2letter_modified -l 11"
     "-m wav2letter_modified -l 12"
     "-m wav2letter_modified -l 13"
-    # w2v2_audioset
-    "-m w2v2_audioset -l 0"
-    "-m w2v2_audioset -l 1"
-    "-m w2v2_audioset -l 2"
-    "-m w2v2_audioset -l 3"
-    "-m w2v2_audioset -l 4"
-    "-m w2v2_audioset -l 5"
-    "-m w2v2_audioset -l 6"
-    "-m w2v2_audioset -l 7"
-    "-m w2v2_audioset -l 8"
-    "-m w2v2_audioset -l 9"
-    "-m w2v2_audioset -l 10"
-    "-m w2v2_audioset -l 11"
-    "-m w2v2_audioset -l 12"
-    "-m w2v2_audioset -l 13"
-    "-m w2v2_audioset -l 14"
-    "-m w2v2_audioset -l 15"
-    "-m w2v2_audioset -l 16"
-    "-m w2v2_audioset -l 17"
-    "-m w2v2_audioset -l 18"
-    "-m w2v2_audioset -l 19"
-    "-m w2v2_audioset -l 20"
+    # w2v2_generic
+    "-m w2v2_generic -l 0"
+    "-m w2v2_generic -l 1"
+    "-m w2v2_generic -l 2"
+    "-m w2v2_generic -l 3"
+    "-m w2v2_generic -l 4"
+    "-m w2v2_generic -l 5"
+    "-m w2v2_generic -l 6"
+    "-m w2v2_generic -l 7"
+    "-m w2v2_generic -l 8"
+    "-m w2v2_generic -l 9"
+    "-m w2v2_generic -l 10"
+    "-m w2v2_generic -l 11"
+    "-m w2v2_generic -l 12"
+    "-m w2v2_generic -l 13"
+    "-m w2v2_generic -l 14"
+    "-m w2v2_generic -l 15"
+    "-m w2v2_generic -l 16"
+    "-m w2v2_generic -l 17"
+    "-m w2v2_generic -l 18"
+    "-m w2v2_generic -l 19"
+    "-m w2v2_generic -l 20"
 
 )
 # # Replace the placeholder with the actual base identifier
@@ -336,7 +336,7 @@ do
         69)
             suff="_l13"
             ;;
-        #w2v2_audioset
+        #w2v2_generic
         70)
             suff="_l0"
             ;;        

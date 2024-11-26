@@ -36,6 +36,9 @@ do
     suff=""
     # Append different suffixes based on the index of the current set of arguments
     case $idx in     
+        0)
+            suff="_l0"
+            ;;
         1)
             suff="_l1"
             ;;

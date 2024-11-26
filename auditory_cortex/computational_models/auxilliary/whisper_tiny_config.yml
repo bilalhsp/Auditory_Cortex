@@ -1,6 +1,6 @@
 use_pca: False
-saved_checkpoint: openai/whisper-tiny
-# shuffle_weights: False
+repo_name: openai/whisper-tiny
+sampling_rate: 16000  # sampling rate the network was trained on
 layers:
 - layer_name: model.encoder.conv1
   layer_id: 0

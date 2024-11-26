@@ -1,5 +1,6 @@
 use_pca: False
 # shuffle_weights: False
+sampling_rate: 48000  # sampling rate the network was trained on
 layers:
 
 - layer_name: 'audio_model.audio_encoder.layers.0.blocks.0.layernorm_after'   

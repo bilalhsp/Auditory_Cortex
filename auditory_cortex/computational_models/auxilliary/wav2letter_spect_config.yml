@@ -54,13 +54,14 @@ layers:
   RF: 640               #(639.44 ms)
   layer_type: conv
   
-# - layer_name: conv13
-#   layer_id: 12
-#   RF: 1240               #(1239.44 ms)
-#   layer_type: conv
-# - layer_name: conv14
-  # layer_id: 13
-  # layer_type: conv
+- layer_name: conv13.activation
+  layer_id: 12
+  RF: 1240               #(1239.44 ms)
+  layer_type: conv
+- layer_name: conv14.activation
+  layer_id: 13
+  RF: 1240
+  layer_type: conv
 # - layer_name: conv15
-  # layer_id: 14
-  # layer_type: conv
+#   layer_id: 14
+#   layer_type: conv

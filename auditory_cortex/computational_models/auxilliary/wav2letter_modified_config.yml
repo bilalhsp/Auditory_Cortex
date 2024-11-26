@@ -22,7 +22,7 @@ saved_checkpoint: Wav2letter-epoch=024-val_loss=0.37.ckpt
 # saved_checkpoint: /scratch/gilbreth/ahmedb/wav2letter/modified_w2l/Wav2letter-epoch=008-val_loss=0.56.ckpt
 
 
-
+sampling_rate: 16000  # sampling rate the network was trained on
 use_pca: False
 
 layers:

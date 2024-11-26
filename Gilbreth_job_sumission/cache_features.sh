@@ -2,12 +2,13 @@
 
 # --output=./result_cache_features_5.out
 
-#SBATCH	-A standby
+#SBATCH	-A jgmakin-n
 #standby
 #jgmakin-n
 #training
 #debug
 # --constraint=F|G|I|K|D|B|H|J 
+# --constraint=~n003
 
 # High Mem GPUs: F|G|I|K|D
 # very Fast GPUs: F|K
@@ -17,7 +18,7 @@
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=2
-#SBATCH --mem=0
+# --mem=0
 #SBATCH --time=4:00:00
 
 hostname

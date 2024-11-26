@@ -17,7 +17,7 @@ from scipy import linalg, signal
 from auditory_cortex.neural_data import NeuralData, NeuralMetaData
 from auditory_cortex.analyses import Correlations
 from auditory_cortex.computational_models.feature_extractors import DNNFeatureExtractor
-from auditory_cortex import LPF_analysis_bw
+# from auditory_cortex import LPF_analysis_bw
 
 from auditory_cortex.io_utils.io import read_cached_spikes, write_cached_spikes
 from auditory_cortex.io_utils.io import read_cached_features, write_cached_features
@@ -54,20 +54,33 @@ class DataLoader:
             return self.metadata.get_mVoc_aud(stim_id)
         else:
             return self.metadata.stim_audio(stim_id)
+        
+    def get_stim_dur(self, stim_id, mVocs=False):
+        """Return duration for stimulus (timit or mVocs) id"""
+        if mVocs:
+            return self.metadata.get_mVoc_dur(stim_id)
+        else:
+            return self.metadata.stim_duration(stim_id)
+        
+    def get_num_bins(self, stim_id, bin_width, mVocs=False):
+        """Returns number of bins for the given duration and bin_width"""
+        duration = self.get_stim_dur(stim_id, mVocs)
+        # return int(np.ceil(duration/(bin_width/1000)))
+        return int(np.ceil(round(duration/(bin_width/1000), 3)))
 
-    def _create_DNN_obj(self, model_name='waveletter_modified', shuffled=False):
+    def _create_DNN_obj(self, model_name='waveletter_modified', shuffled=False, scale_factor=None):
         """Creates DNN feature extractor for the given model_name"""
         # self.DNN_models[model_name] = Regression(model_name, load_features=False)
-        self.DNN_models[model_name] = DNNFeatureExtractor(model_name, shuffled=shuffled)
+        self.DNN_models[model_name] = DNNFeatureExtractor(model_name, shuffled=shuffled, scale_factor=scale_factor)
         self.DNN_layer_ids[model_name] = self.DNN_models[model_name].layer_IDs
         self.DNN_feature_dict[model_name] = {}
 
-    def get_DNN_obj(self, model_name='waveletter_modified', shuffled=False):
+    def get_DNN_obj(self, model_name='waveletter_modified', shuffled=False, scale_factor=None):
         """Retrieves DNN model for the given name, create new if not already 
         exists.
         """
         if model_name not in self.DNN_models.keys():
-            self._create_DNN_obj(model_name=model_name, shuffled=shuffled)
+            self._create_DNN_obj(model_name=model_name, shuffled=shuffled, scale_factor=scale_factor)
         return self.DNN_models[model_name]
     
 
@@ -104,7 +117,8 @@ class DataLoader:
         return raw_DNN_features
 
     def get_raw_DNN_features(
-            self, model_name, force_reload=False, contextualized=False, shuffled=False
+            self, model_name, force_reload=False, contextualized=False, shuffled=False,
+            scale_factor=None
         ):
         """Retrieves raw features for the 'model_name', starts by
         attempting to read cached features, if not found, extract
@@ -129,19 +143,22 @@ class DataLoader:
             if contextualized:
                 long_audio, total_duration, *_ = self.get_contextualized_stim_audio(include_repeated_trials=True)
                 raw_DNN_features = self.get_DNN_obj(
-                    model_name, shuffled=shuffled
+                    model_name, shuffled=shuffled, scale_factor=scale_factor
                     ).extract_features_for_audio(long_audio, total_duration)
             else:
-                raw_DNN_features = self.get_DNN_obj(
-                    model_name, shuffled=shuffled
-                    ).extract_DNN_features()
+                dnn_obj = self.get_DNN_obj(
+                    model_name, shuffled=shuffled, scale_factor=scale_factor
+                    )
+                raw_DNN_features = dnn_obj.extract_DNN_features()
+                if shuffled:
+                    dnn_obj.save_state_dist()
             # cache features for future use...
             write_cached_features(model_name, raw_DNN_features, contextualized=contextualized, shuffled=shuffled)
         return raw_DNN_features
         
     def get_resampled_DNN_features(
             self, model_name, bin_width, force_reload=False, 
-            shuffled=False, mVocs=False, LPF=False
+            shuffled=False, mVocs=False, LPF=False, LPF_analysis_bw=20
         ):
         """
         Retrieves resampled all DNN layer features to specific bin_width
@@ -199,11 +216,11 @@ class DataLoader:
                 else:
                     duration = self.metadata.stim_duration(stim_ID)
                 n = int(np.ceil(round(duration/bin_width_sec, 3)))
+                # int(np.ceil(duration/(bin_width/1000)))
                 if LPF:
-                    LPF_analysis_bw = 10
+                    # LPF_analysis_bw = 10
                     analysis_bw_sec = LPF_analysis_bw/1000
                     n_final = int(np.ceil(round(duration/analysis_bw_sec, 3)))
-                    
 
                 for layer_ID in layer_IDs:
                     if bin_width == 1000:
@@ -211,11 +228,13 @@ class DataLoader:
                         tmp = np.sum(raw_features[layer_ID][stim_ID].numpy(), axis=0)[None, :]
                     else:
                         tmp = signal.resample(raw_features[layer_ID][stim_ID], n, axis=0)
-
                         if LPF:
                             tmp = signal.resample(tmp, n_final, axis=0)
 
                     resampled_features[layer_ID][stim_ID] = tmp
+
+            if LPF:
+                print(f"Resampled ANN features at LPF bin-width: {LPF_analysis_bw}")
             DNN_feature_dict[features_key][bin_width] = resampled_features
         return DNN_feature_dict[features_key][bin_width]
     

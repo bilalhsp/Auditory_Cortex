@@ -2,8 +2,8 @@
 
 # --output=./result_normalizer50.out
 
-#SBATCH	-A standby
-#SBATCH --constraint=F|G|I|K|D|B|H|J 
+#SBATCH	-A jgmakin-n
+#SBATCH --constraint=F|G|I|K|D|B|H|J|N 
 
 # High Mem GPUs: F|G|I|K|D
 # very Fast GPUs: F|K
@@ -13,8 +13,8 @@
 
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=6
-#SBATCH --mem=0
+#SBATCH --ntasks-per-node=4
+# --mem=0
 #SBATCH --time=04:00:00
 
 hostname

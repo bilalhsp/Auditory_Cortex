@@ -1,6 +1,6 @@
-
 saved_checkpoint: librispeech_pretrained_v3.ckpt
 # /depot/jgmakin/data/auditory_cortex/pretrained_weights/deepspeech2/librispeech_pretrained_v3.ckpt
+sampling_rate: 16000  # sampling rate the network was trained on
 use_pca: False
 # shuffle_weights: True
 layers:

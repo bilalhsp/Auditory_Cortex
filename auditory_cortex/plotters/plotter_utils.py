@@ -166,7 +166,7 @@ class PlotterUtils:
 			'height=\\figheight',
 			'axis lines=left',
 			'every x tick label/.append style={rotate=0}',
-			'every axis plot/.append style={mark size=1}',
+			'every axis plot/.append style={mark size=\\marksize}',
 			'xticklabel style={opacity=\\thisXticklabelopacity, align=center}',
 		}
 		tpl_save(
@@ -177,6 +177,7 @@ class PlotterUtils:
 				'\\providecommand{\\figwidth}{5.7in}%',
 				'\\providecommand{\\figheight}{2.0in}%',
 				'\\providecommand{\\thisXticklabelopacity}{1.0}%',
+				'\\providecommand{\\marksize}{2}%',
 			},
 		)
 		print(f"result saved at: {file_path}")

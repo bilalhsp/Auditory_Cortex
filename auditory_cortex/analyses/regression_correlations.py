@@ -206,7 +206,8 @@ class BaseCorrelations(ABC):
 
 # ------------------  Retrieve data for analysis ----------------#
     def get_normalizer_threshold(
-            self, bin_width=20, poisson_normalizer=True, mVocs=False
+            self, bin_width=20, poisson_normalizer=True, mVocs=False,
+            threshold_percentile=None
         ):
         """Retrieves significance threshold, 90th percentile of the NULL distribution
         of normalizer.
@@ -224,43 +225,16 @@ class BaseCorrelations(ABC):
         #     bin_width=bin_width, poisson_normalizer=poisson_normalizer
         #     )
         # if threshold_dict is None or bin_width not in threshold_dict.keys():
+        if threshold_percentile is None:
+            threshold_percentile=90
         if poisson_normalizer:
             null_dist = self.norm_obj.get_normalizer_null_dist_using_poisson(
                 bin_width=bin_width, mVocs=mVocs)
-            threshold = np.percentile(null_dist, 90)    
+            threshold = np.percentile(null_dist, threshold_percentile)    
             # threshold = self.norm_obj.compute_normalizer_threshold_using_poisson(bin_width=bin_width)[0]
         else:
             threshold = self.norm_obj.compute_normalizer_threshold(bin_width=bin_width)[0]
         return threshold
-        #     io.write_normalizer_threshold(
-        #         bin_width=bin_width, poisson_normalizer=poisson_normalizer,
-        #         thresholds=threshold
-        #     )
-        #     return threshold
-        # else:
-        #     return threshold_dict[bin_width]
-
-
-    # def get_normalizer_threshold(self, bin_width=20, poisson_normalizer=True):
-    #     """Retrieves significance threshold from the NULL distribution
-    #     of normalizer.
-    #     """
-    #     threshold_dict = io.read_normalizer_threshold(
-    #         bin_width=bin_width, poisson_normalizer=poisson_normalizer
-    #         )
-    #     if threshold_dict is None or bin_width not in threshold_dict.keys():
-    #         if poisson_normalizer:
-    #             threshold = self.norm_obj.compute_normalizer_threshold_using_poisson(bin_width=bin_width)[0]
-    #         else:
-    #             threshold = self.norm_obj.compute_normalizer_threshold(bin_width=bin_width)[0]
-
-    #         io.write_normalizer_threshold(
-    #             bin_width=bin_width, poisson_normalizer=poisson_normalizer,
-    #             thresholds=threshold
-    #         )
-    #         return threshold
-    #     else:
-    #         return threshold_dict[bin_width]
 
 
 
@@ -1094,7 +1068,7 @@ class Correlations(BaseCorrelations):
 
     def get_selected_data(
                 self, sessions: list=None, bin_width=None, delay=None, threshold=None,
-                N_sents=499, layer=None, channel=None, mVocs=False
+                N_sents=None, layer=None, channel=None, mVocs=False
         ):
         """Retrieves selected data based on provided arguments. 
         If an argument if 'None', no filter is applied on that column.
@@ -1141,6 +1115,7 @@ class Correlations(BaseCorrelations):
                         (select_data['session']==float(session))
                     ])
             select_data = pd.concat(session_data)
+        
         return select_data
 
 
@@ -1590,7 +1565,10 @@ class Correlations(BaseCorrelations):
 
     def get_layer_dist_with_peak_median(
             self, bin_width, neural_area='all', delay=0,
-            normalized=True, poisson_normalizer=True,
+            normalized=True, 
+            mVocs=False,
+            poisson_normalizer=True,
+            threshold_percentile=None,
             norm_bin_width=None, layer_id=None,
         ):
         """Returns the corr distribution, at specific bin width,
@@ -1603,13 +1581,15 @@ class Correlations(BaseCorrelations):
         if norm_bin_width is None:
             norm_bin_width = bin_width
         bw_threshold = self.get_normalizer_threshold(
-                bin_width=norm_bin_width, poisson_normalizer=poisson_normalizer
+                bin_width=norm_bin_width, 
+                mVocs=mVocs,
+                poisson_normalizer=poisson_normalizer,
+                threshold_percentile=threshold_percentile, 
                 )
-
         corr_dict = self.get_corr_all_layers_for_bin_width(
                 neural_area=neural_area, bin_width=bin_width,
                 delay=delay, threshold=bw_threshold,
-                normalized=normalized
+                normalized=normalized, mVocs=mVocs
             )
 
         if layer_id is None:

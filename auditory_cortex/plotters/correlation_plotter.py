@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 # import seaborn as sns
 import matplotlib as mpl
 
+
+import matplotlib.patches as mpatches
+from functools import reduce
+
 # local imports
 from auditory_cortex import results_dir
 from auditory_cortex.analyses import Correlations, STRFCorrelations
@@ -13,6 +17,15 @@ from auditory_cortex.io_utils.io import read_reg_corr, write_reg_corr
 # from auditory_cortex.neural_data import NeuralMetaData
 
 class RegPlotter:
+	num_layers = {
+			'deepspeech2': 7,
+			'speech2text':14,
+			'whisper_tiny': 6,
+			'whisper_base':8 ,
+			'wav2vec2': 21,
+			'wav2letter_modified': 14,
+			'w2v2_generic':21,
+		}
 
 	@staticmethod
 	def session_bar_plot(
@@ -414,6 +427,9 @@ class RegPlotter:
 		xtick_labels = []
 		# lag_ind = f'lag-{lag}'
 		lag_ind = f'lag-cv'
+
+		stim = 'mVocs' if mVocs else 'timit'
+		
 		plt.xlabel(f"   ")
 		# plotting the baseline..
 		model_name = 'STRF'
@@ -447,7 +463,7 @@ class RegPlotter:
 			filepath = os.path.join(
 				results_dir,
 				'tikz_plots',
-				f"Reg-trained-{area}-bw{bin_width}ms-{lag_ind}-{model_name}.tex"
+				f"{model_name}-{stim}-{area}-bw{bin_width}ms-{lag_ind}.tex"
 				)
 			PlotterUtils.save_tikz(filepath)
 
@@ -541,21 +557,12 @@ class RegPlotter:
 		print(f"Plotting trained and shuffled distributions for {model_name}")
 		if untrained_identifiers is None:
 			untrained_identifiers = [
-				'reset_weights0', 'reset_weights1', 'reset_weights2', 'reset_weights3'
+				f'reset_{trained_identifier}',
 				]
 
 		# select appropraite results identifier...
 		if tikz_indicator is None:
 			tikz_indicator = 'reset-avg'
-			# if 'randn' in untrained_identifiers[0]:
-			#         tikz_indicator = 'randn'
-			# elif 'reset' in untrained_identifiers[0]:
-			#         tikz_indicator = 'reset'
-			# elif 'shuffle' in untrained_identifiers[0]:
-			#         tikz_indicator = 'shuffled'
-		
-		# trained_network...
-		# identifier='_bins_corrected_100'
 		corr_obj_trained = Correlations(model_name+'_'+trained_identifier)
 		if threshold is None:
 			threshold = corr_obj_trained.get_normalizer_threshold(
@@ -571,7 +578,7 @@ class RegPlotter:
 
 			)
 		
-		print(f"Number of channels returned: {data_dist_trained[0].shape}")
+		print(f"Number of channels returned: {list(data_dist_trained.values())[0].shape}")
 		
 		# weights shuffled ...
 		# identifier='_weights_shuffled'
@@ -704,8 +711,10 @@ class RegPlotter:
 				ax, architecture_specific_ids, arch_ind_offset, arch_ind_lw
 			)
 		if mVocs:
+			post_script = 'mVocs-'+post_script
 			post_title = ', test: mVocs'
 		else:
+			post_script = 'timit-'+post_script
 			post_title = ', test: timit'
 
 		## formatting the plot...
@@ -733,6 +742,7 @@ class RegPlotter:
 			PlotterUtils.save_tikz(filepath)
 
 		return data_dist_trained, data_dist_shuffled #, baseline_dist
+
 
 
 	@staticmethod
@@ -776,6 +786,8 @@ class RegPlotter:
 			bin_width = 50,
 			area='all',
 			normalized=True,
+			mVocs=False,
+			threshold=None,
 			column=None,
 			alpha=0.2,
 			color=None,
@@ -791,13 +803,13 @@ class RegPlotter:
 		corr_obj = Correlations(
 		model_name=model_name+'_'+identifier,
 		)
-
-		threshold= corr_obj.get_normalizer_threshold(
-			bin_width=bin_width, poisson_normalizer=True,
-			)
+		if threshold is None:
+			threshold= corr_obj.get_normalizer_threshold(
+				bin_width=bin_width, poisson_normalizer=True, mVocs=mVocs
+				)
 		data_dist_trained = corr_obj.get_corr_all_layers_for_bin_width(
 				neural_area=area, bin_width=bin_width,
-				threshold=threshold, normalized=normalized,
+				threshold=threshold, normalized=normalized, mVocs=mVocs,
 				column=column, use_stat_inclusion=use_stat_inclusion,
 				inclusion_p_threshold=inclusion_p_threshold,
 				use_poisson_null=use_poisson_null,
@@ -1027,10 +1039,15 @@ class RegPlotter:
 	def plot_best_layer_at_all_bin_width(model_name, area='all',
 				delay=0, alpha=0.2, save_tikz=True, poisson_normalizer=True,
 				identifier='trained_all_bins', labels=True,
-				normalized=True, normalizer_filename=None,
+				normalized=True,
+				threshold_percentile=None,
+				normalizer_filename=None,
 				display_inter_quartile_range=True,
 				display_dotted_lines=False,
+				indicate_similar_layers=True,
+				indicate_peak_layer=True,
 				norm_bin_width=None,
+				bin_widths=None,
 				layer_id=None,
 				p_threshold = 0.01,
 				offset_y=0.93,
@@ -1049,11 +1066,13 @@ class RegPlotter:
 			)
 		
 		data_dist = {}
-		bin_widths = np.sort(corr_obj.data['bin_width'].unique())
+		if bin_widths is None:
+			bin_widths = np.sort(corr_obj.data['bin_width'].unique())
 		for bin_width in bin_widths:
-			data_dist[bin_width] = corr_obj.get_layer_dist_with_peak_median(
+			sampling_rate = np.log10(1000/bin_width)
+			data_dist[sampling_rate] = corr_obj.get_layer_dist_with_peak_median(
 				bin_width=bin_width, 
-				neural_area=area, delay=delay,
+				neural_area=area, delay=delay, threshold_percentile=threshold_percentile,
 				normalized=normalized, poisson_normalizer=poisson_normalizer,
 				norm_bin_width=norm_bin_width, layer_id=layer_id
 			)
@@ -1064,19 +1083,25 @@ class RegPlotter:
 			display_inter_quartile_range=display_inter_quartile_range,
 			display_dotted_lines=display_dotted_lines,
 			)
-		
+		# label_indices = np.array([0, ])
+		freq_labels = np.array([2,5,10,25,50])
+		label_indices = np.log10(freq_labels)
+		ax.set_xticks(label_indices, freq_labels)
 		RegPlotter.indicate_peak_and_similar_layers(
 			data_dist, p_threshold=p_threshold, offset_y=offset_y,
-			ax=ax)
+			ax=ax, indicate_similar_layers=indicate_similar_layers,
+			indicate_peak_layer=indicate_peak_layer
+			)
 
 		if labels:
 			plt.title(f"Regression: {model_name}, peak_median_layer, area-{area}")
-			plt.xlabel(f"bin width (ms)")
+			# plt.xlabel(f"bin width (ms)")
+			plt.xlabel(f"cut-off freq (Hz)")
 			plt.ylabel(f"$\\rho$")
 			plt.ylim([0.0, 1.0])
 
 		if save_tikz:
-			filepath = os.path.join(results_dir, 'tikz_plots', f"Reg-all-bin-widths-best-layer-local-tuned-{area}-{model_name}.tex")
+			filepath = os.path.join(results_dir, 'tikz_plots', f"Reg-all-bin-widths-best-layer-{area}-{model_name}.tex")
 			PlotterUtils.save_tikz(filepath)
 		return data_dist
 
@@ -1349,6 +1374,8 @@ class RegPlotter:
 
 				if p_value > p_threshold:
 					# means distributions are statistically the same.
+					# add each layer twice in the list, workaround for tikzplotter
+					statistically_same_layers.append(layer)
 					statistically_same_layers.append(layer)
 					
 		statistically_same_layers = np.array(statistically_same_layers)
@@ -1356,7 +1383,11 @@ class RegPlotter:
 		if indicate_similar_layers:
 			ax.scatter(statistically_same_layers, indicator_heights, c='k')
 		if indicate_peak_layer:
-			plt.scatter(peak_median_layer, offset_y, c='r')
+			ax.scatter(
+				[peak_median_layer, peak_median_layer],
+				[offset_y, offset_y],
+				marker='*', c='r'
+				)
 			
 
 	@staticmethod
@@ -1410,4 +1441,226 @@ class RegPlotter:
 			'belt': data_dist_belt
 		}
 		write_reg_corr(model_name, model_results)
+
+
+# ------------  hierarchy: core-other areas ----------------#
+
+	@classmethod
+	def get_dist_prefered_layer(
+		cls,
+		model_name,
+		identifier,
+		bin_width=50,
+		mVocs=False,
+		threshold=None,
+		normalize_layer_ids=False 
+		):
+		"""Returns the distribution of prefered layers for each
+		channel in 'core' and 'non-primary' areas.
+		"""
+		corr_obj = Correlations(model_name+'_'+identifier)
+		if threshold is None:
+			threshold = corr_obj.get_normalizer_threshold(
+				bin_width=bin_width, poisson_normalizer=True,
+				mVocs=mVocs
+		)
 	
+		peak_layer_areas = {}
+		corr_dist_areas = {}
+		neural_areas = ['core', 'non-primary']
+		for area in neural_areas:
+			data_dist_trained = corr_obj.get_corr_all_layers_for_bin_width(
+				neural_area=area, bin_width=bin_width, delay=0,
+				threshold=threshold, normalized=True,
+				column=None, mVocs=mVocs, use_stat_inclusion=False,
+				use_poisson_null=True,
+			)
+			layer_ids = np.arange(len(data_dist_trained.keys()))
+			corr_dist = np.stack(data_dist_trained.values(), axis=0)
+			peak_layer_areas[area] = layer_ids[np.argmax(corr_dist, axis=0)]
+			if normalize_layer_ids:
+				peak_layer_areas[area] = peak_layer_areas[area]/cls.num_layers[model_name]
+			corr_dist_areas[area] = corr_dist
+
+		return peak_layer_areas, corr_dist_areas
+	
+	@classmethod
+	def plot_overlapping_histograms(
+			cls, peak_layers_areawise, model_name=None, ax=None, density=True,
+			fontsize=12, figsize=(8,6), all_models=True,
+			right_label=False
+		):
+		"""Given distribution of peak layers for 'core' and 'non-primary' areas,
+		plot overlapping histograms and kde for each area.
+		"""
+
+		neural_areas = list(peak_layers_areawise.keys())
+		if model_name in cls.num_layers.keys():
+			layer_ids = np.arange(cls.num_layers[model_name])
+			highest_id = max(1, max(layer_ids))
+			bins = np.arange(0, highest_id+1, 1)
+		else:
+			highest_id = 1
+			bins = np.linspace(0, highest_id, 10)
+
+		x_points = np.linspace(0, highest_id, 20)
+		colors = {'core': 'tab:blue', 'non-primary': 'tab:orange'}
+		if ax is None:
+			fig, ax = plt.subplots(figsize=figsize)
+		else:
+			plt.sca(ax)
+		ax1 = ax.twinx()
+		legend_handles = []
+		for area in neural_areas:
+			print(f"Number of channels in {area}: {len(peak_layers_areawise[area])}")
+			layers_dist = peak_layers_areawise[area]
+			ax.hist(
+				layers_dist,
+				bins=bins, 
+				alpha=0.5, 
+				label=area, 
+				density=density,
+				align='left',
+				color=colors[area],
+				)
+			kde = scipy.stats.gaussian_kde(layers_dist, bw_method=0.5)
+			
+			ax1.plot(x_points, kde.pdf(x_points), color=colors[area] ,label=area+'-kde')
+			legend_handles
+			# Manually create legend handles (bar and line)
+			# legend_handles.append(plt.Line2D([0], [0], color=colors[area], lw=8, label=area))
+			legend_handles.append(mpatches.Patch(color=colors[area], label=area))  
+			legend_handles.append(plt.Line2D([0], [0], color=colors[area], lw=2, label=area+'-kde'))
+			
+		# statistical significance test...for core < non-primary
+		_, pvalue = scipy.stats.mannwhitneyu(peak_layers_areawise['core'], peak_layers_areawise['non-primary'], alternative='less')
+		
+		if right_label:
+			ax1.set_ylabel("density")
+		else:
+			ax.set_ylabel("no. neurons")
+		
+		# ax1.set_ylim([0, 400])
+		sig = '***' if pvalue < 0.001 else '**' if pvalue < 0.01 else '*' if pvalue < 0.05 else ''
+		
+		if all_models:
+			ax.set_ylim([0, 400])
+			title = f'{sig}'
+		else:
+			title = f"p-value: {pvalue:.3f}, {sig}"
+
+		plt.title(title, fontsize=fontsize)
+		# plt.legend(handles=legend_handles, loc='best')
+		return ax
+
+	@staticmethod
+	def plot_grouped_bar_medians(
+		trained_dists, untrained_dists, baseline_dist=None, 
+		width=0.35, alpha=0.5, figsize=(8,6),
+		set_xtick_labels=False
+		):
+		"""Given the distribution of correlations corresponding to peak layers,
+		for trained and untrained models, plot the medians of the distributions,
+		as grouped bars for each model.
+		"""
+		# Ensure both dictionaries have the same models (keys)
+		models = list(trained_dists.keys())
+
+		if baseline_dist is not None:
+			models = ['STRF'] + models
+
+		index = np.arange(len(models))
+		fig, ax = plt.subplots(figsize=figsize)
+		# Plot the bars for each model with custom colors
+		for i, model in enumerate(models):
+			color = PlotterUtils.get_model_specific_color(model)
+			if baseline_dist is not None and i==0:
+				ax.bar(
+					index[i]+ width/2, np.median(baseline_dist), #yerr=np.std(baseline_dist)/np.sqrt(len(baseline_dist)), 
+					width=width, label=f'STRF baseline', 
+					color=color, alpha=1
+					)  # Lighter shade for untrained
+			else:	
+				ax.bar(
+					index[i], np.median(untrained_dists[model]), #yerr=np.std(untrained_dists[model])/np.sqrt(len(untrained_dists[model])),
+					width=width, label=f'{model} Untrained', 
+					color=color, alpha=alpha
+					)  
+				ax.bar(
+					index[i] + width, np.median(trained_dists[model]), #yerr=np.std(trained_dists[model])/np.sqrt(len(trained_dists[model])),
+					width=width, label=f'{model} Trained', 
+					color=color, alpha=1
+					)    
+
+
+		# Add labels and title
+		ax.set_xlabel('Models')
+		ax.set_ylabel(f"$\\rho$")
+		ax.set_title('Medians of Untrained and Trained Distributions')
+		
+		if set_xtick_labels:
+			x_tick_labels = models
+			ax.set_xticks(index + width / 2, x_tick_labels, rotation=45, ha="center")
+		else:	
+			ax.set_xticks([])
+		ax.set_ylim([0, 1])
+		
+		return ax
+
+	@staticmethod
+	def plot_grouped_box_and_whisker(
+		trained_dists, untrained_dists, baseline_dist=None,
+		spacing=1, width=0.2, alpha=0.5, figsize=(8,6),
+		set_xtick_labels=False
+		):
+		"""Given the distribution of correlations corresponding to peak layers,
+		for trained and untrained models, plot the box and whisker plots group 
+		for each model.
+		"""
+		# Ensure both dictionaries have the same models (keys)
+		models = list(trained_dists.keys())
+
+		if baseline_dist is not None:
+			models = ['STRF'] + models
+
+		index = np.arange(len(models))*spacing
+		
+		fig, ax = plt.subplots(figsize=figsize)
+
+		for i, model in enumerate(models):
+			color = PlotterUtils.get_model_specific_color(model)
+			if baseline_dist is not None and i==0:
+				ax.boxplot(baseline_dist, positions=[index[i]], widths=width,
+					patch_artist=True, boxprops=dict(facecolor=color, alpha=1),
+					medianprops = dict(color='k', linewidth=2), whis=[5, 95],
+					showfliers=False,
+					)
+
+			else:
+				ax.boxplot(untrained_dists[model], positions=[index[i]-width/2], widths=width,
+						patch_artist=True, boxprops=dict(facecolor=color, alpha=alpha),
+						medianprops = dict(color='k', linewidth=2), whis=[5, 95],
+						showfliers=False,
+						)
+				ax.boxplot(trained_dists[model], positions=[index[i]+width/2], widths=width,
+						patch_artist=True, boxprops=dict(facecolor=color, alpha=1),
+						medianprops = dict(color='k', linewidth=2), whis=[5, 95],
+						showfliers=False,
+						)
+
+
+		# Add labels and title
+		if set_xtick_labels:	
+			x_tick_labels = models
+			ax.set_xticks(index, x_tick_labels, rotation=45, ha="center")
+		else:	
+			ax.set_xticks([])
+		
+		ax.set_xlabel('Models')
+		ax.set_ylabel(f"$\\rho$")
+		ax.set_title('Box and Whisker Plot for Untrained and Trained Distributions')
+		ax.set_ylim([0, 1])
+		ax.set_xlim([index[0]-2*width, index[-1]+2*width])
+		
+		return ax
+		

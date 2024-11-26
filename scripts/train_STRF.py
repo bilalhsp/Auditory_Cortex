@@ -5,12 +5,15 @@ import argparse
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import RidgeCV, ElasticNetCV
+import auditory_cortex.io_utils.io as io
 
 # local
 from auditory_cortex.neural_data import NeuralMetaData
 from auditory_cortex import utils, config, saved_corr_dir
 from auditory_cortex.io_utils.io import write_model_parameters
 from auditory_cortex.computational_models import baseline
+from auditory_cortex.datasets import BaselineDataset, DNNDataset
+from auditory_cortex.computational_models.encoding import TRF
 
 
 
@@ -39,10 +42,30 @@ def compute_and_save_STRF_baseline(args):
     mVocs = args.mVocs
     mel_spectrogram = args.mel_spectrogram
 
+
+    id_details = f'trf_lags{lags[0]}_bw{bin_width}'
     if identifier != '':
-        identifier = identifier + '_'
+        identifier = id_details + '_' + identifier
+    else:
+        identifier = id_details
+
+    if mVocs:
+        identifier = 'mVocs_' + identifier
+    else:
+        identifier = 'timit_' + identifier
+
+    # csv_file_name = 'corr_results.csv'
+    # # if identifier != '':
+    # csv_file_name = identifier + '_' + csv_file_name
+    # if identifier != '':
+    #     identifier = identifier + '_'
+    if mel_spectrogram:
+        identifier = 'mel_' + identifier
+    else:
+        identifier = 'wavlet_' + identifier
+
     
-    csv_file_name = f'STRF_freqs{num_freqs}_{identifier}corr_results.csv'
+    csv_file_name = f'STRF_freqs{num_freqs}_{identifier}_corr_results.csv'
     # if third is None:
     #     csv_file_name = f'STRF_freqs{num_freqs}_corr_results.csv'
     # else:
@@ -71,7 +94,7 @@ def compute_and_save_STRF_baseline(args):
     else:
         subjects = sessions
 
-    strf_model = baseline.STRF(mel_spectrogram=mel_spectrogram)
+    # strf_model = baseline.STRF(mel_spectrogram=mel_spectrogram)
     # subjects = np.array(['200206'])
     for session in subjects:
         if mVocs:
@@ -82,29 +105,31 @@ def compute_and_save_STRF_baseline(args):
         print(f"\n Working with '{session}'")
         # obj = get_reg_obj(data_dir, sub)
 
-        corr, opt_lag, opt_lmbda = strf_model.grid_search_CV(
-            session, bin_width, lags=lags, tmin=tmin,
-            num_workers=num_workers, num_lmbdas=num_alphas, 
-            num_folds=num_folds, use_nonlinearity=use_nonlinearity,
-            test_trial=test_trial, mVocs=mVocs
-        )
+        # corr, opt_lag, opt_lmbda = strf_model.grid_search_CV(
+        #     session, bin_width, lags=lags, tmin=tmin,
+        #     num_workers=num_workers, num_lmbdas=num_alphas, 
+        #     num_folds=num_folds, use_nonlinearity=use_nonlinearity,
+        #     test_trial=test_trial, mVocs=mVocs
+        # )
 
+        dataset = BaselineDataset(
+            session, bin_width, mVocs=mVocs,
+            mel_spectrogram=mel_spectrogram
+            )
+        model_name = 'strf'
+        trf_obj = TRF(model_name, dataset)
+        
+        corr, opt_lag, opt_lmbda, trf_model = trf_obj.grid_search_CV(
+                lags=lags, tmin=tmin,
+                num_workers=num_workers, num_folds=num_folds,
+                use_nonlinearity=use_nonlinearity,
+                test_trial=test_trial
+            )
 
-        # Deprecated
-        # alphas = np.logspace(-2, 5, num_alphas)
-        # estimator = RidgeCV(alphas=alphas, cv=5)
-
-        # strf_model = baseline.STRF(
-        #             session,
-        #             estimator=estimator,
-        #             num_workers=num_workers, 
-        #             num_freqs=num_freqs,
-        #             tmin=tmin,
-        #             tmax=tmax,
-        #             bin_width=bin_width
-        #         )
-
-        # corr = strf_model.fit(third=third)
+        betas = trf_model.coef_
+        io.write_trf_parameters(
+            model_name, session, betas, bin_width=bin_width,
+            )
         if mVocs:
             mVocs_corr = corr
             timit_corr = np.zeros_like(corr)
