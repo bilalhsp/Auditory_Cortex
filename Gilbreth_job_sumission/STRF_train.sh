@@ -2,8 +2,8 @@
 
 # --output=./result_train_STRF50.out
 
-#SBATCH	-A standby
-#SBATCH --constraint=F|G|I|K|D
+#SBATCH	-A jgmakin-n
+#SBATCH --constraint=F|G|I|K|D|B|H|J|N
 #|B|H|J
 #F|G|I|K|D|B|H|J
 
@@ -15,8 +15,8 @@
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=0
+#SBATCH --cpus-per-task=4
+# --mem=0
 #SBATCH --time=4:00:00
 
 hostname

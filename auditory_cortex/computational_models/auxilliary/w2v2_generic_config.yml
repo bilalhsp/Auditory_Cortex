@@ -1,5 +1,6 @@
 use_pca: False
 # shuffle_weights: False
+sampling_rate: 48000  # sampling rate the network was trained on
 layers:
 
 - layer_name: feature_extractor.conv_layers.0.layer_norm   

@@ -1,6 +1,7 @@
+repo_name: facebook/s2t-large-librispeech-asr
+sampling_rate: 16000  # sampling rate the network was trained on
 use_pca: False
 pca_comps: 50
-# shuffle_weights: False
 layers:
 
 - layer_name: model.encoder.conv.conv_layers.0

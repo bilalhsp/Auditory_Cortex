@@ -23,7 +23,8 @@ def save_qualititive_plots(args):
         os.makedirs(figs_dir)
 
     corr_obj = Correlations(model_name=model_name+'_test_all_trials')
-    sessions = corr_obj.get_significant_sessions(bin_width=bin_width, threshold=threshold)
+    # sessions = corr_obj.get_significant_sessions(bin_width=bin_width, threshold=threshold)
+    sessions = ['180731', '200206']
     for session in sessions:
         session = int(session)
         channels = corr_obj.get_good_channels(session, threshold=threshold, bin_width=bin_width)

@@ -1,19 +1,84 @@
-import math
+"""
+TRF Module for Neural Encoding with Time-Delayed Regression Models
+
+This module contains the implementation of a TRF (Temporal Response Function) class for performing 
+neural encoding using time-delayed linear regression models. It includes functionality for 
+cross-validated model fitting, evaluation of model performance, and optimization of hyperparameters 
+such as lag and regularization strength. The module also includes a GPU-accelerated version of 
+the TRF model, built on top of naplib's encoding functionality.
+
+Classes:
+	TRF: 
+		A class for encoding neural responses using time-delayed regression models. It includes 
+		methods for cross-validation, hyperparameter search, and evaluation on test data.
+		
+	GpuTRF:
+		A GPU-accelerated implementation of naplib's TRF model, enabling faster model fitting 
+		and prediction by leveraging the GPU for computations.
+
+Methods in TRF:
+	__init__(model_name, dataset_obj):
+		Initializes the TRF class with a given model name and dataset object.
+		
+	evaluate(trf_model, test_trial=None):
+		Evaluates the trained TRF model on the test set, computing correlation between predicted 
+		and actual neural responses.
+		
+	cross_validated_fit(tmax=50, tmin=0, num_folds=3, num_workers=1, use_nonlinearity=False):
+		Performs cross-validated fitting of the TRF model to optimize the regularization parameter.
+		
+	grid_search_CV(lags=None, tmin=0, num_workers=1, num_folds=3, use_nonlinearity=False, test_trial=None, return_dict=False):
+		Performs a grid search over possible lag values and cross-validation to find the optimal 
+		regularization parameter and lag.
+
+Methods in GpuTRF:
+	__init__(tmin, tmax, sfreq, alpha=1):
+		Initializes the GPU-accelerated TRF model with given time window and regularization parameter.
+		
+	fit(X, y):
+		Fits the TRF model using time-delayed versions of the input features and neural responses.
+		
+	predict(X):
+		Predicts the neural responses for the given input features using the fitted TRF model.
+		
+	score(X, y):
+		Computes the R² score of the model's predictions.
+
+		
+Author: Bilal Ahmed
+Date: 09-16-2024
+Version: 1.0
+License: MIT
+Dependencies:
+	- naplib
+	- numpy (np)
+	- cupy (cp)
+	- sklearn.metrics (r2_score)
+	- auditory_cortex.utils (for computing average test correlation)
+
+Usage:
+	This module is intended for neural encoding tasks, particularly for modeling temporal dynamics 
+	between stimuli and neural responses. The TRF model is suitable for both CPU and GPU computations, 
+	making it flexible for various computational settings.
+"""
+
+
+# import math
 import numpy as np
-from scipy.signal import resample
-
+# from scipy.signal import resample
+from sklearn.metrics import r2_score
+import gc
 import naplib as nl
-from auditory_cortex import config
+# from auditory_cortex import config
 # from auditory_cortex.neural_data import dataset
-from auditory_cortex.dataloader import DataLoader
+# from auditory_cortex.dataloader import DataLoader
 from auditory_cortex import utils
-from sklearn.linear_model import RidgeCV, ElasticNet, Ridge, PoissonRegressor
+import auditory_cortex.io_utils.io as io
+# from sklearn.linear_model import RidgeCV, ElasticNet, Ridge, PoissonRegressor
 import cupy as cp
-from multiprocessing import Pool
-from tqdm.auto import tqdm
-import copy
-
-
+# from multiprocessing import Pool
+# from tqdm.auto import tqdm
+# import copy
 
 
 
@@ -26,10 +91,8 @@ class TRF:
 		"""       
 		self.model_name = model_name
 		self.dataset_obj = dataset_obj
+		print(f"TRF object created for '{model_name}' model.")
 		
-
-
-
 	def evaluate(self, trf_model, test_trial=None):
 		"""Computes correlation on trials of test set for the model provided.
 		
@@ -39,23 +102,45 @@ class TRF:
 			test_trial: int = trial ID to be tested on. Default=None, 
 				in which case, it tests on all the trials [0--10]
 				and returns averaged correlations. 
+			test_fewer_trials: bool = if True, test on randomly 
+				choosen'test_trial' number of fewer trials
+				instead of all 11 trials.
 		Return:
 			ndarray: (num_channels,)   
 		"""
 
-		test_spect_list, all_test_spikes = self.dataset_obj.get_test_data()
+		test_spect_list, all_test_spikes = self.dataset_obj.get_testing_data()
 		predicted_response = trf_model.predict(X=test_spect_list)
 		predicted_response = np.concatenate(predicted_response, axis=0)
-
+		
 		corr = utils.compute_avg_test_corr(
-			all_test_spikes, predicted_response, test_trial)
+			all_test_spikes, predicted_response, test_trial, mVocs=self.dataset_obj.mVocs)
 		return corr
+	
+	def get_mapping_set_ids(self, N_sents=None, mVocs=False):
+		"""Returns a smaller mapping set of given size."""
+		mapping_set = self.dataset_obj.training_sent_ids
+		np.random.shuffle(mapping_set)
+		if N_sents is None or N_sents >= 100:	
+			return mapping_set
+		else:
+			required_duration = N_sents*10
+			print(f"Mapping set for stim duration={required_duration:.2f} sec")
+			stimili_duration=0
+			for n in range(5, len(mapping_set)):
+				stimili_duration += self.dataset_obj.dataloader.get_stim_duration(
+					mapping_set[n], mVocs=mVocs
+					)
+				if stimili_duration >= required_duration:
+					break
+		return mapping_set[:n+1]
 
-	def cross_validted_fit(
+	def cross_validated_fit(
 			self,
 			tmax=50,
 			tmin=0, 
 			num_folds=3,
+			mapping_set=None,
 			num_workers=1,
 			use_nonlinearity=False,
 		):
@@ -74,18 +159,19 @@ class TRF:
 		"""
 		tmin = tmin/1000
 		tmax = tmax/1000
-		sfreq = 1000/self.dataset_obj.bin_width
+		sfreq = 1000/self.dataset_obj.get_bin_width()
 		num_channels = self.dataset_obj.num_channels
 		
 		# Deprecated...
-		mapping_set = self.dataset_obj.training_sent_ids
+		if mapping_set is None:
+			mapping_set = self.dataset_obj.training_sent_ids
+			np.random.shuffle(mapping_set)
 		# mapping_set = self.dataset_obj.get_training_stim_ids()
 		# lmbdas = np.logspace(-12, 7, 20)
 		# lmbdas = np.logspace(-2, 5, 8)
 		# lmbdas = np.logspace(-2, 10, 13)
-		lmbdas = np.logspace(-2, 12, 15)
+		lmbdas = np.logspace(-5, 10, 16)
 		lmbda_score = np.zeros(((len(lmbdas), num_channels)))
-		np.random.shuffle(mapping_set)
 		size_of_chunk = int(len(mapping_set) / num_folds)
 
 		for r in range(num_folds):
@@ -96,29 +182,41 @@ class TRF:
 				val_set = mapping_set[r*size_of_chunk:]
 			train_set = mapping_set[np.isin(mapping_set, val_set, invert=True)]
 
-			train_x, train_y = self.dataset_obj.get_data(stim_ids=train_set)
-			val_x, val_y = self.dataset_obj.get_data(stim_ids=val_set)
+			train_x, train_y = self.dataset_obj.get_training_data(stim_ids=train_set)
+			val_x, val_y = self.dataset_obj.get_training_data(stim_ids=val_set)
 			for i, lmbda in enumerate(lmbdas):
 
-				if use_nonlinearity:
-					estimator = PoissonRegressor(alpha=lmbda)
-				else:
-					estimator = Ridge(alpha=lmbda)
+				# if use_nonlinearity:
+				# 	estimator = PoissonRegressor(alpha=lmbda)
+				# else:
+				# 	estimator = Ridge(alpha=lmbda)
 			
-				trf_model = nl.encoding.TRF(
-						tmin, tmax, sfreq, estimator=estimator,
-						n_jobs=num_workers, show_progress=True
-						)
+				# trf_model = nl.encoding.TRF(
+				# 		tmin, tmax, sfreq, estimator=estimator,
+				# 		n_jobs=num_workers, show_progress=True
+				# 		)
+				trf_model = GpuTRF(
+					tmin, tmax, sfreq, alpha=lmbda,
+					# n_jobs=1, show_progress=True
+					)
 				trf_model.fit(X=train_x, y=train_y)
 
 				# save validation score for lmbda..
 				lmbda_score[i] += trf_model.score(X=val_x, y=val_y)
 
 		lmbda_score /= num_folds
-		avg_lmbda_score = np.mean(lmbda_score, axis=1)
-		max_lmbda_score = np.max(avg_lmbda_score)
-		opt_lmbda = lmbdas[np.argmax(avg_lmbda_score)]
+		# avg_lmbda_score = np.mean(lmbda_score, axis=1)
+		max_lmbda_score = np.max(lmbda_score, axis=0)
+		opt_lmbda = lmbdas[np.argmax(lmbda_score, axis=0)]
+		
+		# make sure to free up memory
+		gc.collect()
 		return max_lmbda_score, opt_lmbda
+	
+		# avg_lmbda_score = np.mean(lmbda_score, axis=1)
+		# max_lmbda_score = np.max(avg_lmbda_score)
+		# opt_lmbda = lmbdas[np.argmax(avg_lmbda_score)]
+		# return max_lmbda_score, opt_lmbda
 
 	def grid_search_CV(
 			self,
@@ -128,6 +226,7 @@ class TRF:
 			num_folds = 3, 
 			use_nonlinearity = False, 
 			test_trial=None,
+			N_sents=None,
 			return_dict=False
 		):
 		"""Fits the linear model (with or without non-linearity) 
@@ -151,324 +250,329 @@ class TRF:
 			optimal_lmbdas: ndarray = (num_channels,) 
 
 		"""
-
 		if lags is None:
 			# lags = [50, 100, 150, 200, 250, 300, 350, 400]
 			lags = [300]
+
+		mapping_set = self.get_mapping_set_ids(N_sents=N_sents, mVocs=self.dataset_obj.mVocs)
 
 		lag_scores = []
 		opt_lmbdas = []
 		for lag in lags:
 
 			print(f"\n Running for max lag={lag} ms")
-			score, opt_lmbda = self.cross_validted_fit(
+			score, opt_lmbda = self.cross_validated_fit(
 				tmax=lag,
 				tmin=tmin, 
 				num_workers=num_workers,
 				num_folds=num_folds,
+				mapping_set=mapping_set,
 				use_nonlinearity=use_nonlinearity
 				)
 			lag_scores.append(score)
 			opt_lmbdas.append(opt_lmbda)
+			
+		# # modifying...
+		# lag_scores = np.array(lag_scores)
+		# opt_lmbdas = np.array(opt_lmbdas)
 
-		max_score_ind = np.argmax(lag_scores)
-		opt_lag = lags[max_score_ind]
+		# max_score_ind = np.argmax(lag_scores)
+		# opt_lag = lags[max_score_ind]
 
-		### for using RidgeCV ####
-		opt_lmbda = opt_lmbdas[max_score_ind]
+		# ### for using RidgeCV ####
+		# opt_lmbda = opt_lmbdas[max_score_ind]
+		opt_lag = lags[0]
+		opt_lmbda = opt_lmbdas[0]
+		
 
 		# get mapping data..
-		mapping_x, mapping_y = self.dataset_obj.get_data()
+		mapping_x, mapping_y = self.dataset_obj.get_data(mapping_set)
 
-		# fit strf using opt lag and lmbda
-		if use_nonlinearity:
-			estimator = PoissonRegressor(alpha=opt_lmbda)
-		else:
-			estimator = Ridge(alpha=opt_lmbda)
-		sfreq = 1000/self.dataset_obj.bin_width
+		# # fit strf using opt lag and lmbda
+		# if use_nonlinearity:
+		# 	estimator = PoissonRegressor(alpha=opt_lmbda)
+		# else:
+		# 	estimator = Ridge(alpha=opt_lmbda)
+		sfreq = 1000/self.dataset_obj.get_bin_width()
 		tmax = opt_lag/1000 # convert seconds to ms
-		trf_model = nl.encoding.TRF(
-				tmin, tmax, sfreq, estimator=estimator,
-				n_jobs=num_workers, show_progress=True
-				)
+
+		# trf_model = nl.encoding.TRF(
+		# 		tmin, tmax, sfreq, estimator=estimator,
+		# 		n_jobs=num_workers, show_progress=True
+		# 		)
+		print(f"Fitting model using optimal lag={opt_lag} ms and optimal lmbda={opt_lmbda}")
+		trf_model = GpuTRF(
+					tmin, tmax, sfreq, alpha=opt_lmbda,
+					# n_jobs=1, show_progress=True
+					)
 		trf_model.fit(X=mapping_x, y=mapping_y)
 
+		print(f"Computing corr for test set...")
 		corr = self.evaluate(trf_model, test_trial)
-		return corr, opt_lag, opt_lmbda
+		return corr, opt_lag, opt_lmbda, trf_model
 	
-class GpuTRF(nl.encoding.TRF):
-	"""GPU accelerated TRF model."""
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
+	def load_saved_model(
+			self, model_name, session, layer_ID, bin_width, shuffled=False,
+			tmax=300, tmin=0, 
+		):
+		"""Loads a saved weights and biases for the TRF model."""
 		
-		self.model = LinearModel(alpha=2)
+		session = int(session)
+		weights = io.read_trf_parameters(
+				model_name, session, bin_width, shuffled,
+				verbose=False, bias=False,
+			)[layer_ID]
+
+		biases = io.read_trf_parameters(
+				model_name, session, bin_width, shuffled,
+				verbose=False, bias=True,
+			)[layer_ID]
+		
+		tmax = tmax/1000
+		sfreq = 1000/bin_width
+		trf_model = GpuTRF(tmin, tmax, sfreq, alpha=0.1)
+		trf_model.coef_ = (weights, biases)
+		return trf_model
+
+	def neural_prediction(self, model_name, session, layer_ID, bin_width, stim_ids,
+				shuffled=False):
+		"""Predicts the neural responses using the trained TRF model."""
+		trf_model = self.load_saved_model(
+			model_name, session, layer_ID, bin_width, shuffled=shuffled
+		)
+		X, _ = self.dataset_obj.get_data(stim_ids)
+		pred = trf_model.predict(X)
+		return pred
+	
+	# @staticmethod
+	# def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
+	# 	"""Computes correlation for each trial and averages across all trials.
+		
+	# 	Args:
+	# 		y_all_trials: (num_trials, num_bins)
+	# 		y_pred: (num_bins,)
+	# 		test_trial: int = integer in range=[0, 11], Default=None.
+	# 			specifies number of trials to be tested on.
+
+	# 	"""
+	# 	trial_corr = []
+	# 	if mVocs:
+	# 		total_trial_repeats = 15
+	# 	else:
+	# 		total_trial_repeats = 11
+	# 	# total_trial_repeats = y_all_trials.shape[0]
+	# 	trial_ids = np.arange(total_trial_repeats)
+	# 	if test_trial is not None:
+	# 		np.random.shuffle(trial_ids)
+	# 		trial_ids = trial_ids[:test_trial]
+	# 	for tr in trial_ids:
+	# 		trial_corr.append(cc_norm(y_all_trials[tr], y_pred))
+	# 	trial_corr = np.stack(trial_corr, axis=0)
+	# 	trial_corr = np.mean(trial_corr, axis=0)
+	# 	return trial_corr
+
+		# if test_trial is None:
+		# 	for tr in range(total_trial_repeats):
+		# 		trial_corr.append(cc_norm(y_all_trials[tr], y_pred))
+		# 	trial_corr = np.stack(trial_corr, axis=0)
+		# 	trial_corr = np.mean(trial_corr, axis=0)
+		# else:
+		# 	trial_corr = cc_norm(y_all_trials[test_trial], y_pred)
+		# return trial_corr
+
+class GpuTRF(nl.encoding.TRF):
+	"""GPU accelerated implementation of TRF model. 
+	Built on top of naplib's TRF model.
+	https://naplib-python.readthedocs.io/en/latest/references/encoding.html#trf 
+	"""
+	def __init__(self, tmin, tmax, sfreq, alpha=0.1):
+		"""
+		Args:
+			tmin: int = start of time window in ms
+			tmax: int = end of time window in ms
+			sfreq: int = sampling frequency (Hz) of the data
+			alpha: float or list = regularization parameter scalar or list of scalars.
+				if list, fit separate model for channel of Y.
+			
+		"""
+		print(f"GpuTRF object created with alpha={alpha}, tmin={tmin}, tmax={tmax}, sfreq={sfreq}")
+		self.alpha = alpha
+		if isinstance(alpha, float):
+			# self.alpha = alpha
+			self.n_alphas = 1
+			self.model = LinearModel(alpha=alpha)
+		elif isinstance(alpha, list) or (isinstance(alpha, np.ndarray) and alpha.ndim == 1):
+			# self.alpha = alpha
+			self.n_alphas = len(alpha)
+			for i in range(self.n_alphas):
+				self.models = [LinearModel(alpha=alp) for alp in alpha]
+			# this is redundant, just to pass the first model to the parent class
+			self.model = self.models[0]
+		else:
+			raise ValueError(f"Invalid alpha value={alpha}")
+		super().__init__(
+			tmin=tmin, tmax=tmax, sfreq=sfreq,
+			estimator=self.model,
+			n_jobs=1, show_progress=True
+			)
 
 	def fit(self, X, y):
-
-		# gpu implementation
-		# concatenate along 2nd last axis (the time axis),
-		X = np.concatenate(X, axis=-2) 	
-		y = np.concatenate(y, axis=0)
-
-		if y.ndim == 1:
-			y = y[:, np.newaxis]
-		#
-		self.ndim_y_ = y.ndim
-		self.X_feats_ = X.shape[-1]
-		self.n_targets_ = y.shape[1]
+		"""Given the input data, fits TRF model. Precisely, for each trial
+		features in X, it's time delayed versions are stacked along features axis,
+		and resultant ndarrays for each trial are concatenated along time axis.
+		concatenates time delayed copies of X and fits the linear model.
+		For example, if shape of trial features is (n_samples, n_features),
+		then the features with time delays will be of shape (n_samples, n_features*n_lags).
+		where n_lags is computed as (tmax-tmin)/sfreq.
+		
+		Args:
+			X: list = list of ndarrays of shape (n_samples, n_features)
+			y: list = list of ndarrays of shape (n_samples, n_targets)
+		"""
+		self.ndim_y_ = y[0].ndim
+		self.X_feats_ = X[0].shape[-1]
+		self.n_targets_ = y[0].shape[1]
 		self.n_models = None
-		# self.y_feats_ = 1
-
-
-		print(self.n_models)
-		print(f"X shape: {X.shape}")
-		print(f"y shape: {y.shape}")
 		
-		# Delay inputs and reshape
-		if X.ndim == 3:
-			# if there is layer axis in X, then we need to delay each layer separately
-			self.n_models = X.shape[0]
-			X_delayed = []
-			for i in range(X.shape[0]):
-				x_tmp, _ = self._delay_and_reshape(X[i])
-				X_delayed.append(x_tmp)
-			X_delayed = np.concatenate(X_delayed, axis=0)
+		X_delayed, y_delayed = [], []
+		for xx, yy in zip(X, y):
+			X_tmp, y_tmp = self._delay_and_reshape(xx, yy)
+			X_delayed.append(X_tmp)
+			y_delayed.append(y_tmp)
+		
+		X_delayed = np.concatenate(X_delayed, axis=0)
+		y_delayed = np.concatenate(y_delayed, axis=0)
+
+		if self.n_alphas == 1:
+			self.model.fit(X_delayed, y_delayed)
 		else:
-			X_delayed, _ = self._delay_and_reshape(X)
-		y_delayed = y
-		
-		print(f"X shape: {X_delayed.shape}")
-		print(f"y shape: {y_delayed.shape}")
-
-		self.model.fit(X_delayed, y_delayed)
-
+			for i in range(self.n_alphas):
+				self.models[i].fit(X_delayed, y_delayed[:,i])
 		return self
 	
 	def predict(self, X):
+		"""Predicts the response for the given input data. Hanldes time
+		delays as explained in fit() method.
+		
+		Args:
+			X: list = list of ndarrays of shape (n_samples, n_features)
+		
+		Return:
+			list = list of ndarrays of shape (n_samples, n_targets)
+		"""
 		if not hasattr(self, 'X_feats_'):
 			raise ValueError(f'Must call .fit() before can call .predict()')
-		
-		X = np.concatenate(X, axis=-2) 	
 
-		# Delay inputs and reshape
-		if X.ndim == 3:
-			# if there is layer axis in X, then we need to delay each layer separately
-			# self.n_models = X.shape[0]
-			X_delayed = []
-			for i in range(X.shape[0]):
-				x_tmp, _ = self._delay_and_reshape(X[i])
-				X_delayed.append(x_tmp)
-			X_delayed = np.concatenate(X_delayed, axis=0)
+		X_delayed = []
+		for xx in X:
+			X_tmp,_ = self._delay_and_reshape(xx)
+			X_delayed.append(X_tmp)
+			
+		if self.n_alphas == 1:
+			y_pred = []
+			for xx in X_delayed:
+				y_pred.append(self.model.predict(xx))
 		else:
-			X_delayed, _ = self._delay_and_reshape(X)
-		
-		y_pred = self.model.predict(X_delayed)
+			y_pred = [[] for _ in range(len(X_delayed))]
+			for xi, xx in enumerate(X_delayed):
+				for i in range(self.n_alphas):
+					y_pred[xi].append(self.models[i].predict(xx))
+					# y_pred.append()
+				y_pred[xi] = np.stack(y_pred[xi], axis=1)
 		return y_pred
 	
 	def score(self, X, y):
-		"""Compute the negative mean squared error of the model on the given data.
+		"""Compute the coefficient of determination (score).
 		"""
-		X = np.concatenate(X, axis=-2) 	
+	
 		y = np.concatenate(y, axis=0)
-
 		if y.ndim == 1:
 			y = y[:, np.newaxis]
 
-		# Delay inputs and reshape
-		if X.ndim == 3:
-			# if there is layer axis in X, then we need to delay each layer separately
-			X_delayed = []
-			for i in range(X.shape[0]):
-				x_tmp, _ = self._delay_and_reshape(X[i])
-				X_delayed.append(x_tmp)
-			X_delayed = np.concatenate(X_delayed, axis=0)
-		else:
-			X_delayed, _ = self._delay_and_reshape(X)
-
-		score = self.model.score(X_delayed, y)
-
+		pred = self.predict(X)
+		pred = np.concatenate(pred, axis=0)
+		score = r2_score(y, pred, multioutput='raw_values')
 		return score
+
+	def normalize(self, X):
+		return (X - np.mean(X, axis=0)[None,...])/np.std(X, axis=0)[None,...]
 	
 	@property
 	def coef_(self):
 		if not hasattr(self, 'ndim_y_'):
 			raise ValueError(f'Must call fit() first before accessing coef_ attribute.')
 		if hasattr(self, 'n_models') and self.n_models is not None:
+			# for fitting multiple layers at the same time, this will almost never happen.
 			return self.model.coef_.reshape(self.n_models, self.X_feats_, self._ndelays, self.n_targets_)
 		else:
-			return self.model.coef_.reshape(self.X_feats_, self._ndelays, self.n_targets_)
+			if self.n_alphas ==1:	
+				weights = self.model.coef_[0].reshape(self.X_feats_, self._ndelays, self.n_targets_)
+				biases = self.model.coef_[1]
+				return weights, biases
+			else:
+				coef = []
+				biases = []
+				for i in range(self.n_alphas):
+					coef.append(self.models[i].coef_[0].reshape(self.X_feats_, self._ndelays))
+					biases.append(self.models[i].coef_[1])
+				return np.stack(coef, axis=-1), np.stack(biases, axis=-1)
+			
+	@coef_.setter
+	def coef_(self, value):
+		"""Sets the coefficients of the linear map and the bias term."""
+		# Expecting value to be a tuple: (weights, bias)
+		weights, bias = value
+		self.model.coef_ = (weights, bias)
+		# these attributes are needed to be able to predict.
+		self.n_alphas = 1
+		self.X_feats_ = weights.shape[0]
+		
+
 		
 
 class LinearModel:
-	"""GPU accelerated linear model."""
+	"""GPU accelerated linear model. Uses cupy for computations on GPU.
+	It implements close form solution for linear regression with L2 regularization.
+	"""
 	def __init__(self, alpha):
 		"""Create linear model with regularization parameter alpha."""
 		self.alpha = alpha
 
 	def fit(self, X, y):
+		"""Fit the linear model using the given data."""
+		X = self.adjust_for_bias(X)
 		X = cp.array(X)
 		y = cp.array(y)
 		self.Beta = utils.reg(X, y, lmbda=self.alpha)
-		# self.model.fit(X, y)
 
 	def predict(self, X):
+		X = self.adjust_for_bias(X)
 		X = cp.array(X)
 		pred = np.matmul(X, self.Beta)
 		return cp.asnumpy(pred)
 	
-	def score(self, X, y):
-		pred = self.predict(X)
-		loss = -1*utils.mse_loss(y, pred)
-		return loss
+	
+	def adjust_for_bias(self, X):
+		"""augment vector of 1's to X, which is the bias term."""
+		return np.concatenate([X, np.ones((X.shape[0], 1))], axis=1)
 	
 	@property
 	def coef_(self):
+		"""Returns the coefficients of the linear map, excluding the bias term."""
 		if not hasattr(self, 'Beta'):
 			raise ValueError("Model has not been fit yet.")
-		return cp.asnumpy(self.Beta)
+		return cp.asnumpy(self.Beta[:-1]), cp.asnumpy(self.Beta[-1])
 	
+	@coef_.setter
+	def coef_(self, value):
+		"""Sets the coefficients of the linear map and the bias term."""
+		# Expecting value to be a tuple: (weights, bias)
+		weights, bias = value
 
+		# Ensure the input values are numpy/cupy arrays and assign them to the appropriate parts of Beta
+		weights = cp.asarray(weights)  # Convert weights to the appropriate format (using cupy here)
+		bias = cp.asarray(bias)  # Convert bias to the appropriate format (using cupy here)
 
-
-
-# # Old implementations
-
-# class STRF:
-#     def __init__(self, session, estimator=None, num_workers=1, num_freqs=80, 
-#             tmin=0, tmax = 0.3, bin_width=20, train_dataset_size=0.8):
-#         """
-#         Args:
-#             num_freqs (int): Number of frequency channels on spectrogram
-#             tmin: receptive field begins at (ms)
-#             tmax: receptive field ends at (ms)
-#             sfreq: sampling frequency of data (Hz)
-
-#             train_dataset_size: [0.0, 1.0]= fraction of total dataset 
-#             to be used as training/val split. Defalt=0.8
-#                 (excluding the test split only)
-#         """
-#         self.model_name = 'strf_model'
-#         session = str(int(session))
-#         self.bin_width = bin_width
-#         data_dir = config['neural_data_dir']
-#         # self.dataset = NeuralData(data_dir, session)
-#         # self.dataset.extract_spikes(bin_width=self.bin_width, delay=0)
-#         # self.fs = self.dataset.fs
-#         self.dataloader = DataLoader()
-#         self.session_spikes = self.dataloader.get_session_spikes(
-#             session=session, bin_width=bin_width, delay=0
-#             )
-#         self.fs = self.dataloader.metadata.get_sampling_rate()
-#         self.num_freqs = num_freqs # num_freqs in the spectrogram
-
-#         if estimator is None:
-#             alphas = np.logspace(-2, 5, 6)
-#             estimator = RidgeCV(alphas=alphas, cv=5)
-
-
-#         # creating a STRF model...
-#         sfreq = 1000/bin_width # 50 (since bin_width is in ms)
-#         self.strf_model = nl.encoding.TRF(
-#             tmin, tmax, sfreq, estimator=estimator,
-#             n_jobs=num_workers, show_progress=True
-#             )
-
-#         # sents = np.arange(1,499)
-#         # self.random_sent_ids = np.random.permutation(sents)
-#         # self.size_training_dataset = int(train_dataset_size*(sents.size))
-#         sent_IDs = self.dataloader.sent_IDs
-#         self.testing_sent_ids = self.dataloader.test_sent_IDs
-#         self.training_sent_ids = sent_IDs[np.isin(sent_IDs, self.testing_sent_ids, invert=True)]
-
-#     def get_sample(self, sent, third=None):
-
-#         # spikes = self.dataset.unroll_spikes([sent], third=third).astype(np.float32)
-#         # aud = self.dataset.audio(sent)
-	
-#         spikes = self.session_spikes[sent]
-#         num_bins = spikes[0]
-#         aud = self.dataloader.metadata.stim_audio(sent)
-#         # Getting the spectrogram at 10 ms and then resample to match the bin_width
-#         spect = nl.features.auditory_spectrogram(aud, self.fs, frame_len=10)
-
-#         if third is not None:
-#             # bin_width = self.bin_width/1000.0
-#             # n = int(np.ceil(round(self.dataset.duration(sent)/bin_width, 3)))
-			
-#             # # store boundaries of sent thirds...
-#             # one_third = int(n/3)
-#             # two_third = int(2*n/3)
-#             # sent_sections = [0, one_third, two_third, n]
-
-#             # spect = resample(spect, n, axis=0)
-#             # # print(spect.shape)
-#             # spect = spect[sent_sections[third-1]: sent_sections[third]]
-#             # print(spect.shape)
-#             ...
-			
-#         else:
-#             spect = resample(spect, num_bins, axis=0)
-#         # read spikes for the sent id, as (time, channel)
-#         # spikes = self.spikes[sent].astype(np.float32)
-
-#         # get spectrogram for the audio inputs, as (time, freq) 
-#         # spect = nl.features.auditory_spectrogram(aud, self.fs)
-#         # resample spect to get same # number of time samples as in spikes..
-#         # spect = resample(spect, spikes.shape[0], axis=0)
-#         # spect = resample(spect, samples, axis=0)
-
-#         # spect has 128 channels at this point, we can reduce the channels 
-#         # for easy training, to match speech2text spectrogram 80 for now...
-#         spect = resample(spect, self.num_freqs, axis=1)
-#         return spect, spikes#np.expand_dims(spikes[:,ch], axis=1)
-
-
-	
-
-		
-
-	
-#     def fit(self, third=None):
-#         """
-
-#         """
-#         # training_sent_ids = self.random_sent_ids[:self.size_training_dataset]
-		
-#         # collecting data after pre-processing...
-#         train_spect_list = []
-#         train_spikes_list = []
-#         for sent in self.training_sent_ids:
-#             spect, spikes = self.get_sample(sent, third=third)
-#             train_spect_list.append(spect)
-#             train_spikes_list.append(spikes)
-		
-#         self.strf_model.fit(X=train_spect_list, y=train_spikes_list)
-#         corr = self.evaluate(third=third)
-#         return corr
-	
-#     def evaluate(self, third=None):
-#         # testing_sent_ids = self.random_sent_ids[self.size_training_dataset:]
-	
-#         # collecting data after pre-processing...
-#         test_spect_list = []
-#         test_spikes_list = []
-#         for sent in self.testing_sent_ids:
-#             spect, spikes = self.get_sample(sent, third=third)
-#             test_spect_list.append(spect)
-#             test_spikes_list.append(spikes)
-		
-#         corr = self.strf_model.corr(X=test_spect_list, y=test_spikes_list)
-#         return corr
-	
-#     def get_coefficients(self):
-#         """Returns the coefficients of the linear map from STRF to 
-#         neural responses.
-		
-#         Returns:
-#             ndarray = strf_model coefficients (num_ch, n_features_X, n_lags)
-#         """
-#         return self.strf_model.coef_
-
-
-
+		# Concatenate the weights and bias to form the new Beta
+		self.Beta = np.concatenate([weights.reshape(-1, weights.shape[-1]), bias[None,:]], axis=0)	
 

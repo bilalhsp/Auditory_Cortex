@@ -7,23 +7,22 @@ import numpy as np
 # select 2d color map to be used
 # CMAP_2D = ColorMap2DZiegler
 
-# candidate model names
-valid_model_names = [
-		'deepspeech2',              # 0
-        'speech2text',              # 1
-		'wav2letter_modified',      # 2
-		'whisper_tiny',             # 3
-        'whisper_base',             # 4
-		'wav2vec2',                 # 5
-        'wav2letter_spect',         # 6
-        'w2v2_audioset',            # 7
-        'MERT',                     # 8
-        'CLAP',                     # 9
-        'w2v2_generic',             # 10
-        'spect2vec',             # 11    
-    ]
+# # candidate model names
+# valid_model_names = [
+# 		'deepspeech2',              # 0
+#         'speech2text',              # 1
+# 		'wav2letter_modified',      # 2
+# 		'whisper_tiny',             # 3
+#         'whisper_base',             # 4
+# 		'wav2vec2',                 # 5
+#         'wav2letter_spect',         # 6
+#         'w2v2_audioset',            # 7
+#         'MERT',                     # 8
+#         'CLAP',                     # 9
+#         'w2v2_generic',             # 10
+#         'spect2vec',             # 11    
+#     ]
 
- 
 
 # get parent directory of directory containing __init__.py file (parent of parent)
 aux_dir = os.path.join(os.path.dirname(__file__), 'computational_models', 'auxilliary')
@@ -33,6 +32,12 @@ aux_dir = os.path.join(os.path.dirname(__file__), 'computational_models', 'auxil
 config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
 with open(os.path.join(config_dir, 'regression_config.yaml'), 'r') as f:
     config = yaml.load(f, yaml.FullLoader)
+
+
+NEURAL_DATASETS = config['neural_datasets']
+DNN_MODELS = config['dnn_models']
+valid_model_names = DNN_MODELS
+
 
 hpc_cluster = config['hpc_cluster']
 neural_data_dir = config['neural_data_dir']
@@ -45,13 +50,12 @@ opt_inputs_dir = os.path.join(results_dir, 'optimal_inputs')
 
 # Used to cache frequently used data (e.g. features, spikes etc.)
 cache_dir = config['cache_dir']
+CACHE_DIR = config['cache_dir']
 normalizers_dir = os.path.join(cache_dir, 'normalizers')
 
-
-
-
-
 bad_sessions = config['bad_sessions']
+
+
 # session ID's per subject and hemisphere
 c_RH_sessions = np.array([190606, 190604, 190726, 190801, 180725, 180720, 180731,
                  180807, 180622, 190703, 190607, 190605, 180728, 180619, 180502])

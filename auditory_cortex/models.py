@@ -113,22 +113,13 @@ class Regression():
 
             layer_feats = all_layer_features[layer_ID]
             if third is None:
-                # [:-1] is used to drop the partial bins at the end of each sequence.
-                # Not using that anymore..
                 if trim !=0:
                     feats[layer_ID] = np.concatenate([layer_feats[stim_id][:-trim] for stim_id in stim_ids], axis=0)
                 else:
                     feats[layer_ID] = np.concatenate([layer_feats[stim_id] for stim_id in stim_ids], axis=0)
-                # feats[j] = np.concatenate([sampled_features[layer_ID][sent] for sent in sents], axis=0)
             else:
                 pass
-                # feats[layer_ID] = np.concatenate([layer_feats[sent][self.sent_sections[sent][third-1]:self.sent_sections[sent][third]] for sent in sents], axis=0)
-            # if self.use_pca:
-            #     if train_pca:
-            #         self.pca[layer_ID] = PCA(n_components=self.pca_comps)
-            #         feats[layer_ID] = self.pca[layer_ID].fit_transform(feats[layer_ID])
-            #     else:
-            #          feats[layer_ID] = self.pca[layer_ID].transform(feats[layer_ID])
+
             if not numpy:
                 feats[layer_ID] = cp.array(feats[layer_ID])
         if not return_dict:

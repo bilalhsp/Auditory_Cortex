@@ -4,12 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 import argparse
+import gc
 
 # local
 from auditory_cortex import saved_corr_dir
 from auditory_cortex import config
 import auditory_cortex.utils as utils
 import auditory_cortex.models as models
+import auditory_cortex.io_utils.io as io
 from auditory_cortex.io_utils.io import write_lmbdas
 from auditory_cortex import valid_model_names
 from auditory_cortex.neural_data import NeuralMetaData
@@ -28,6 +30,8 @@ def compute_and_save_regression(args):
     test_trial = args.test_trial
     identifier = args.identifier
     mVocs = args.mVocs
+    LPF = args.LPF
+    save_param = args.save_param
     # fixed parameters..
     
     tmin=0
@@ -35,15 +39,31 @@ def compute_and_save_regression(args):
     N_sents=500
     num_workers=16
     num_folds=3
+    LPF_analysis_bw = 20
+    # LPF_analysis_bw = 10
     
     lags=[300]
     use_nonlinearity=False
 
-    csv_file_name = 'corr_results.csv'
+    id_details = f'trf_lags{lags[0]}_bw{bin_widths[0]}'
     if identifier != '':
-        csv_file_name = identifier + '_' + csv_file_name
+        identifier = id_details + '_' + identifier
+    else:
+        identifier = id_details
 
-    csv_file_name = model_name + '_' + csv_file_name
+    if mVocs:
+        identifier = 'mVocs_' + identifier
+    else:
+        identifier = 'timit_' + identifier
+
+    csv_file_name = 'corr_results.csv'
+    # if identifier != '':
+    csv_file_name = identifier + '_' + csv_file_name
+
+    if shuffled:
+        csv_file_name = model_name + '_reset_' + csv_file_name
+    else:
+        csv_file_name = model_name + '_' + csv_file_name
     # CSV file to save the results at
     file_exists = False
     file_path = os.path.join(saved_corr_dir, csv_file_name)
@@ -95,17 +115,30 @@ def compute_and_save_regression(args):
             print(f"Working with '{session}'")
 
             dataset = DNNDataset(
-                session, bin_width, model_name, layer_ID, mVocs=mVocs
+                session, bin_width, model_name, layer_ID, mVocs=mVocs,
+                shuffled=shuffled,
+                LPF=LPF, LPF_analysis_bw=LPF_analysis_bw
                 )
             trf_obj = TRF(model_name, dataset)
-
-            corr, opt_lag, opt_lmbda = trf_obj.grid_search_CV(
+            
+            corr, opt_lag, opt_lmbda, trf_model = trf_obj.grid_search_CV(
                     lags=lags, tmin=tmin,
                     num_workers=num_workers, num_folds=num_folds,
                     use_nonlinearity=use_nonlinearity,
                     test_trial=test_trial
                 )
-            
+            weights, biases = trf_model.coef_
+            if save_param:
+                io.write_trf_parameters(
+                    model_name, session, weights, bin_width=bin_width, 
+                    shuffled=shuffled, layer_ID=layer_ID, LPF=LPF, mVocs=mVocs
+                    )
+                io.write_trf_parameters(
+                    model_name, session, biases, bin_width=bin_width, 
+                    shuffled=shuffled, layer_ID=layer_ID, LPF=LPF, mVocs=mVocs,
+                    bias=True
+                    )
+                
             if mVocs:
                 mVocs_corr = corr
                 timit_corr = np.zeros_like(corr)
@@ -131,6 +164,13 @@ def compute_and_save_regression(args):
                 }
 
             df = utils.write_to_disk(corr_dict, file_path, normalizer=None)
+
+            # make sure to delete the objects to free up memory
+            del dataset
+            del trf_obj
+            del weights
+            del biases
+            gc.collect()
 
     END = time.time()
     print(f"Took {(END-START)/60:.2f} min., for bin_widths: '{bin_widths}'.")
@@ -170,8 +210,8 @@ def get_parser():
     )
     parser.add_argument(
         '-i','--identifier', dest='identifier', type= str, action='store',
-        required=True,
-        # default='sampling_rate_opt_neural_delay',
+        # required=True,
+        default='',
         # choices=[],
         help="Specify identifier for saved results."
     )
@@ -183,6 +223,10 @@ def get_parser():
     parser.add_argument(
         '-v','--mVocs', dest='mVocs', action='store_true', default=False,
         help="Specify if spikes for mVocs are to be used."
+    )
+    parser.add_argument(
+        '-L','--LPF', dest='LPF', action='store_true', default=False,
+        help="Specify if features are to be low pass filtered."
     )
     parser.add_argument(
         '-t','--test_trial', dest='test_trial', type= int, action='store',
@@ -201,6 +245,10 @@ def get_parser():
         default=41,
         # choices=[],
         help="Choose sessions ending index to compute results at."
+    )
+    parser.add_argument(
+        '--save_param', dest='save_param', action='store_true', default=False,
+        help="Specify if parameters to be saved."
     )
 
 

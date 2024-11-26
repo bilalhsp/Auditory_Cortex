@@ -7,8 +7,10 @@ import matplotlib.pyplot as plt
 import auditory_cortex.utils as utils
 from auditory_cortex import results_dir
 from auditory_cortex.models import Regression
-from auditory_cortex.analyses import Correlations
+from auditory_cortex.analyses import Correlations, STRFCorrelations
+from auditory_cortex.computational_models.encoding import TRF
 from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.datasets import BaselineDataset, DNNDataset
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
 from auditory_cortex.plotters.coordinates_plotter import CoordinatesPlotter
 from auditory_cortex.plotters.correlation_plotter import RegPlotter
@@ -195,6 +197,7 @@ def peak_layer_core_non_primary_areas(
 		baseline_identifier = f"STRF_freqs80_bw50",
 		plot_baseline=False,
 		untrained_identifiers=None,
+		indicate_similar_layers=False,
 		p_threshold = 0.01,
 		offset_y=0.93,
 		normalized=True,
@@ -231,10 +234,15 @@ def peak_layer_core_non_primary_areas(
 		area_wise_dist[area] = dist_trained
 		print(f"Number of neurons in dist for {area}: {dist_trained[4].size}")
 		RegPlotter.indicate_peak_and_similar_layers(
-			dist_trained, p_threshold=p_threshold, offset_y=offset_y)
-		
+			dist_trained, p_threshold=p_threshold, offset_y=offset_y,
+			indicate_similar_layers=indicate_similar_layers
+			)
+		if mVocs:
+			stim = 'mVocs'
+		else:
+			stim = 'timit'
 		if save_tikz:
-			filepath = os.path.join(results_dir, 'tikz_plots', f"Reg-layerwise-with-peak-identified-{bin_width}ms-{model_name}-{area}.tex")
+			filepath = os.path.join(results_dir, 'tikz_plots', f"Reg-layerwise-with-peak-identified-{stim}-{bin_width}ms-{model_name}-{area}.tex")
 			PlotterUtils.save_tikz(filepath)
 	return area_wise_dist
 
@@ -326,12 +334,14 @@ def plot_best_layer_across_all_bin_widths(
 	identifier = 'trained_all_bins',
 	areas = None,
 	normalized = True, 
+	threshold_percentile=90,
 	save_tikz = True, 
 	alpha = 0.2, 
 	normalizer_filename = None,
 	display_inter_quartile_range=True,
 	display_dotted_lines=False,
 	norm_bin_width=None,
+	bin_widths=None,
 	p_threshold = 0.01,
 	offset_y=0.93,
 	):
@@ -365,11 +375,13 @@ def plot_best_layer_across_all_bin_widths(
 				identifier=identifier,
 				save_tikz=save_tikz,
 				normalized=normalized,
+				threshold_percentile=threshold_percentile,
 				normalizer_filename=normalizer_filename,
 				display_inter_quartile_range=display_inter_quartile_range,
 				display_dotted_lines=display_dotted_lines,
 				norm_bin_width=norm_bin_width,
 				layer_id=layer_id,
+				bin_widths=bin_widths,
 				p_threshold=p_threshold,
 				offset_y=offset_y,
 			)
@@ -522,7 +534,7 @@ def plot_spectrogram_spike_count_pair(
 	"""
 		### best layers of the model..
 	layers = {
-		'wav2vec2': 8,
+		'wav2vec2': 5,
 		'wav2letter_modified': 6,
 		'deepspeech2': 3,
 		'speech2text': 2,
@@ -572,11 +584,20 @@ def plot_spectrogram_spike_count_pair(
 	prediction_colors = {}
 	if model_name not in saved_predictions.keys():
 		layer = layers[model_name]
-		reg_obj = Regression(model_name)
-		saved_predictions[model_name] = reg_obj.neural_prediction(
-			session, bin_width=bin_width, delay=0, sents=sent_ids, layer_IDs=[layer],
-			force_reload=force_reload
-			)
+		
+		# reg_obj = Regression(model_name)
+		# saved_predictions[model_name] = reg_obj.neural_prediction(
+		# 	session, bin_width=bin_width, delay=0, sents=sent_ids, layer_IDs=[layer],
+		# 	force_reload=force_reload
+		# 	)
+		dataset = DNNDataset(
+				session, bin_width, model_name, layer
+				)
+		trf_obj = TRF(model_name, dataset)
+		saved_predictions[model_name] = trf_obj.neural_prediction(
+				model_name, session, layer, bin_width, sent_ids,
+			)[0]
+	
 	if prediction_color is None:
 		prediction_colors[model_name] = PlotterUtils.get_model_specific_color(model_name)
 	else:
@@ -799,6 +820,7 @@ def plot_layerwise_correlations_at_num_units_and_rfs(
 		rfs :list = None,
 		num_units :list = None,
 		area='all',
+		base_identifier='timit_trf_lags300_bw50',
 		normalized=True,
 		column=None,
 		alpha=0.2,
@@ -806,8 +828,6 @@ def plot_layerwise_correlations_at_num_units_and_rfs(
 		display_inter_quartile_range=True,
 		display_dotted_lines=False,
 		save_tikz=True,
-		
-
 		use_stat_inclusion=False,
 		inclusion_p_threshold=0.05,
 		use_poisson_null=True,
@@ -827,7 +847,7 @@ def plot_layerwise_correlations_at_num_units_and_rfs(
 
 	for rf in rfs:
 		for units in num_units:
-			identifier = f'units{units}_rf{rf}'
+			identifier = base_identifier+f'_units{units}_rf{rf}'
 			dist, ax = RegPlotter.plot_all_layers_at_bin_width(
 				model_name=model_name, identifier=identifier,
 				color=color,
@@ -850,4 +870,263 @@ def plot_layerwise_correlations_at_num_units_and_rfs(
 					f"{model_name}-bw{bin_width}ms-rf{rf}-units{units}.tex",
 				)
 				PlotterUtils.save_tikz(filepath)
+
+
+
+
+# ------------------  Fig: Area wise hierarchy ----------------#
+
+# ------------------  Fig: Area wise hierarchy ----------------#
+def plot_peak_layer_scatter_plots(
+	model_names,
+	identifier,
+	bin_width=50,
+	mVocs = False,
+	threshold=None,
+	density=False,
+	save_tikz=False,
+	fontsize=20,
+	figsize=(2.5,2),
+	):
+	"""Scatter plots for peak layers for all models in core vs non-primary"""
+	peak_layers_core = []
+	peak_layers_np = []
+	colors = []
+	x_err = []
+	y_err = []
+	fig, ax = plt.subplots(figsize=figsize)
+	for model_name in model_names:
+		peak_layers, corr_dist = RegPlotter.get_dist_prefered_layer(
+			model_name,
+			identifier,
+			bin_width=bin_width,
+			mVocs=mVocs,
+			threshold=threshold,
+			normalize_layer_ids=True,
+			)
+		peak_layers_core.append(np.median(peak_layers['core']))
+		peak_layers_np.append(np.median(peak_layers['non-primary']))
+		colors.append(PlotterUtils.get_model_specific_color(model_name))
+		x_err.append(np.std(peak_layers['core']))
+		y_err.append(np.std(peak_layers['non-primary']))
+		print(f"model_name: {model_name}, core: {peak_layers_core[-1]}, non-primary: {peak_layers_np[-1]}")
+		# ax.scatter(peak_layers_core[-1], peak_layers_np[-1], color=colors[-1])
+
+	ax.scatter(peak_layers_core, peak_layers_np, facecolors=colors)
+	# ax.errorbar(peak_layers_core, peak_layers_np, xerr=x_err, yerr=y_err, fmt='o', color='k')
+	ax.set_xlim([0,1])
+	ax.set_ylim([0,1])
+	ax.plot([0, 1], [0, 1], color='k', linestyle='--')
+	ax.set_xlabel("Core")
+	ax.set_ylabel("Non-primary")
+	if mVocs:
+		title = 'mVocs'
+	else:
+		title = 'timit'
+	ax.set_title(title)
+		# RegPlotter.plot_overlapping_histograms(
+		# 	peak_layers, model_name, ax=None, density=False, figsize=figsize, fontsize=fontsize,
+		# 	all_models=False
+		# 	)
+		# if save_tikz:
+		# 	if mVocs:
+		# 		stim='mVocs'
+		# 	else:
+		# 		stim='timit'
+		# 	filepath = os.path.join(
+		# 		results_dir,
+		# 		'tikz_plots',
+		# 		f"peak-layer-histogram-{stim}-{bin_width}ms-{model_name}.png" 
+		# 		# f"peak-layer-histogram-{stim}-{bin_width}ms-{model_name}.tex"
+		# 		)
+		# 	# PlotterUtils.save_tikz(filepath)
+		# 	plt.savefig(filepath, bbox_inches='tight')
+		# 	print(f"Saved: {filepath}")
+
+
+
+def plot_peak_layer_histograms(
+	model_names,
+	identifier,
+	bin_width=50,
+	mVocs = False,
+	threshold=None,
+	density=False,
+	save_tikz=False,
+	fontsize=20,
+	figsize=(2.5,2),
+	):
+	for model_name in model_names:
+		peak_layers, corr_dist = RegPlotter.get_dist_prefered_layer(
+			model_name,
+			identifier,
+			bin_width=bin_width,
+			mVocs=mVocs,
+			threshold=threshold,
+			normalize_layer_ids=False,
+			)
+		RegPlotter.plot_overlapping_histograms(
+			peak_layers, model_name, ax=None, density=False, figsize=figsize, fontsize=fontsize,
+			all_models=False
+			)
+		if save_tikz:
+			if mVocs:
+				stim='mVocs'
+			else:
+				stim='timit'
+			filepath = os.path.join(
+				results_dir,
+				'tikz_plots',
+				f"peak-layer-histogram-{stim}-{bin_width}ms-{model_name}.png" 
+				# f"peak-layer-histogram-{stim}-{bin_width}ms-{model_name}.tex"
+				)
+			# PlotterUtils.save_tikz(filepath)
+			plt.savefig(filepath, bbox_inches='tight')
+			print(f"Saved: {filepath}")
+			
+
+def plot_peak_layer_histograms_all_models(
+			model_names,
+			identifier,
+			bin_width=50,
+			mVocs=False,
+			threshold=None,
+			save_tikz=False,
+			fontsize=12,
+			figsize=(8, 6),
+			normalize_layer_ids=True
+		):
+	"""Plots histogram of peak layers for all models"""
+	dist_core = []
+	dist_non_primary = []
+	normalize_layer_ids=True
+	for i, model_name in enumerate(model_names):
+		peak_layers, corr_dist = RegPlotter.get_dist_prefered_layer(
+				model_name,
+				identifier,
+				bin_width=bin_width,
+				mVocs=mVocs,
+				threshold=threshold,
+				normalize_layer_ids=normalize_layer_ids,
+				)
+		dist_core.extend(peak_layers['core'])
+		dist_non_primary.extend(peak_layers['non-primary'])
+		
+	number_of_channels = [len(dist_core), len(dist_non_primary)]
+	peak_layers = {'core': dist_core, 'non-primary': dist_non_primary}
+	
+	if mVocs:
+		right_label = True
+	else:
+		right_label = False
+	
+	ax = RegPlotter.plot_overlapping_histograms(
+		peak_layers, 'all_models', ax=None, density=False, figsize=figsize, fontsize=fontsize,
+		right_label=right_label
+		)
+	# statistical significance test...for core < non-primary
+	# _, pvalue = scipy.stats.mannwhitneyu(dist_core, dist_non_primary, alternative='less')
+	
+	# sig = '***' if pvalue < 0.001 else '**' if pvalue < 0.01 else '*' if pvalue < 0.05 else ''
+	# title = f'p-value: {pvalue:.3f}, {sig}'
+	# ax.set_title(title)
+	if save_tikz:
+		if mVocs:
+			stim='mVocs'
+		else:
+			stim='timit'
+		filepath = os.path.join(
+			results_dir,
+			'tikz_plots',
+			f"peak-layer-histogram-{stim}-{bin_width}ms-all-models.png" 
+			# f"peak-layer-histogram-{stim}-{bin_width}ms-{model_name}.tex"
+			)
+		# PlotterUtils.save_tikz(filepath)
+		plt.savefig(filepath, bbox_inches='tight')
+		print(f"Saved: {filepath}")
+			
+	
+	# plt.suptitle(f"Threshold: {threshold}, number of channels: {number_of_channels}")
+
+
+
+def plot_correlations_summary(
+	model_names,
+	identifier,
+	bin_width=50,
+	area = 'all',
+	mVocs=False,
+	save_tikz=False,
+	threshold_percentile=None,
+	normalized = True,
+	width = 0.3,
+	alpha=0.4,
+	set_xtick_labels=False,
+	figsize=(5,4),
+	bar_plot=True
+	):
+	"""Plots bar graphs for peak layer correlations for all models
+	(both trained and untrained) and STRF baseline as well.
+	"""
+	trained_dists = {}
+	untrained_dists = {}
+
+	for model_name in model_names:
+		for iden in [identifier, 'reset_'+identifier]:
+			corr_obj = Correlations(model_name+'_'+iden)
+			data_dist = corr_obj.get_layer_dist_with_peak_median(
+							bin_width=bin_width, 
+							neural_area=area, 
+							mVocs=mVocs,
+							delay=0, threshold_percentile=threshold_percentile,
+							normalized=normalized, poisson_normalizer=True, 
+							norm_bin_width=None, layer_id=None
+						)
+			if 'reset' in iden:
+				untrained_dists[model_name] = data_dist
+			else:
+				trained_dists[model_name] = data_dist
+	# get baseline dist
+	if mVocs:
+		baseline_identifier = f"STRF_freqs80_wavlet_{identifier}"
+	else:
+		baseline_identifier = f"STRF_freqs80_mel_{identifier}"
+	strf_obj = STRFCorrelations(baseline_identifier)
+	threshold= strf_obj.get_normalizer_threshold(
+		bin_width=bin_width, poisson_normalizer=True, mVocs=mVocs,
+	)
+
+	baseline_dist = strf_obj.get_correlations_for_bin_width( #get_corr_for_area
+				neural_area=area, bin_width=bin_width, delay=0,
+				threshold=threshold, normalized=normalized, mVocs=mVocs,
+				lag=None, use_stat_inclusion=False
+			)
+
+	if bar_plot:
+		# plot the bar plot
+		RegPlotter.plot_grouped_bar_medians(
+			trained_dists, untrained_dists, baseline_dist,
+			width=width, alpha=alpha, figsize=figsize,
+			set_xtick_labels=set_xtick_labels
+			)
+		summary = 'summary-bar'
+	else:	
+		RegPlotter.plot_grouped_box_and_whisker(
+			trained_dists, untrained_dists, baseline_dist,
+			spacing=1, width=width, alpha=alpha, figsize=figsize, 
+			set_xtick_labels=set_xtick_labels
+			)
+		summary = 'summary-box'
+		
+	if save_tikz:
+		if mVocs:
+			stim='mVocs'
+		else:
+			stim='timit'
+		filepath = os.path.join(
+			results_dir,
+			'tikz_plots',
+			f"correlations-{summary}-{stim}-{bin_width}ms-all-models.tex" 
+			)
+		PlotterUtils.save_tikz(filepath)
 

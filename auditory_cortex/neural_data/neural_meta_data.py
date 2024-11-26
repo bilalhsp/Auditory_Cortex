@@ -6,9 +6,12 @@ import fnmatch
 import pickle
 import wave
 
-from auditory_cortex import neural_data_dir, config
+from auditory_cortex import neural_data_dir, config, NEURAL_DATASETS
 # from auditory_cortex.neural_data.config import RecordingConfig
 from auditory_cortex.neural_data import recording_config
+
+DATASET_NAME = NEURAL_DATASETS[0]
+DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)
 
 class NeuralMetaData:
     def __init__(self, cfg: recording_config.RecordingConfig = None) -> None:
@@ -24,7 +27,7 @@ class NeuralMetaData:
 
         # loading stimuli metadata details...
         mat_file = 'out_sentence_details_timit_all_loudness.mat'
-        self.sentences = io.loadmat(os.path.join(neural_data_dir, mat_file), struct_as_record = False, squeeze_me = True, )
+        self.sentences = io.loadmat(os.path.join(DATA_DIR, mat_file), struct_as_record = False, squeeze_me = True, )
         self.features = self.sentences['features']
         self.phn_names = self.sentences['phnnames']
         self.sentdet = self.sentences['sentdet']
@@ -36,6 +39,7 @@ class NeuralMetaData:
         self.mVocAud, self.mVocDur, self.mVocRate = NeuralMetaData.read_mVoc_stim_details()
         self.mVocTrialIds = np.array(list(self.mVocAud.keys()))
         self.mVoc_silence_dur = 0.0 # seconds
+        self.mVocs_all_stim_ids = list(self.mVocId_to_trialId.keys())
 
 
 
@@ -79,6 +83,11 @@ class NeuralMetaData:
         #bef = self.sentdet[sent].befaft[0]
         #aft = self.sentdet[sent].befaft[1]
         duration = self.sentdet[sent].duration - (bef + aft)
+        # duration = (self.sentdet[sent].sound).shape[0]/16000 - (bef + aft)
+        #### following calculation is wrong, based on very tight durations completely eliminating 
+        #### the silence at the beginning and end of the sentence.
+        #### This was done to compare to Jeff Johnson's data, where the silence was clipped off.
+        # duration = self.sentdet[sent].soundOns[1] - self.sentdet[sent].soundOns[0] #- (bef + aft)
         return duration
     
     def stim_samples(self, sent, bin_width=20):
@@ -101,6 +110,28 @@ class NeuralMetaData:
                 duration += self.stim_duration(sent)
         return duration
 
+    def get_total_stimuli_duration(self, stim_ids=None, mVocs=False):
+        """Returns the total duration of the unique stimuli in seconds.
+        
+        Args:
+            stim_ids: list = list of stimulus IDs, default=None.
+                if stim_ids is None, then all the stimuli are considered,
+                including the test set..
+        """
+        duration = 0
+        if mVocs:
+            if stim_ids is None:
+                stim_ids = self.mVocs_all_stim_ids
+            for stim_id in stim_ids:
+                tr_id = self.get_mVoc_tr_id(stim_id)[0]
+                duration += self.get_mVoc_dur(tr_id)
+        else:
+            if stim_ids is None:
+                stim_ids = self.sent_IDs
+
+            for sent in stim_ids:
+                duration += self.stim_duration(sent)
+        return duration
 
     def audio_phoneme_data(self):
         audio = {}
@@ -239,7 +270,7 @@ class NeuralMetaData:
         # for s in bad_sessions:
         #     sessions = np.delete(sessions, np.where(sessions == s))
         # Ex
-        all_sessions = get_subdirectories(neural_data_dir)
+        all_sessions = get_subdirectories(DATA_DIR)
         sessions = all_sessions[np.isin(all_sessions, bad_sessions, invert=True)]
         sessions = np.sort(sessions.astype(str))
         return sessions
@@ -248,7 +279,7 @@ class NeuralMetaData:
     def get_num_channels(self, session):
         """Returns the number of channels in a session."""
         session = str(int(float(session)))
-        session_dir = os.path.join(neural_data_dir, session)
+        session_dir = os.path.join(DATA_DIR, session)
         channel_filenames = np.array(os.listdir(session_dir)) 
         valid_channels = fnmatch.filter(channel_filenames,'*Ch*MUspk.mat')
         return len(valid_channels)
@@ -261,7 +292,7 @@ class NeuralMetaData:
         and dictionary that gives trial Ids for stim IDs.
         """
         mat_file = 'SqMoPhys_MVOCStimcodes.mat'
-        sqm_data = io.loadmat(os.path.join(neural_data_dir, mat_file), struct_as_record = False, squeeze_me = True, )
+        sqm_data = io.loadmat(os.path.join(DATA_DIR, mat_file), struct_as_record = False, squeeze_me = True, )
 
         mVocId_to_trialId = {}
         mVocStimCodes = np.unique(sqm_data['mVocsStimCodes'])
@@ -320,7 +351,7 @@ class NeuralMetaData:
         """
         # read wav file..
         file_name = 'MonkVocs_15Blocks.wav'
-        file_path = os.path.join(neural_data_dir, file_name)
+        file_path = os.path.join(DATA_DIR, file_name)
         audio_data, sampling_rate = read_wav_file(file_path)
         num_frames = audio_data.shape[0]
         # get pulse start samples
@@ -352,7 +383,7 @@ class NeuralMetaData:
     def write_mVoc_stim_details(new_sampling_rate=16000):
         """Extract mVoc stim details and write to disk."""
         filename = 'mVoc_stim_details.pkl'
-        mVoc_filepath = os.path.join(neural_data_dir, filename)
+        mVoc_filepath = os.path.join(DATA_DIR, filename)
         mVoc_wavforms, mVoc_durations, sampling_rate = NeuralMetaData.extract_mVoc_stimuli_info()
         # resample, clip silence, normalize
         mVoc_wavforms, mVoc_durations, sampling_rate = NeuralMetaData.pre_process_mVocs(
@@ -374,7 +405,7 @@ class NeuralMetaData:
     def read_mVoc_stim_details():
         """Extract mVoc stim details and write to disk."""
         filename = 'mVoc_stim_details.pkl'
-        mVoc_filepath = os.path.join(neural_data_dir, filename)
+        mVoc_filepath = os.path.join(DATA_DIR, filename)
 
         if os.path.exists(mVoc_filepath):
             with open(mVoc_filepath, 'rb') as F:

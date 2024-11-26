@@ -2,6 +2,7 @@ use_pca: False
 # shuffle_weights: False
 layers:
 
+# wav2vec2.feature_extractor.conv_layers.0.conv
 - layer_name: wav2vec2.feature_extractor.conv_layers.0.layer_norm   
   layer_id: 0
   layer_type: conv
