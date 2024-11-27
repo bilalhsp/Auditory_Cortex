@@ -79,30 +79,32 @@ class NormalizerCalculator:
 	###       Computing the distribution of Normalizers (repeated trials)          ###
 	### -------------------------------------------------------------------------- ###
 
-	def save_bootstrapped_normalizer(self, iterations=None, bin_width=50, n=1000, mVocs=False):
-		
+	def save_bootstrapped_normalizer(self, percent_durations, iterations=None, bin_width=50, n=1000, mVocs=False):
+		"""
+		"""
 		session = int(self.dataset.session_id)
-		# dataset = self._get_dataset_obj(session)
-
-		stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=False)
+		
+		stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
 		stim_ids = list(stim_wise_repeated_spikes.keys())
 		num_repeates = stim_wise_repeated_spikes[stim_ids[0]].shape[0]
 			
 		if iterations is None:
 			iterations = [1]
-		percent_durations = [25, 50, 75, 100]
-		num_trials_list = np.arange(3, num_repeates+1)
+		# percent_durations = [11, 22, 33, 44, 55, 66, 77, 88, 100]
+		num_trials_list = np.arange(2, num_repeates+1)
 		for itr in iterations:
 			for percent_dur in percent_durations:
 				for num_trials in num_trials_list:
-					stim_ids = self.get_test_set_ids(percent_dur)
+					stim_ids = self.get_test_set_ids(percent_dur, mVocs=mVocs)
 
 					normalizer_all = self.inter_trial_corr_for_bootstrap_analysis(
-						stim_wise_repeated_spikes, stim_ids, n=n, num_trials=num_trials)
+						stim_wise_repeated_spikes, stim_ids, n=n, num_trials=num_trials
+						)
 
 					normalizer_all = np.delete(normalizer_all, np.where(np.isnan(normalizer_all))[0], axis=0)
 					io.write_bootstrap_normalizer_dist(
-						normalizer_all, session, itr, percent_dur, num_trials, bin_width
+						normalizer_all, session, itr, percent_dur, num_trials, bin_width,
+						dataset_name=self.dataset.dataset_name, mVocs=mVocs
 					)
 
 
@@ -861,19 +863,20 @@ class NormalizerCalculator:
 	
 	@staticmethod
 	def inter_trial_corr_for_bootstrap_analysis(
-		sent_wise_repeated_spikes, stim_ids=None, n=10000, mVocs=False, num_trials=3, 
+		sent_wise_repeated_spikes, stim_ids=None, n=10000, num_trials=3, 
 		):
 
 		if stim_ids is None:
 			stim_ids = list(sent_wise_repeated_spikes.keys())
-		num_channels = next(iter(sent_wise_repeated_spikes.values())).shape[-1]
+		# num_channels = next(iter(sent_wise_repeated_spikes.values())).shape[-1]
+		max_num_trials, _, num_channels = sent_wise_repeated_spikes[stim_ids[0]].shape
 		trials_corr = np.zeros((n, num_channels))
-		if mVocs:
-			max_num_trials = 15
+		# if mVocs:
+		# 	max_num_trials = 15
 			
-		else:
-			max_num_trials = 11
-		assert num_trials <= max_num_trials and num_trials > 2, "num_trials must be between 2 and {}".format(max_num_trials)
+		# else:
+		# 	max_num_trials = 11
+		assert num_trials <= max_num_trials and num_trials >= 2, "num_trials must be between 1 and {}".format(max_num_trials)
 		trial_ids = np.arange(max_num_trials)
 		trial_ids = np.random.choice(trial_ids, size=num_trials, replace=False)
 

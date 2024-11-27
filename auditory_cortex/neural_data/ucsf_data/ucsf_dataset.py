@@ -23,7 +23,7 @@ class UCSFDataset(BaseDataset):
 	'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
 	"""
 	def __init__(self, sub=200206, data_dir=None, mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
-		logger.info(f"NeuralData:  Creating object for session: {sub} ... ", end='')
+		logger.info(f"NeuralData:  Creating object for session: {sub} ... ")
 		self.sub = str(int(sub))
 		self.dataset_name = DATASET_NAME
 		if data_dir is None:
