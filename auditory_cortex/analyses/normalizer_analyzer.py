@@ -67,5 +67,42 @@ class NormalizerAnalyzer:
 			raise ValueError(f"Null distribution not found for bw-{bin_width}, mVocs={mVocs}")
 		return null_dist_poisson
 	
+	def get_normalizer_bootstrap_distributions(
+		self, session, iterations:list, percent_durs:list, num_trials: list,
+		bin_width=50, dataset_name='ucsf', mVocs=False
+		):
+		"""Retrieves distributions of normalizer for bootstrap analysis,
+		for the specified session.
+
+		Args:
+			session: str = session id
+			iterations: list = iteration ids of bootstrap analysis
+			percent_durs: list = list of percent durations
+			num_trials: list = list of number of trials for each percent duration
+			bin_width: int = bin width in ms
+			dataset_name: str = Name of the dataset
+			mVocs: bool = If True, 
+
+		Returns:
+			dict of dict: {num_trials: {percent_dur: np.array(num_ch, num_samples)}}
+		"""
+		# std_devs = np.zeros((len(num_trials), len(percent_durs)))
+		std_devs = {}
+		for i, num_tr in enumerate(num_trials):
+			std_devs_dur = {}
+			for j, pd in enumerate(percent_durs):
+				dist_all_itr = []
+				for itr in iterations:
+	
+					bootstrap_dist = io.read_bootstrap_normalizer_dist(
+						session, itr, pd, num_tr, bin_width, dataset_name=dataset_name, mVocs=mVocs
+					)
+					dist_all_itr.append(np.median(bootstrap_dist, axis=0))				
+				std_devs_dur[pd] = np.array(dist_all_itr).transpose() #	np.std(dist_all_itr, axis=0)
+			std_devs[num_tr] = std_devs_dur
+		return std_devs
+
+	
+	
 
 

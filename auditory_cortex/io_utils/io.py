@@ -5,9 +5,11 @@ import pickle
 from auditory_cortex import opt_inputs_dir, results_dir, cache_dir, normalizers_dir
 from auditory_cortex import valid_model_names
 
+import logging
+logger = logging.getLogger(__name__)
 
 def read_bootstrap_normalizer_dist(
-        session, itr, percent_dur, num_trial, bin_width, dataset_name='ucsf'
+        session, itr, percent_dur, num_trial, bin_width, dataset_name='ucsf', mVocs=False
         ):
     """Reads distribution of medians for standard error of mean using
      bootstrap method.
@@ -20,20 +22,23 @@ def read_bootstrap_normalizer_dist(
     path_dir = os.path.join(cache_dir, 'bootstrap', 'normalizer')
     if dataset_name != 'ucsf':
         path_dir = os.path.join(path_dir, dataset_name)
+    if mVocs:
+        path_dir = os.path.join(path_dir, 'mVocs')
     filename = f'norm_bootstrap_dist_session_{session}_{bin_width}ms_dur_{percent_dur}_trials_{num_trial}_itr_{itr}.pkl'   
     file_path = os.path.join(path_dir, filename)
 
     if os.path.exists(file_path):
-        print(f"Reading from file: {file_path}")
+        logger.info(f"Reading from file: {file_path}")
+        logger.info
         with open(file_path, 'rb') as F: 
             reg_results = pickle.load(F)
         return reg_results
     else:
-        print(f"Results not found.")
+        logger.info(f"Results not found.")
         return None
 
 def write_bootstrap_normalizer_dist(
-        normalizer_dist, session, itr, percent_dur, num_trial, bin_width, dataset_name='ucsf'
+        normalizer_dist, session, itr, percent_dur, num_trial, bin_width, dataset_name='ucsf', mVocs=False
         ):
     """Reads distribution of medians for standard error of mean using
      bootstrap method.
@@ -46,17 +51,19 @@ def write_bootstrap_normalizer_dist(
     path_dir = os.path.join(cache_dir, 'bootstrap', 'normalizer')
     if dataset_name != 'ucsf':
         path_dir = os.path.join(path_dir, dataset_name)
+    if mVocs:
+        path_dir = os.path.join(path_dir, 'mVocs')
     filename = f'norm_bootstrap_dist_session_{session}_{bin_width}ms_dur_{percent_dur}_trials_{num_trial}_itr_{itr}.pkl'   
     file_path = os.path.join(path_dir, filename)
 
     if not os.path.exists(path_dir):
         os.makedirs(path_dir)
-        print(f"Directory path created: {path_dir}")
+        logger.info(f"Directory path created: {path_dir}")
     
 
     with open(file_path, 'wb') as F: 
         pickle.dump(normalizer_dist, F)
-    print(f"Normalizer dist at path: \n {file_path}.")
+    logger.info(f"Normalizer dist at path: \n {file_path}.")
 
 #-----------      cache bootstrap median dist    -----------
 
@@ -84,12 +91,12 @@ def read_bootstrap_median_dist(
     
     if os.path.exists(file_path):
         if verbose:
-            print(f"Reading from file: {file_path}")
+            logger.info(f"Reading from file: {file_path}")
         with open(file_path, 'rb') as F: 
             reg_results = pickle.load(F)
         return reg_results
     else:
-        print(f"Results not found.")
+        logger.info(f"Results not found.")
         return None
     
 def write_bootstrap_median_dist(
@@ -113,12 +120,12 @@ def write_bootstrap_median_dist(
 
     if not os.path.exists(path_dir):
         os.makedirs(path_dir)
-        print(f"Directory path created: {path_dir}")
+        logger.info(f"Directory path created: {path_dir}")
     
 
     with open(file_path, 'wb') as F: 
         pickle.dump(median_dist, F)
-    print(f"trf parameters saved for {model_name} at path: \n {file_path}.")
+    logger.info(f"trf parameters saved for {model_name} at path: \n {file_path}.")
     
 
 
@@ -134,7 +141,7 @@ def read_trf_parameters(
     session = int(session)
     bin_width = int(bin_width)
     # layer_ID = int(layer_ID)
-    print(f"Reading TRF parameters for {model_name}, session-{session}," +\
+    logger.info(f"Reading TRF parameters for {model_name}, session-{session}," +\
            f"bin-width-{bin_width}ms, shuffled-{shuffled}, LPF-{LPF}, bias-{bias}")
     path_dir = os.path.join(cache_dir, 'trf', f'{model_name}')
     if mVocs:
@@ -150,12 +157,12 @@ def read_trf_parameters(
     
     if os.path.exists(file_path):
         if verbose:
-            print(f"Reading from file: {file_path}")
+            logger.info(f"Reading from file: {file_path}")
         with open(file_path, 'rb') as F: 
             reg_results = pickle.load(F)
         return reg_results
     else:
-        print(f"Results not found.")
+        logger.info(f"Results not found.")
         return None
 
 def write_trf_parameters(
@@ -180,7 +187,7 @@ def write_trf_parameters(
         path_dir = os.path.join(path_dir, 'bias')
     if not os.path.exists(path_dir):
         os.makedirs(path_dir)
-        print(f"Directory path created: {path_dir}")
+        logger.info(f"Directory path created: {path_dir}")
 
     filename = f'{model_name}_sess_{session}_trf_{bin_width}ms.pkl' 
     file_path = os.path.join(path_dir, filename)
@@ -198,7 +205,7 @@ def write_trf_parameters(
     exisiting_results[layer_ID] = betas
     with open(file_path, 'wb') as F: 
         pickle.dump(exisiting_results, F)
-    print(f"trf parameters saved for {model_name} at path: \n {file_path}.")
+    logger.info(f"trf parameters saved for {model_name} at path: \n {file_path}.")
 
 
 
@@ -218,13 +225,13 @@ def read_significant_sessions_and_channels(bin_width, p_threshold, use_poisson_n
     else:
         path_dir = os.path.join(normalizers_dir, 'significant_neurons', subdir)
     file_path = os.path.join(path_dir, f"significant_sessions_and_channels_bw_{bin_width}ms_pvalue_{p_threshold}.pkl")
-    print(f"Reading sig sessions/channels from: {file_path}")
+    logger.info(f"Reading sig sessions/channels from: {file_path}")
     if os.path.exists(file_path):
         with open(file_path, 'rb') as F: 
             significant_sessions_and_channels = pickle.load(F)
         return significant_sessions_and_channels
     else:
-        print(f"Sigificant sessions/channels data not found: for bin-width {bin_width}ms.")
+        logger.info(f"Sigificant sessions/channels data not found: for bin-width {bin_width}ms.")
         return None
 
 def write_significant_sessions_and_channels(
