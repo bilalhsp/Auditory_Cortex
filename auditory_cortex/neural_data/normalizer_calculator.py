@@ -877,8 +877,9 @@ class NormalizerCalculator:
 		# else:
 		# 	max_num_trials = 11
 		assert num_trials <= max_num_trials and num_trials >= 2, "num_trials must be between 1 and {}".format(max_num_trials)
-		trial_ids = np.arange(max_num_trials)
-		trial_ids = np.random.choice(trial_ids, size=num_trials, replace=False)
+		# trial_ids = np.arange(max_num_trials)
+		# trial_ids = np.random.choice(trial_ids, size=num_trials, replace=False)
+		trial_ids = np.random.choice(max_num_trials, size=num_trials, replace=True)
 
 		for t in range(n):
 			long_seq1 = []
@@ -886,7 +887,9 @@ class NormalizerCalculator:
 
 			for stim_id in stim_ids:
 				spikes = sent_wise_repeated_spikes[stim_id]
-				tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)
+				tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)   
+				# replace=False is important here, because, we wouldn't want to 
+                # compute correlation between identical sequence. 
 
 				long_seq1.append(spikes[tr1])
 				long_seq2.append(spikes[tr2])

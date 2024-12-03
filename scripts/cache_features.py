@@ -10,9 +10,11 @@ import logging
 
 # Configure the logging system
 logging.basicConfig(
-    level=logging.DEBUG,  # Set the logging level
+    level=logging.INFO,  # Logging level for the logger DEBUG, INFO, WARNING, ERROR, CRITICAL
     # format="%(name)s - %(levelname)s - %(message)s",
 )
+
+logger = logging.getLogger(__name__)
 
 # ------------------  cache features function ----------------------
 
@@ -52,7 +54,7 @@ def cache_features(args):
 	# 		scale_factor=factor
 	# 		)
 
-	logging.info(f"Done...!")
+	logger.info(f"Done...!")
 
 # ------------------  get parser ----------------------#
 
@@ -66,14 +68,13 @@ def get_parser():
 	
 	parser.add_argument(
 		'-d','--dataset_name', dest='dataset_name', type= str, action='store',
-		choices=['ucsf', 'ucdavis'],
+		choices=['ucsf', 'ucdavis'], required=True,
 		help = "Name of neural data to be used."
 	)
 
 	parser.add_argument(
 		'-i','--ind', dest='ind', type= int, action='store',
-		# default=[5, 10, 20, 40],
-		# choices=[],
+		required=True,
 		help = "Index of the network, that we want to load features for."
 	)
 	parser.add_argument(
@@ -110,8 +111,8 @@ if __name__ == '__main__':
 
 	# display the arguments passed
 	for arg in vars(args):
-		print(f"{arg:15} : {getattr(args, arg)}")
+		logger.info(f"{arg:15} : {getattr(args, arg)}")
 
 	cache_features(args)
 	elapsed_time = time.time() - start_time
-	print(f"It took {elapsed_time/60:.1f} min. to run.")
+	logger.info(f"It took {elapsed_time/60:.1f} min. to run.")

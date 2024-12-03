@@ -306,7 +306,8 @@ class FeatureExtractorWhisper(BaseFeatureExtractor):
 		# with torch.no_grad():
 		self.model.eval()
 		input_features = input_features.to(self.device)
-		generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
+		with torch.no_grad():
+			generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
 			# transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 		return generated_ids
 	

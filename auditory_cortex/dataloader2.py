@@ -10,6 +10,7 @@ Regression Analysis, Representation Similarity Analysis etc.
 import gc
 import numpy as np
 from scipy import linalg, signal
+from memory_profiler import profile
 
 # from auditory_cortex.models import Regression
 # from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
@@ -132,7 +133,6 @@ class DataLoader:
 			_ = self.get_session_spikes(mVocs=mVocs)
 		return self.num_channels
 
-
 	def get_raw_DNN_features(
 			self, mVocs=False, force_reload=False, contextualized=False, scale_factor=None
 		):
@@ -175,7 +175,14 @@ class DataLoader:
 					model_name, shuffled=shuffled, scale_factor=scale_factor
 					).extract_features_for_audio(long_audio, total_duration)
 			else:
+				logger.info(f"Extracting DNN features for '{model_name}'...")
 				raw_DNN_features = self.feature_extractor.extract_features(stim_audios, sampling_rate, stim_durations)
+				
+
+			# delete temporary variables to avoid memory issues
+			del stim_audios, stim_durations
+			collected = gc.collect()
+			logger.info(f"Garbage collector: collected {collected} objects.")
 				# if shuffled:
 				# 	dnn_obj.save_state_dist()
 			# cache features for future use...

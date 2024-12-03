@@ -28,7 +28,7 @@ def save_normalizer_bootstrap_dist(args):
     session_index = args.session_index
     n = args.num_samples
     dataset_name = args.dataset_name
-    mVocs = False
+    mVocs = args.mVocs
     bin_width = 50
     percent_durations = [11, 22, 33, 44, 55, 66, 77, 88, 100]
     iterations = np.arange(1, 81)
@@ -75,6 +75,10 @@ def get_parser():
         '-s', '--session', dest='session_index', type=int, action='store', 
         default=0,
         help="Choose sessions index."
+    )
+    parser.add_argument(
+        '-v', '--mVocs', dest='mVocs', action='store_true', default=False, 
+        help="Choose to use mVocs."
     )
     parser.add_argument(
         '-n', '--num_samples', dest='num_samples', type=int, action='store', 
