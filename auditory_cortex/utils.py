@@ -650,15 +650,15 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
 	else:
 		return corr_coeff
 	
-def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
-	"""Computes correlation for each trial and averages across all trials.
+# def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
+# 	"""Computes correlation for each trial and averages across all trials.
 	
-	Args:
-		y_all_trials: (num_trials, num_bins)
-		y_pred: (num_bins,)
-		tr: int = integer in range=[0, 11], Default=None.
+# 	Args:
+# 		y_all_trials: (num_trials, num_bins)
+# 		y_pred: (num_bins,)
+# 		tr: int = integer in range=[0, 11], Default=None.
 
-	"""
+# 	"""
 def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
 	"""Computes correlation for each trial and averages across all trials.
 	
@@ -675,10 +675,12 @@ def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
 	# else:
 	# 	total_trial_repeats = 11
 	total_trial_repeats = y_all_trials.shape[0]
-	trial_ids = np.arange(total_trial_repeats)
-	if test_trial is not None:
-		np.random.shuffle(trial_ids)
-		trial_ids = trial_ids[:test_trial]
+	if test_trial is None:
+		trial_ids = np.arange(total_trial_repeats)
+	else:
+		trial_ids = np.random.choice(total_trial_repeats, size=test_trial, replace=True)
+		# np.random.shuffle(trial_ids)
+		# trial_ids = trial_ids[:test_trial]
 	for tr in trial_ids:
 		trial_corr.append(cc_norm(y_all_trials[tr], y_pred))
 	trial_corr = np.stack(trial_corr, axis=0)

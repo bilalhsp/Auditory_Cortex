@@ -4,8 +4,9 @@ import numpy as np
 from scipy.signal import resample
 from abc import ABC, ABCMeta, abstractmethod, abstractproperty
 import torch
+import gc
 from transformers import ClapModel, ClapProcessor
-
+from memory_profiler import profile
 from auditory_cortex import config_dir, results_dir, aux_dir, cache_dir
 
 import logging
@@ -88,7 +89,7 @@ class BaseFeatureExtractor(ABC):
 				param.data = param.data*self.scale_factor
 
 
-
+	@profile
 	def extract_features(self, stim_audios, sampling_rate, stim_durations=None):
 		"""
 		Returns raw features for all layers of the DNN..!
@@ -118,9 +119,12 @@ class BaseFeatureExtractor(ABC):
 				sent_samples = int((sent_duration + bin_width/2)/bin_width)
 
 			# self.translate(audio, grad=False)
-			_ = self.fwd_pass(audio)
+			# _ = self.fwd_pass(audio)
+			stim_features = self.get_features(audio)
 			for layer_id in self.layer_ids:
-				features[layer_id][stim_id] = self.get_features(layer_id)
+				# features[layer_id][stim_id] = self.get_features(layer_id)
+				layer_name = self.get_layer_name(layer_id)
+				features[layer_id][stim_id] = stim_features[layer_name]
 				if 'whisper' in self.model_name:
 					## whisper networks gives features for 30s long clip,
 					## extracting only the true initial samples...
@@ -132,6 +136,9 @@ class BaseFeatureExtractor(ABC):
 					else:
 						feature_samples = sent_samples
 					features[layer_id][stim_id] = features[layer_id][stim_id][:feature_samples]
+			del stim_features
+			collected = gc.collect()
+			# logger.debug(f"Garbage collector: collected {collected} objects.")
 		return features
 
 
@@ -194,32 +201,42 @@ class BaseFeatureExtractor(ABC):
 		ind = self.layer_ids.index(layer_id)
 		return self.layer_names[ind]
 	
-
-	def get_features(self, layer_id):
-		'''
-		Use to extract features for specific layer after calling 'translate()' method 
-		for given audio input.
-
-		Args:
-			layer_ID (int): layer identifier, assigned in config.
-
-		returns:
-			(dim, time) features extracted for layer at 'layer_ID'
-		'''
-		layer_name = self.get_layer_name(layer_id)
-		if 'rnn' in layer_name:
-			return self.features[layer_name].cpu()
+	def get_features(self, audio):
+		"""Returns features for all layers of the DNN..!"""
+		_ = self.fwd_pass(audio)
+		# if 'rnn' in layer_name:
+			# return self.features[layer_name].cpu()
 		#	return self.features[layer].data[:,1024:] # only using fwd features (first half of concatenatation)
-		else:
-			return self.features[layer_name].cpu()
-	
-	# def translate(self, aud, grad=False):
-	# 	if grad:
-	# 		input = self.fwd_pass_tensor(aud)
+		features = {layer_name:feat.cpu() for layer_name, feat in self.features.items()}
+		self.features = {}
+		return features
+
+
+	# def get_features(self, layer_id):
+	# 	'''
+	# 	Use to extract features for specific layer after calling 'translate()' method 
+	# 	for given audio input.
+
+	# 	Args:
+	# 		layer_ID (int): layer identifier, assigned in config.
+
+	# 	returns:
+	# 		(dim, time) features extracted for layer at 'layer_ID'
+	# 	'''
+	# 	layer_name = self.get_layer_name(layer_id)
+	# 	if 'rnn' in layer_name:
+	# 		return self.features[layer_name].cpu()
+	# 	#	return self.features[layer].data[:,1024:] # only using fwd features (first half of concatenatation)
 	# 	else:
-	# 		with torch.no_grad():
-	# 			input = self.fwd_pass(aud)
-	# 	return input
+	# 		return self.features[layer_name].cpu()
+	
+	def translate(self, aud, grad=False):
+		if grad:
+			input = self.fwd_pass_tensor(aud)
+		else:
+			with torch.no_grad():
+				input = self.fwd_pass(aud)
+		return input
 	
 	@staticmethod
 	def read_config_file(file_name):

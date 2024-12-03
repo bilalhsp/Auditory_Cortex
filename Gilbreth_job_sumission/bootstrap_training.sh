@@ -1,5 +1,5 @@
 #!/bin/bash
-## Usage example: ./bootstrap_training_data.sh "-d ucdavis -i itr"
+## Usage example: ./bootstrap_training.sh "-m whisper_base -l 2 -d ucdavis -b 50 -i itr"
 
 # Check if the number of command-line arguments is correct
 if [ "$#" -ne 1 ]; then
@@ -11,17 +11,16 @@ base_args="$1"
 
 # Define the sets of additional arguments for each submission
 args_sets=(
-    # whisper_base
-    "-m whisper_base -b 50 -l 2 -N 10"
-    "-m whisper_base -b 50 -l 2 -N 20"
-    "-m whisper_base -b 50 -l 2 -N 30"
-    "-m whisper_base -b 50 -l 2 -N 40"
-    "-m whisper_base -b 50 -l 2 -N 50"
-    "-m whisper_base -b 50 -l 2 -N 60"
-    "-m whisper_base -b 50 -l 2 -N 70"
-    "-m whisper_base -b 50 -l 2 -N 80"
-    "-m whisper_base -b 50 -l 2 -N 90"
-    "-m whisper_base -b 50 -l 2 -N 100"
+    "-N 10"
+    "-N 20"
+    "-N 30"
+    "-N 40"
+    "-N 50"
+    "-N 60"
+    "-N 70"
+    "-N 80"
+    "-N 90"
+    "-N 100"
 )
 # # Replace the placeholder with the actual base identifier
 
@@ -66,8 +65,8 @@ do
     esac
 
     # Submit the job with the current set of arguments
-    echo bootstrap_encoding.sh $args $base_args$suff
+    echo bootstrap_fit.sh $args $base_args$suff
 
     # Submit the job
-    sbatch bootstrap_encoding.sh $args $base_args$suff
+    sbatch bootstrap_fit.sh $args $base_args$suff
 done

@@ -79,7 +79,8 @@ import cupy as cp
 # from multiprocessing import Pool
 # from tqdm.auto import tqdm
 # import copy
-
+import logging
+logger = logging.getLogger(__name__)
 
 
 
@@ -91,7 +92,7 @@ class TRF:
 		"""       
 		self.model_name = model_name
 		self.dataset_assembler = dataset_assembler
-		print(f"TRF object created for '{model_name}' model.")
+		logger.info(f"TRF object created for '{model_name}' model.")
 		
 	def evaluate(self, trf_model, test_trial=None):
 		"""Computes correlation on trials of test set for the model provided.
@@ -171,7 +172,7 @@ class TRF:
 		size_of_chunk = int(len(mapping_set) / num_folds)
 
 		for r in range(num_folds):
-			print(f"\n For fold={r}: ")
+			logger.info(f"\n For fold={r}: ")
 			if r<(num_folds-1):
 				val_set = mapping_set[r*size_of_chunk:(r+1)*size_of_chunk]
 			else:
@@ -237,7 +238,7 @@ class TRF:
 		opt_lmbdas = []
 		for lag in lags:
 
-			print(f"\n Running for max lag={lag} ms")
+			logger.info(f"\n Running for max lag={lag} ms")
 			score, opt_lmbda = self.cross_validated_fit(
 				tmax=lag,
 				tmin=tmin, 
@@ -256,45 +257,76 @@ class TRF:
 		sfreq = 1000/self.dataset_assembler.get_bin_width()
 		tmax = opt_lag/1000 # convert seconds to ms
 
-		print(f"Fitting model using optimal lag={opt_lag} ms and optimal lmbda={opt_lmbda}")
+		logger.info(f"Fitting model using optimal lag={opt_lag} ms and optimal lmbda={opt_lmbda}")
 		trf_model = GpuTRF(
 					tmin, tmax, sfreq, alpha=opt_lmbda,
 					)
 		trf_model.fit(X=mapping_x, y=mapping_y)
 
-		print(f"Computing corr for test set...")
+		logger.info(f"Computing corr for test set...")
 		corr = self.evaluate(trf_model, test_trial)
 		return corr, opt_lag, opt_lmbda, trf_model
 	
+	@staticmethod
 	def load_saved_model(
-			self, model_name, session, layer_ID, bin_width, shuffled=False,
-			tmax=300, tmin=0, 
+			model_name, session, layer_ID, bin_width, shuffled=False,
+			LPF=False, mVocs=False,
+			tmax=300, tmin=0, dataset_name='ucsf'
 		):
 		"""Loads a saved weights and biases for the TRF model."""
 		
 		session = int(session)
 		weights = io.read_trf_parameters(
 				model_name, session, bin_width, shuffled,
-				verbose=False, bias=False,
-			)[layer_ID]
-
+				verbose=False, LPF=LPF, mVocs=mVocs,
+				bias=False, dataset_name=dataset_name
+			)
 		biases = io.read_trf_parameters(
 				model_name, session, bin_width, shuffled,
-				verbose=False, bias=True,
-			)[layer_ID]
+				verbose=False, LPF=LPF, mVocs=mVocs,
+				bias=True, dataset_name=dataset_name
+			)
+		if (weights is None) or (biases is None):
+			# raise ValueError(f"Model parameters not found for session={session}")
+			return None
+		
+		weights = weights[layer_ID]
+		biases = biases[layer_ID]
 		
 		tmax = tmax/1000
 		sfreq = 1000/bin_width
 		trf_model = GpuTRF(tmin, tmax, sfreq, alpha=0.1)
 		trf_model.coef_ = (weights, biases)
 		return trf_model
+	
+	@staticmethod
+	def save_model_parameters(
+			trf_model, model_name, layer_ID, session, bin_width, shuffled=False,
+			LPF=False, mVocs=False, dataset_name='ucsf'):
+		"""Saves the weights and biases of the trained TRF model."""
+		weights, biases = trf_model.coef_
+		io.write_trf_parameters(
+			model_name, session, weights, bin_width=bin_width, 
+			shuffled=shuffled, layer_ID=layer_ID, LPF=LPF, mVocs=mVocs,
+			dataset_name=dataset_name
+			)
+		io.write_trf_parameters(
+			model_name, session, biases, bin_width=bin_width, 
+			shuffled=shuffled, layer_ID=layer_ID, LPF=LPF, mVocs=mVocs,
+			bias=True, dataset_name=dataset_name
+			)
+		
 
-	def neural_prediction(self, model_name, session, layer_ID, bin_width, stim_ids,
-				shuffled=False):
+	def neural_prediction(
+			self, model_name, session, layer_ID, bin_width, stim_ids,
+				dataset_name, shuffled=False, mVocs=False
+			):
 		"""Predicts the neural responses using the trained TRF model."""
 		trf_model = self.load_saved_model(
-			model_name, session, layer_ID, bin_width, shuffled=shuffled
-		)
+			model_name, session, layer_ID, bin_width, shuffled=shuffled,
+			LPF=False, mVocs=mVocs, dataset_name=dataset_name
+            )
+			
 		X, _ = self.dataset_assembler.get_training_data(stim_ids)
 		pred = trf_model.predict(X)
 		return pred
@@ -315,7 +347,7 @@ class GpuTRF(nl.encoding.TRF):
 				if list, fit separate model for channel of Y.
 			
 		"""
-		print(f"GpuTRF object created with alpha={alpha}, tmin={tmin}, tmax={tmax}, sfreq={sfreq}")
+		logger.info(f"GpuTRF object created with alpha={alpha}, tmin={tmin}, tmax={tmax}, sfreq={sfreq}")
 		self.alpha = alpha
 		if isinstance(alpha, float):
 			# self.alpha = alpha
