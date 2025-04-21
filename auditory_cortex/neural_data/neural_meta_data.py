@@ -403,7 +403,7 @@ class NeuralMetaData:
 
     @staticmethod
     def read_mVoc_stim_details():
-        """Extract mVoc stim details and write to disk."""
+        """Read mVoc stimulus details from the disk."""
         filename = 'mVoc_stim_details.pkl'
         mVoc_filepath = os.path.join(DATA_DIR, filename)
 
@@ -412,7 +412,10 @@ class NeuralMetaData:
                 mVoc_stim_dict = pickle.load(F)
             return mVoc_stim_dict['stim_audios'], mVoc_stim_dict['stim_durations'], mVoc_stim_dict['sampling_rate']		
         else:
-            raise FileNotFoundError(f"{mVoc_filepath} does not exist.")
+            # raise FileNotFoundError(f"{mVoc_filepath} does not exist.")
+            print(f"{mVoc_filepath} does not exist!!! calling write_mVoc_stim_details() method.")
+            NeuralMetaData.write_mVoc_stim_details()
+            raise FileNotFoundError(f"{mVoc_filepath} now saved to disk, trying creating this object again.")
         
     @staticmethod
     def pre_process_mVocs(mVoc_wavforms, sampling_rate, new_sampling_rate=16000):
