@@ -1,7 +1,7 @@
 import time
 import argparse
 
-from auditory_cortex.neural_data.normalizer import Normalizer
+from auditory_cortex.neural_data.deprecated.normalizer import Normalizer
 
 
 # ------------------  get parser ----------------------#

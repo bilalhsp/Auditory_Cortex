@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from .dataset import NeuralData
-from .neural_meta_data import NeuralMetaData
+# from .deprecated.dataset import NeuralData
+# from .deprecated.neural_meta_data import NeuralMetaData
 from auditory_cortex.neural_data import create_neural_dataset
 from auditory_cortex import results_dir
 import auditory_cortex.io_utils.io as io

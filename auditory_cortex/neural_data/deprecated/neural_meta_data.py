@@ -8,7 +8,7 @@ import wave
 
 from auditory_cortex import neural_data_dir, config, NEURAL_DATASETS
 # from auditory_cortex.neural_data.config import RecordingConfig
-from auditory_cortex.neural_data import recording_config
+from auditory_cortex.neural_data.deprecated import recording_config
 
 DATASET_NAME = NEURAL_DATASETS[0]
 DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)

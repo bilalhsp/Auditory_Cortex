@@ -17,7 +17,7 @@ from auditory_cortex import valid_model_names
 from auditory_cortex.neural_data import NeuralMetaData
 from auditory_cortex.datasets import BaselineDataset, DNNDataset
 from auditory_cortex.computational_models.encoding import TRF
-from auditory_cortex.neural_data.normalizer import Normalizer
+from auditory_cortex.neural_data.deprecated.normalizer import Normalizer
 
 from auditory_cortex.neural_data.normalizer_calculator import NormalizerCalculator
 
