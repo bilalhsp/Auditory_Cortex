@@ -13,7 +13,6 @@ def get_parser():
             'for the sessions of neural data.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
-
     parser.add_argument(
         '-b','--bin_width', dest='bin_widths', nargs='+', type=int, action='store', 
         default=[20],

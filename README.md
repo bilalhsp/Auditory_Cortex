@@ -1,6 +1,41 @@
 # Auditory_cortex
 
 
+## 📂 Repository Structure
+
+This section outlines the main directories and files. See the corresponding documentation for details.
+
+```
+auditory_cortex/
+├── auditory_cortex/             ← Core functionality code
+│   ├── config/                  ← Configuration files
+│   ├── dnn_feature_extractor/   ← DNN feature extraction
+│   ├── neural_data/             ← Neural data handling
+│   ├── plotters/                ← Plotting utilities
+│   ├── analyses/                ← Analysis utilities
+│   ├── dataloader.py            ← Data loading
+│   ├── encoding.py              ← Encoding models
+│   ├── utils.py                 ← Helper functions
+├── docs/                        ← Documentation
+├── scripts/                     ← Experiment scripts
+├── notebooks/                   ← Analysis notebooks
+├── Gilbreth_job_submission/     ← Cluster job scripts
+└── README.md                    ← Project overview
+```
+
+
+
+## 📚 Documentation
+
+- 🧑‍🔬 [User Guide](docs/guide_users.md) — How to run scripts and use the models
+- 👨‍💻 [Developer Guide](docs/guide_developers.md) — Contributing, structure, dev notes
+- 🎧 [Dataset Guide](docs/guide_datasets.md) — Audio/neural dataset formats and loading
+- 🏋️ [Training Guide](docs/guide_training.md) — Training new models or fine-tuning
+- 📈 [Evaluation Guide](docs/guide_evaluation.md) — Metrics, evaluation scripts, visualization
+
+
+
+
 [Repo Link](https://github.com/bilalhsp/Auditory_Cortex)
 
 ```git clone https://github.com/bilalhsp/Auditory_Cortex.git```

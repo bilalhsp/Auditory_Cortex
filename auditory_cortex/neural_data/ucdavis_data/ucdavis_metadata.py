@@ -3,13 +3,18 @@ import struct
 import scipy.io 
 import numpy as np
 
+from auditory_cortex import neural_data_dir, config, NEURAL_DATASETS
+
+DATASET_NAME = NEURAL_DATASETS[1]
+DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)
+
 class UCDavisMetaData:
-	def __init__(self, data_dir):
-		self.data_dir = data_dir
+	def __init__(self):
+		self.data_dir = DATA_DIR
 
 		self.sampling_rate = 48000
 		# reading timit metadata
-		self.timit_meta_file = os.path.join(data_dir, 'recanzone_timit_details.mat')
+		self.timit_meta_file = os.path.join(self.data_dir, 'recanzone_timit_details.mat')
 		self.timit_meta = UCDavisMetaData.read_stim_meta(self.timit_meta_file)
 
 		timit_mask = self.timit_meta['timit'].use.astype(bool)
@@ -20,7 +25,7 @@ class UCDavisMetaData:
 		self.timit_audios = {}	# no need to read in advance
 
 		# reading mVocs metadata
-		self.mVocs_meta_file = os.path.join(data_dir, 'MSL.mat')
+		self.mVocs_meta_file = os.path.join(self.data_dir, 'MSL.mat')
 		self.mVocs_meta = UCDavisMetaData.read_stim_meta(self.mVocs_meta_file)
 		mVocs_mask = self.mVocs_meta['MSL'].useThisSound.astype(bool)
 		mVocs_durs = self.mVocs_meta['MSL'].actualDur#[mVocs_mask]   #mVocs_mask is not right
@@ -54,7 +59,7 @@ class UCDavisMetaData:
 			stim_audios[stim_id] = stim_audio
 		return stim_audios[stim_id]
 
-	def get_sampling_rate(self):
+	def get_sampling_rate(self, mVocs=False):
 		return self.sampling_rate
 
 

@@ -1,15 +1,21 @@
 from .dnn_feature_extractors import FeatureExtractorW2L, FeatureExtractorDeepSpeech2
 from .dnn_feature_extractors import FeatureExtractorS2T, FeatureExtractorW2V2, FeatureExtractorWhisper
-
+from auditory_cortex import DNN_MODELS
 
 # mapping strings to classes
-FEATURE_EXTRACTORS = {
-    'wav2letter_modified': FeatureExtractorW2L,
-    'deepspeech2': FeatureExtractorDeepSpeech2,
-    'speech2text': FeatureExtractorS2T,
-    'wav2vec2': FeatureExtractorW2V2,
-    'whisper_tiny': FeatureExtractorWhisper,
-    'whisper_base': FeatureExtractorWhisper,
+DNN_MODELS_MAP = {
+    DNN_MODELS[0]: FeatureExtractorDeepSpeech2,
+    DNN_MODELS[1]: FeatureExtractorS2T,
+    DNN_MODELS[2]: FeatureExtractorW2L,
+    DNN_MODELS[3]: FeatureExtractorWhisper,
+    DNN_MODELS[4]: FeatureExtractorWhisper,
+    DNN_MODELS[5]: FeatureExtractorW2V2,
+    # 'wav2letter_modified': ,
+    # 'deepspeech2': ,
+    # 'speech2text': ,
+    # 'wav2vec2': FeatureExtractorW2V2,
+    # 'whisper_tiny': FeatureExtractorWhisper,
+    # 'whisper_base': FeatureExtractorWhisper,
 }
 
 def create_feature_extractor(model_name, shuffled=False):
@@ -23,4 +29,4 @@ def create_feature_extractor(model_name, shuffled=False):
     Returns:
         object: returns the object of the feature extractor class.
     """
-    return FEATURE_EXTRACTORS[model_name](model_name, shuffled=shuffled)
+    return DNN_MODELS_MAP[model_name](model_name, shuffled=shuffled)
