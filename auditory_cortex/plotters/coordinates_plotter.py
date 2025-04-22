@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 
 from auditory_cortex import results_dir
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
-from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
-from auditory_cortex.neural_data.recording_config import RecordingConfig
+from auditory_cortex.neural_data.deprecated.neural_meta_data import NeuralMetaData
+from auditory_cortex.neural_data.deprecated.recording_config import RecordingConfig
 
 class CoordinatesPlotter:
     """"Provides functionality of plotting mini-plots at coordinate

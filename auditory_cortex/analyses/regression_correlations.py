@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 import auditory_cortex.utils as utils
 from auditory_cortex.utils import CorrelationUtils
 from auditory_cortex.neural_data import NeuralMetaData
-from auditory_cortex.neural_data.normalizer import Normalizer
+from auditory_cortex.neural_data.deprecated.normalizer import Normalizer
 from auditory_cortex import session_to_coordinates, session_to_subject, session_to_area, area_to_sessions #, CMAP_2D
 from auditory_cortex import saved_corr_dir, aux_dir
 from auditory_cortex.io_utils import io

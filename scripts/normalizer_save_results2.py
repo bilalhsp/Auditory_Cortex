@@ -107,10 +107,6 @@ def compute_and_save_normalizers(args):
                     mVocs=mVocs, random_pairs=random_pairs
                     )
                 
-                
-              
-                
-  
 # ------------------  main function ----------------------#
 
 if __name__ == '__main__':

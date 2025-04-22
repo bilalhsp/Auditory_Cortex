@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 import auditory_cortex.utils as utils
 from auditory_cortex import neural_data_dir
-from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
+from auditory_cortex.neural_data.deprecated.neural_meta_data import NeuralMetaData
 
 
 class NeuralData:
