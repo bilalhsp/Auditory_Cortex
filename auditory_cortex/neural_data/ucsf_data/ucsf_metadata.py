@@ -14,11 +14,9 @@ DATASET_NAME = NEURAL_DATASETS[0]
 DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)
 
 class UCSFMetaData:
-    def __init__(self, cfg: RecordingConfig = None) -> None:
-        
-        if cfg is None:
-            cfg = RecordingConfig()
-        self.cfg = cfg
+    def __init__(self) -> None:
+    
+        self.cfg = RecordingConfig()
         # session to area.
         self.session_to_area = {}
         for k, v in self.cfg.area_wise_sessions.items():
@@ -103,8 +101,9 @@ class UCSFMetaData:
         """Returns combined duration (seconds) of test set stimuli."""
         duration = 0
         if mVocs:
-            for mVoc_id in self.mVoc_test_stimIds:
-                duration += self.get_mVoc_dur(mVoc_id)
+            for stim_id in self.mVoc_test_stimIds:
+                tr_id = self.get_mVoc_tr_id(stim_id)[0]
+                duration += self.get_mVoc_dur(tr_id)
         else:
             for sent in self.test_sent_IDs:
                 duration += self.stim_duration(sent)
@@ -123,7 +122,8 @@ class UCSFMetaData:
             if stim_ids is None:
                 stim_ids = self.mVocs_all_stim_ids
             for stim_id in stim_ids:
-                duration += self.get_mVoc_dur(stim_id)
+                tr_id = self.get_mVoc_tr_id(stim_id)[0]
+                duration += self.get_mVoc_dur(tr_id)
         else:
             if stim_ids is None:
                 stim_ids = self.sent_IDs
@@ -323,11 +323,10 @@ class UCSFMetaData:
         # return aud_res
 
     
-    def get_mVoc_dur(self, stim_id):
-        """Return mVoc aud for the stim_id, subtracts silence
+    def get_mVoc_dur(self, tr_id):
+        """Return mVoc aud for the tr_id, subtracts silence
         duration from the total trial dur."""
         # silence_dur = 0.3   # seconds
-        tr_id = self.get_mVoc_tr_id(stim_id)[0]
         return self.mVocDur[tr_id] #- self.mVoc_silence_dur
     
     def get_mVoc_sampling_rate(self):

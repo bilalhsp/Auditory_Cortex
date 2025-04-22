@@ -14,343 +14,346 @@ import logging
 logger = logging.getLogger(__name__)
 
 class NormalizerCalculator:
-	"""Computes the inter-trial correlations for stimuli having multilple trials.
-	These will be used as normalizer for regression correlations and for identifying channels
-	(and sessions) with good enough SNR. In summary, this class does the following:
-	- Compute the normalizer distribution.
+    """Computes the inter-trial correlations for stimuli having multilple trials.
+    These will be used as normalizer for regression correlations and for identifying channels
+    (and sessions) with good enough SNR. In summary, this class does the following:
+    - Compute the normalizer distribution.
     - Compute the null distribution.
     - Save these distributions to disk.
-	"""
+    """
 
-	def __init__(self, dataset_name, session_id):
-		
-		self.dataset = create_neural_dataset(dataset_name, session_id)
+    def __init__(self, dataset_name, session_id=None):
+        
+        if session_id is None:
+            if dataset_name == 'ucdavis':
+                session_id = 0
+            elif dataset_name == 'ucsf':
+                session_id = 180810
+        self.dataset = create_neural_dataset(dataset_name, session_id)
 
+    def get_stim_wise_repeated_spikes(self, bin_width=50, mVocs=False):
+        """Reads spikes for repeated stimuli and returns a dictionary
+        
+        Args:
+            bin_width: int = bin width in ms
+            mVocs: bool = If True, mVocs trials are considered.
+        Returns:
+            dict: {stim_id: ndarray} = where ndarray is of shape (num_trials, seq_len, num_channels) 
+        """
+        spikes = self.dataset.extract_spikes(
+            bin_width=bin_width, delay=0, repeated=True, mVocs=mVocs
+            )
+        stim_wise_repeated_spikes = {}
+        for stim_id, spikes_dict in spikes.items():
+            stim_spikes = np.stack([ch_spikes for ch_spikes in spikes_dict.values()], axis=-1).squeeze()
+            stim_wise_repeated_spikes[stim_id] = stim_spikes
+        return stim_wise_repeated_spikes
+    
 
+    def get_testing_stim_duration(self, mVocs=False):
+        """Returns total duration of testing stimuli"""
+        stim_duration = self.dataset.total_stimuli_duration(mVocs)
+        return stim_duration['repeated']
+        # stim_ids = self.dataset.get_testing_stim_ids(mVocs)
+        # total_duration = 0
+        # for stim_id in stim_ids:
+        # 	total_duration += self.dataset.get_stim_duration(stim_id, mVocs=mVocs)
+        # return total_duration
 
-	def get_stim_wise_repeated_spikes(self, bin_width=50, mVocs=False):
-		"""Reads spikes for repeated stimuli and returns a dictionary
-		
-		Args:
-			bin_width: int = bin width in ms
-			mVocs: bool = If True, mVocs trials are considered.
-		Returns:
-			dict: {stim_id: ndarray} = where ndarray is of shape (num_trials, seq_len, num_channels) 
-		"""
-		spikes = self.dataset.extract_spikes(
-			bin_width=bin_width, delay=0, repeated=True, mVocs=mVocs
-			)
-		stim_wise_repeated_spikes = {}
-		for stim_id, spikes_dict in spikes.items():
-			stim_spikes = np.stack([ch_spikes for ch_spikes in spikes_dict.values()], axis=-1).squeeze()
-			stim_wise_repeated_spikes[stim_id] = stim_spikes
-		return stim_wise_repeated_spikes
-	
+    def get_test_set_ids(self, percent_duration=None, mVocs=False):
+        """Returns a smaller mapping set of given size."""
+        test_duration = self.get_testing_stim_duration(mVocs)
+        stim_ids = self.dataset.get_testing_stim_ids(mVocs)
+        np.random.shuffle(stim_ids)
+        if percent_duration is None or percent_duration >= 100:	
+            return stim_ids
+        else:
+            required_duration = percent_duration*test_duration/100
+            logger.info(f"Stim ids for duration={required_duration:.2f} sec")
+            stimili_duration=0
+            for n in range(len(stim_ids)):
+                stimili_duration += self.dataset.get_stim_duration(stim_ids[n], mVocs=mVocs)
+                if stimili_duration >= required_duration:
+                    break
+        logger.info(f"Total duration={stimili_duration:.2f} sec")
+        return stim_ids[:n+1]
 
-	def get_testing_stim_duration(self, mVocs=False):
-		"""Returns total duration of testing stimuli"""
-		stim_duration = self.dataset.total_stimuli_duration(mVocs)
-		return stim_duration['repeated']
-		# stim_ids = self.dataset.get_testing_stim_ids(mVocs)
-		# total_duration = 0
-		# for stim_id in stim_ids:
-		# 	total_duration += self.dataset.get_stim_duration(stim_id, mVocs=mVocs)
-		# return total_duration
+    ### -------------------------------------------------------------------------- ###
+    ###       Computing the distribution of Normalizers (repeated trials)          ###
+    ### -------------------------------------------------------------------------- ###
 
-	def get_test_set_ids(self, percent_duration=None, mVocs=False):
-		"""Returns a smaller mapping set of given size."""
-		test_duration = self.get_testing_stim_duration(mVocs)
-		stim_ids = self.dataset.get_testing_stim_ids(mVocs)
-		np.random.shuffle(stim_ids)
-		if percent_duration is None or percent_duration >= 100:	
-			return stim_ids
-		else:
-			required_duration = percent_duration*test_duration/100
-			logger.info(f"Stim ids for duration={required_duration:.2f} sec")
-			stimili_duration=0
-			for n in range(len(stim_ids)):
-				stimili_duration += self.dataset.get_stim_duration(stim_ids[n], mVocs=mVocs)
-				if stimili_duration >= required_duration:
-					break
-		logger.info(f"Total duration={stimili_duration:.2f} sec")
-		return stim_ids[:n+1]
+    def save_bootstrapped_normalizer(self, percent_durations, iterations=None, bin_width=50, n=1000, mVocs=False):
+        """
+        """
+        session = int(self.dataset.session_id)
+        
+        stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
+        stim_ids = list(stim_wise_repeated_spikes.keys())
+        num_repeates = stim_wise_repeated_spikes[stim_ids[0]].shape[0]
+            
+        if iterations is None:
+            iterations = [1]
+        # percent_durations = [11, 22, 33, 44, 55, 66, 77, 88, 100]
+        num_trials_list = np.arange(2, num_repeates+1)
+        for itr in iterations:
+            for percent_dur in percent_durations:
+                for num_trials in num_trials_list:
+                    stim_ids = self.get_test_set_ids(percent_dur, mVocs=mVocs)
 
-	### -------------------------------------------------------------------------- ###
-	###       Computing the distribution of Normalizers (repeated trials)          ###
-	### -------------------------------------------------------------------------- ###
+                    normalizer_all = self.inter_trial_corr_for_bootstrap_analysis(
+                        stim_wise_repeated_spikes, stim_ids, n=n, num_trials=num_trials
+                        )
 
-	def save_bootstrapped_normalizer(self, percent_durations, iterations=None, bin_width=50, n=1000, mVocs=False):
-		"""
-		"""
-		session = int(self.dataset.session_id)
-		
-		stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
-		stim_ids = list(stim_wise_repeated_spikes.keys())
-		num_repeates = stim_wise_repeated_spikes[stim_ids[0]].shape[0]
-			
-		if iterations is None:
-			iterations = [1]
-		# percent_durations = [11, 22, 33, 44, 55, 66, 77, 88, 100]
-		num_trials_list = np.arange(2, num_repeates+1)
-		for itr in iterations:
-			for percent_dur in percent_durations:
-				for num_trials in num_trials_list:
-					stim_ids = self.get_test_set_ids(percent_dur, mVocs=mVocs)
-
-					normalizer_all = self.inter_trial_corr_for_bootstrap_analysis(
-						stim_wise_repeated_spikes, stim_ids, n=n, num_trials=num_trials
-						)
-
-					normalizer_all = np.delete(normalizer_all, np.where(np.isnan(normalizer_all))[0], axis=0)
-					io.write_bootstrap_normalizer_dist(
-						normalizer_all, session, itr, percent_dur, num_trials, bin_width,
-						dataset_name=self.dataset.dataset_name, mVocs=mVocs
-					)
-
-
-	### -------------------------------------------------------------------------- ###
-	###       Computing the distribution of Normalizers (repeated trials)          ###
-	### -------------------------------------------------------------------------- ###
-
-	# --------   Method 1: computes normalizer separately for each channel   ------- #
-	# --------                  using random pairs of trials.                ------- #
-
-	def _compute_normalizer_using_random_pairs(
-			self, bin_width=50, num_itr=100000, mVocs=False):
-		"""Compute dist. of normalizer for correlations (repeatability of neural
-		spikes), using 100k runs with random concatenation of trials at each iteration.."""
-		stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
-		normalizer_all = self.inter_trial_corr_using_random_pairing(
-			stim_wise_repeated_spikes, num_itr=num_itr
-			)
-		# remove the nan entries from the distribution..
-		normalizer_all = np.delete(normalizer_all, np.where(np.isnan(normalizer_all))[0], axis=0)
-		return normalizer_all
+                    normalizer_all = np.delete(normalizer_all, np.where(np.isnan(normalizer_all))[0], axis=0)
+                    io.write_bootstrap_normalizer_dist(
+                        normalizer_all, session, itr, percent_dur, num_trials, bin_width,
+                        dataset_name=self.dataset.dataset_name, mVocs=mVocs
+                    )
 
 
-	# --------   Method 2: computes normalizer separately for each channel   -------- #
-	# --------                  using all possible pairs                     -------- #
+    ### -------------------------------------------------------------------------- ###
+    ###       Computing the distribution of Normalizers (repeated trials)          ###
+    ### -------------------------------------------------------------------------- ###
 
-	def _compute_normalizer_all_possible_pairs(self, bin_width, mVocs=False):
-		"""Computes correlations separately for each sentence and using 
-		all possible trial pairs. Returns the distribution comprising of 
-		data points for all channels.    
-		Args:
-			bin_width: int = bin width in ms
-			mVocs: bool = If True, mVocs trials are considered.
+    # --------   Method 1: computes normalizer separately for each channel   ------- #
+    # --------                  using random pairs of trials.                ------- #
 
-		Returns:
-			corr_dist: ndarray = shape = (all_possible_pairs*num_sents, ch) 
-		"""
-		stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
-		corr_dist_combined = []
-		for stim_id, stim_spikes in stim_wise_repeated_spikes.items():
-			corr_dist_sent = self.inter_trial_corr_all_possible_pairs(stim_spikes)
-			corr_dist_combined.append(corr_dist_sent)
-		corr_dist_combined = np.concatenate(corr_dist_combined, axis=0)
-		corr_dist_combined = np.nan_to_num(corr_dist_combined)
-		return corr_dist_combined
-	
-	# --------    computes normalizer separately for each channel   -------- #
-	# --------             using all possible pairs 	            -------- #
-	
-
-	def get_normalizer_for_session_random_pairs(
-			self, bin_width=20, delay=0, force_redo=False, mVocs=False,
-			random_pairs=True):
-		"""Retrieves the distribution of normalizer for all the channels 
-		of the specified session, at specified bin_width and delay.
-		"""
-		session = str(int(float(self.dataset.session_id)))    # to make sure session is in str format.
-		bin_width = int(bin_width)
-		dataset_name = self.dataset.dataset_name
-		logger.info(f"Getting normalizer dist. for sess-{session}, bw-{bin_width}, mVocs={mVocs}")
-
-		if random_pairs:
-			method = 'random'
-		else:
-			method = 'app'
-		
-		if dataset_name=='ucsf' and mVocs:
-			# handling the excluded sessions for mVocs...
-			if session == '190726':
-				return np.zeros((1000, 60))
-			elif session == '200213':
-				return np.zeros((1000, 64))
-		
-		if not force_redo:
-			norm_dict_all_sessions = io.read_normalizer_distribution(
-				bin_width=bin_width, delay=delay, method=method, mVocs=mVocs, dataset_name=dataset_name
-				)
-		if force_redo or (norm_dict_all_sessions is None) or (session not in norm_dict_all_sessions.keys()):
-			if random_pairs:
-				norm_dist_session = self._compute_normalizer_using_random_pairs(
-					bin_width, mVocs=mVocs,
-					)
-			else:
-				norm_dist_session = self._compute_normalizer_all_possible_pairs(
-					bin_width, mVocs=mVocs
-					)
-			# save normalizer dist to disk..s
-			io.write_normalizer_distribution(
-				session, bin_width, delay, norm_dist_session, method=method, mVocs=mVocs, 
-				dataset_name=dataset_name
-			)
-			# return  norm_dist_session
-		else:
-			norm_dist_session =  norm_dict_all_sessions[session]
-
-		# Redundant check: We have already penalized correlations for being NAN (zero sequence)
-		# check zero valid samples in the distribution
-		if norm_dist_session.shape[0] == 0:
-			norm_dist_session = np.zeros((1, norm_dist_session.shape[-1]))
-		return norm_dist_session
+    def _compute_normalizer_using_random_pairs(
+            self, bin_width=50, num_itr=100000, mVocs=False):
+        """Compute dist. of normalizer for correlations (repeatability of neural
+        spikes), using 100k runs with random concatenation of trials at each iteration.."""
+        stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
+        normalizer_all = self.inter_trial_corr_using_random_pairing(
+            stim_wise_repeated_spikes, num_itr=num_itr
+            )
+        # remove the nan entries from the distribution..
+        normalizer_all = np.delete(normalizer_all, np.where(np.isnan(normalizer_all))[0], axis=0)
+        return normalizer_all
 
 
+    # --------   Method 2: computes normalizer separately for each channel   -------- #
+    # --------                  using all possible pairs                     -------- #
 
-	### --------------------------------------------------------------------------###
-	###         Computing the Null distribution of Normalizers                    ###
-	### --------------------------------------------------------------------------###
+    def _compute_normalizer_all_possible_pairs(self, bin_width, mVocs=False):
+        """Computes correlations separately for each sentence and using 
+        all possible trial pairs. Returns the distribution comprising of 
+        data points for all channels.    
+        Args:
+            bin_width: int = bin width in ms
+            mVocs: bool = If True, mVocs trials are considered.
 
-	# --------  Method 1 Null distribution: Using random poisson sequences   ------ #
+        Returns:
+            corr_dist: ndarray = shape = (all_possible_pairs*num_sents, ch) 
+        """
+        stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
+        corr_dist_combined = []
+        for stim_id, stim_spikes in stim_wise_repeated_spikes.items():
+            corr_dist_sent = self.inter_trial_corr_all_possible_pairs(stim_spikes)
+            corr_dist_combined.append(corr_dist_sent)
+        corr_dist_combined = np.concatenate(corr_dist_combined, axis=0)
+        corr_dist_combined = np.nan_to_num(corr_dist_combined)
+        return corr_dist_combined
+    
+    # --------    computes normalizer separately for each channel   -------- #
+    # --------             using all possible pairs 	            -------- #
+    
 
-	def _compute_normalizer_null_dist_using_poisson(
-			self, bin_width, spike_rate=50, p_value=5, num_itr=10000, mVocs=False
-		):
-		"""Normalizer based on assumption that spikes are generated by a poisson process, 
-		and are uniformly distributed in time."""
-		logger.info(f"Poisson Process: Null distribution for bin_width: {bin_width}, spike_rate: {spike_rate}...")
-		test_duration = self.get_testing_stim_duration(mVocs)
-		logger.info(f"Test duration: {test_duration:.2f} sec")
-		total_spikes = int(spike_rate * test_duration)
-		num_bins = self.dataset.calculate_num_bins(test_duration, bin_width/1000)
-		null_dist = []
-		for i in range(num_itr):
-			spike_times_1 = np.random.uniform(0, test_duration, int(total_spikes))
-			counts_1,_ = np.histogram(spike_times_1, num_bins)
+    def get_normalizer_for_session(
+            self, bin_width=20, delay=0, force_redo=False, mVocs=False,
+            random_pairs=True):
+        """Retrieves the distribution of normalizer for all the channels 
+        of the specified session, at specified bin_width and delay.
+        """
+        session = str(int(float(self.dataset.session_id)))    # to make sure session is in str format.
+        bin_width = int(bin_width)
+        dataset_name = self.dataset.dataset_name
+        logger.info(f"Getting normalizer dist. for sess-{session}, bw-{bin_width}, mVocs={mVocs}")
 
-			spike_times_2 = np.random.uniform(0, test_duration, int(total_spikes))
-			counts_2, _ = np.histogram(spike_times_2, num_bins)
+        if random_pairs:
+            method = 'random'
+        else:
+            method = 'app'
+        
+        if dataset_name=='ucsf' and mVocs:
+            # handling the excluded sessions for mVocs...
+            if session == '190726':
+                return np.zeros((1000, 60))
+            elif session == '200213':
+                return np.zeros((1000, 64))
+        
+        if not force_redo:
+            norm_dict_all_sessions = io.read_normalizer_distribution(
+                bin_width=bin_width, delay=delay, method=method, mVocs=mVocs, dataset_name=dataset_name
+                )
+        if force_redo or (norm_dict_all_sessions is None) or (session not in norm_dict_all_sessions.keys()):
+            if random_pairs:
+                norm_dist_session = self._compute_normalizer_using_random_pairs(
+                    bin_width, mVocs=mVocs,
+                    )
+            else:
+                norm_dist_session = self._compute_normalizer_all_possible_pairs(
+                    bin_width, mVocs=mVocs
+                    )
+            # save normalizer dist to disk..s
+            io.write_normalizer_distribution(
+                session, bin_width, delay, norm_dist_session, method=method, mVocs=mVocs, 
+                dataset_name=dataset_name
+            )
+            # return  norm_dist_session
+        else:
+            norm_dist_session =  norm_dict_all_sessions[session]
 
-			null_dist.append(np.corrcoef(counts_1, counts_2)[0,1])
-	   
-		q = 100 - p_value
-		return np.percentile(null_dist, q), np.array(null_dist)
-	
+        # Redundant check: We have already penalized correlations for being NAN (zero sequence)
+        # check zero valid samples in the distribution
+        if norm_dist_session.shape[0] == 0:
+            norm_dist_session = np.zeros((1, norm_dist_session.shape[-1]))
+        return norm_dist_session
 
-	def get_normalizer_null_dist_using_poisson(
-			self, bin_width, spike_rate=50, num_itr=10000, force_redo=False,
-			mVocs=False
-		):
-		"""Retrieves null distribution for normalizer using poisson
-		sequences. Reads off the disk, if already available, or recomputes
-		otherwise..
-		
-		Args:
-			bin_width: int = bin width in ms
-			spike_rate: int = spikes per second (Hz)
-			itr: int = number of iterations.
-			mVocs: bool = If True, 
-		"""
-		dataset_name = self.dataset.dataset_name
-		if not force_redo:
-			null_dist_poisson = io.read_normalizer_null_distribution_using_poisson(
-				bin_width=bin_width, spike_rate=spike_rate, mVocs=mVocs, dataset_name=dataset_name
-				)
-		if force_redo or null_dist_poisson is None:
-			threshold, null_dist_poisson = self._compute_normalizer_null_dist_using_poisson(
-				bin_width, spike_rate, num_itr=num_itr, mVocs=mVocs
-			)
-			io.write_normalizer_null_distribution_using_poisson(
-				bin_width, spike_rate, null_dist_poisson, mVocs=mVocs,
-				dataset_name=dataset_name
-			)
-		return null_dist_poisson
-	
-	# ----------  Method 2 Null distribution: Randomly shifted seq.    ---------- #
 
-	def _compute_normalizer_null_dist_using_random_shifts(
-			self, bin_width=50, num_itr=100000, min_shift_frac=0.2, max_shift_frac=0.8,
-			mVocs=False
-			):
-		"""Computes Null distribution by correlating randomly shifted spike sequence for 
-		randomly choosen trial against the original spike sequence (not shifted).
-		At each iteration shift is randomly choosen from [min_shift_samples, max_shift_samples],
-		where shift_sample = seq_length * shift_fraction
-		
-		Args:
-			bin_width: int = bin width in ms.
-			num_itr: int = number of iterations of correlation computation
-			min_shift_frac: float = fraction of sequence length for min_shift_samples
-			max_shift_frac: float = fraction of sequence length for max_shift_samples
-		"""
-		stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
-		all_trial_spikes = np.concatenate(list(stim_wise_repeated_spikes.values()), axis=1)
 
-		num_trials, seq_len, num_channels = all_trial_spikes.shape
-		null_dist = np.zeros((num_itr, num_channels))
-		min_shift = int(seq_len*min_shift_frac)
-		max_shift = int(seq_len*max_shift_frac)
-		for t in range(num_itr):
-			
-			tr_id1, tr_id2 = np.random.choice(
-					np.arange(0, num_trials),
-					size=2,
-					replace=True
-				)
-			spk_seq1 = all_trial_spikes[tr_id1].squeeze()
-			spk_seq2 = all_trial_spikes[tr_id2].squeeze()
-			# randomly roll the sequence to get the second sequence
-			rand_shift = np.random.randint(min_shift, max_shift)
-			spk_seq2 = np.roll(spk_seq2, rand_shift, axis=0)
+    ### --------------------------------------------------------------------------###
+    ###         Computing the Null distribution of Normalizers                    ###
+    ### --------------------------------------------------------------------------###
 
-			for ch in range(num_channels):
-				null_dist[t, ch] = np.corrcoef(
-					spk_seq1[...,ch],
-					spk_seq2[...,ch]
-					)[0,1]
-		# delete the entire iteration if there is nan for entry channel...
-		null_dist = np.delete(null_dist, np.where(np.isnan(null_dist))[0], axis=0)
-		return null_dist
-	
+    # --------  Method 1 Null distribution: Using random poisson sequences   ------ #
 
-	def get_normalizer_null_dist_using_random_shifts(
-			self, bin_width=50, num_itr=100000, min_shift_frac=0.2, max_shift_frac=0.8,
-			force_redo=False
-		):
-		"""Retrieves null distribution for normalizer using randomly 
-		shifted spike sequence of a trial vs non-shifted sequence.
-		At each iteration, trial is randomly choosen out of all available 
-		trials.
-		Reads off the disk, if already available, or recomputes
-		otherwise..
-		
-		Args:
-			bin_width: int = bin width in ms
-			spike_rate: int = spikes per second (Hz)
-			itr: int = number of iterations.
-		"""
-		session = str(int(float(self.dataset.session_id)))  # enforcing exact format of session
-		dataset_name = self.dataset.dataset_name
-		null_dist_shifts = io.read_normalizer_null_distribution_random_shifts(
-			bin_width=bin_width, min_shift_frac=min_shift_frac,
-			max_shift_frac=max_shift_frac, dataset_name=dataset_name
-			)
-		if null_dist_shifts is None or session not in null_dist_shifts.keys() or force_redo:
-			null_dist_sess = self._compute_normalizer_null_dist_using_random_shifts(
-				session=session, bin_width=bin_width, num_itr=num_itr,
-				min_shift_frac=min_shift_frac, max_shift_frac=max_shift_frac
-			)
-			io.write_normalizer_null_distribution_using_random_shifts(
-				session, bin_width=bin_width, min_shift_frac=min_shift_frac,
-				max_shift_frac=max_shift_frac, null_dist_sess=null_dist_sess,
-				dataset_name=dataset_name
-			)
-			return null_dist_sess
-		else:
-			null_dist = null_dist_shifts[session]
-			null_dist = np.delete(null_dist, np.where(np.isnan(null_dist))[0], axis=0)
-			return null_dist
+    def _compute_normalizer_null_dist_using_poisson(
+            self, bin_width, spike_rate=50, p_value=5, num_itr=10000, mVocs=False
+        ):
+        """Normalizer based on assumption that spikes are generated by a poisson process, 
+        and are uniformly distributed in time."""
+        logger.info(f"Poisson Process: Null distribution for bin_width: {bin_width}, spike_rate: {spike_rate}...")
+        test_duration = self.get_testing_stim_duration(mVocs)
+        logger.info(f"Test duration: {test_duration:.2f} sec")
+        total_spikes = int(spike_rate * test_duration)
+        num_bins = self.dataset.calculate_num_bins(test_duration, bin_width/1000)
+        null_dist = []
+        for i in range(num_itr):
+            spike_times_1 = np.random.uniform(0, test_duration, int(total_spikes))
+            counts_1,_ = np.histogram(spike_times_1, num_bins)
+
+            spike_times_2 = np.random.uniform(0, test_duration, int(total_spikes))
+            counts_2, _ = np.histogram(spike_times_2, num_bins)
+
+            null_dist.append(np.corrcoef(counts_1, counts_2)[0,1])
+       
+        q = 100 - p_value
+        return np.percentile(null_dist, q), np.array(null_dist)
+    
+
+    def get_normalizer_null_dist_using_poisson(
+            self, bin_width, spike_rate=50, num_itr=10000, force_redo=False,
+            mVocs=False
+        ):
+        """Retrieves null distribution for normalizer using poisson
+        sequences. Reads off the disk, if already available, or recomputes
+        otherwise..
+        
+        Args:
+            bin_width: int = bin width in ms
+            spike_rate: int = spikes per second (Hz)
+            itr: int = number of iterations.
+            mVocs: bool = If True, 
+        """
+        dataset_name = self.dataset.dataset_name
+        if not force_redo:
+            null_dist_poisson = io.read_normalizer_null_distribution_using_poisson(
+                bin_width=bin_width, spike_rate=spike_rate, mVocs=mVocs, dataset_name=dataset_name
+                )
+        if force_redo or null_dist_poisson is None:
+            threshold, null_dist_poisson = self._compute_normalizer_null_dist_using_poisson(
+                bin_width, spike_rate, num_itr=num_itr, mVocs=mVocs
+            )
+            io.write_normalizer_null_distribution_using_poisson(
+                bin_width, spike_rate, null_dist_poisson, mVocs=mVocs,
+                dataset_name=dataset_name
+            )
+        return null_dist_poisson
+    
+    # ----------  Method 2 Null distribution: Randomly shifted seq.    ---------- #
+
+    def _compute_normalizer_null_dist_using_random_shifts(
+            self, bin_width=50, num_itr=100000, min_shift_frac=0.2, max_shift_frac=0.8,
+            mVocs=False
+            ):
+        """Computes Null distribution by correlating randomly shifted spike sequence for 
+        randomly choosen trial against the original spike sequence (not shifted).
+        At each iteration shift is randomly choosen from [min_shift_samples, max_shift_samples],
+        where shift_sample = seq_length * shift_fraction
+        
+        Args:
+            bin_width: int = bin width in ms.
+            num_itr: int = number of iterations of correlation computation
+            min_shift_frac: float = fraction of sequence length for min_shift_samples
+            max_shift_frac: float = fraction of sequence length for max_shift_samples
+        """
+        stim_wise_repeated_spikes = self.get_stim_wise_repeated_spikes(bin_width=bin_width, mVocs=mVocs)
+        all_trial_spikes = np.concatenate(list(stim_wise_repeated_spikes.values()), axis=1)
+
+        num_trials, seq_len, num_channels = all_trial_spikes.shape
+        null_dist = np.zeros((num_itr, num_channels))
+        min_shift = int(seq_len*min_shift_frac)
+        max_shift = int(seq_len*max_shift_frac)
+        for t in range(num_itr):
+            
+            tr_id1, tr_id2 = np.random.choice(
+                    np.arange(0, num_trials),
+                    size=2,
+                    replace=True
+                )
+            spk_seq1 = all_trial_spikes[tr_id1].squeeze()
+            spk_seq2 = all_trial_spikes[tr_id2].squeeze()
+            # randomly roll the sequence to get the second sequence
+            rand_shift = np.random.randint(min_shift, max_shift)
+            spk_seq2 = np.roll(spk_seq2, rand_shift, axis=0)
+
+            for ch in range(num_channels):
+                null_dist[t, ch] = np.corrcoef(
+                    spk_seq1[...,ch],
+                    spk_seq2[...,ch]
+                    )[0,1]
+        # delete the entire iteration if there is nan for entry channel...
+        null_dist = np.delete(null_dist, np.where(np.isnan(null_dist))[0], axis=0)
+        return null_dist
+    
+
+    def get_normalizer_null_dist_using_random_shifts(
+            self, bin_width=50, num_itr=100000, min_shift_frac=0.2, max_shift_frac=0.8,
+            force_redo=False
+        ):
+        """Retrieves null distribution for normalizer using randomly 
+        shifted spike sequence of a trial vs non-shifted sequence.
+        At each iteration, trial is randomly choosen out of all available 
+        trials.
+        Reads off the disk, if already available, or recomputes
+        otherwise..
+        
+        Args:
+            bin_width: int = bin width in ms
+            spike_rate: int = spikes per second (Hz)
+            itr: int = number of iterations.
+        """
+        session = str(int(float(self.dataset.session_id)))  # enforcing exact format of session
+        dataset_name = self.dataset.dataset_name
+        null_dist_shifts = io.read_normalizer_null_distribution_random_shifts(
+            bin_width=bin_width, min_shift_frac=min_shift_frac,
+            max_shift_frac=max_shift_frac, dataset_name=dataset_name
+            )
+        if null_dist_shifts is None or session not in null_dist_shifts.keys() or force_redo:
+            null_dist_sess = self._compute_normalizer_null_dist_using_random_shifts(
+                session=session, bin_width=bin_width, num_itr=num_itr,
+                min_shift_frac=min_shift_frac, max_shift_frac=max_shift_frac
+            )
+            io.write_normalizer_null_distribution_using_random_shifts(
+                session, bin_width=bin_width, min_shift_frac=min_shift_frac,
+                max_shift_frac=max_shift_frac, null_dist_sess=null_dist_sess,
+                dataset_name=dataset_name
+            )
+            return null_dist_sess
+        else:
+            null_dist = null_dist_shifts[session]
+            null_dist = np.delete(null_dist, np.where(np.isnan(null_dist))[0], axis=0)
+            return null_dist
 
 
 
@@ -422,14 +425,14 @@ class NormalizerCalculator:
 
 # 		Args:
 # 			bin_width: int = bin width in ms.
-			
+            
 # 		Returns:
 # 			dict: {session: np.array([ch, ch])}
 # 		"""
 # 		significant_sessions_and_channels = io.read_significant_sessions_and_channels(
 # 			bin_width=bin_width, p_threshold=p_threshold, mVocs=mVocs
 # 			)
-		
+        
 # 		if significant_sessions_and_channels is None or force_redo:
 # 			significant_sessions_and_channels = self._compute_significant_sessions_and_channels_using_poisson_null(
 # 				bin_width=bin_width, spike_rate=spike_rate, p_threshold=p_threshold, mVocs=mVocs
@@ -445,10 +448,10 @@ class NormalizerCalculator:
 
 
 
-	
+    
 
-		
-		
+        
+        
 
 
 # 	def _compute_significant_sessions_and_channels_using_shifts_null(
@@ -498,7 +501,7 @@ class NormalizerCalculator:
 # 						significant_sessions_and_channels[session] = [ch]
 # 		print(f"Total significant neurons at {bin_width}ms bin width = {total_sig_channels}")
 # 		return significant_sessions_and_channels
-	
+    
 
 
 # 	def get_significant_sessions_and_channels_using_shifts_null(
@@ -510,14 +513,14 @@ class NormalizerCalculator:
 
 # 		Args:
 # 			bin_width: int = bin width in ms.
-			
+            
 # 		Returns:
 # 			dict: {session: np.array([ch, ch])}
 # 		"""
 # 		significant_sessions_and_channels = io.read_significant_sessions_and_channels(
 # 			bin_width=bin_width, p_threshold=p_threshold, use_poisson_null=False
 # 			)
-		
+        
 # 		if significant_sessions_and_channels is None or force_redo:
 # 			significant_sessions_and_channels = self._compute_significant_sessions_and_channels_using_shifts_null(
 # 				bin_width=bin_width, p_threshold=p_threshold,
@@ -579,7 +582,7 @@ class NormalizerCalculator:
 # 		# 	# print(f"Using default normalizer file...")
 # 		# 	normalizer_filename = "modified_bins_normalizer.csv"
 # 		# 	# "corr_normalizer.csv" original with full length sequnces. 
-		
+        
 # 		# # print(f"Creating normalizer object from: {normalizer_filename}")
 # 		# # self.dataframe, self.filepath = Normalizer.load_data(normalizer_filename)
 # 		# self.metadata = NeuralMetaData()
@@ -591,13 +594,13 @@ class NormalizerCalculator:
 # 		select_data = self._get_normalizers_for_bin_width_and_delay(bin_width, delay)
 # 		select_data = select_data[select_data['normalizer'] >= threshold]
 # 		return select_data['session'].unique()
-	
+    
 # 	def get_good_channels(self, session, bin_width=20, delay=0, threshold=0.068):
 # 		"""Returns a list of sig. channels for the session, bw and delay"""
 # 		select_data = self.get_normalizer_for_session(session, bin_width=bin_width, delay=delay)
 # 		select_data = select_data[select_data['normalizer'] >= threshold]
 # 		return select_data['channel'].unique()
-		
+        
 # 	def _get_normalizers_for_bin_width_and_delay(self, bin_width=20, delay=0):
 # 		"""Retrieves section of dataframe for specified bin_width and delay"""
 # 		select_data =  self.dataframe[
@@ -622,7 +625,7 @@ class NormalizerCalculator:
 # 		else:
 # 			return select_data
 
-	
+    
 # 	def save_normalizer_for_all_sessions(self, bin_width=20, delay=0):
 # 		sessions = self.metadata.get_all_available_sessions()
 # 		select_data = self._get_normalizers_for_bin_width_and_delay(bin_width, delay)
@@ -662,7 +665,7 @@ class NormalizerCalculator:
 
 # 		# self.dataframe = pd.concat([self.dataframe, df], axis=0, ignore_index=True)
 # 		# self.dataframe.to_csv(self.filepath, index=False)
-	
+    
 
 
 
@@ -683,13 +686,13 @@ class NormalizerCalculator:
 # 	#         sent_wise_repeated_spikes[sent] = dataset.get_repeated_trials(
 # 	#             sents=[sent], bin_width=bin_width, delay=delay
 # 	#             )
-			
+            
 # 	#     normalizer_all = Normalizer.inter_trial_corr_using_random_pairing(
 # 	#         sent_wise_repeated_spikes, n=n
 # 	#         )
 # 	#     normalizer_all_med = np.median(normalizer_all, axis=0)
 # 	#     return normalizer_all_med, normalizer_all
-	
+    
  
 
 
@@ -701,7 +704,7 @@ class NormalizerCalculator:
 # 			self.loaded_datasets.clear()
 # 			self.loaded_datasets[session] = NeuralData(session)
 # 		return self.loaded_datasets[session]
-	
+    
 # 	def compute_normalizer_threshold(self, bin_width, p_value=5, itr=10000):
 # 		"""Computes significance threshold for normalizer at bin_width."""
 
@@ -721,190 +724,190 @@ class NormalizerCalculator:
 
 # 		q = 100 - p_value
 # 		return np.percentile(null_dist, q), null_dist
-	
+    
 
-	
-
-
+    
 
 
-	
 
-		
 
-	
+    
+
+        
+
+    
 #########################################################
 ######      static methods
 ########################################################
 
-	@staticmethod
-	def write_data(df, filepath):
-		if os.path.exists(filepath):
-			existing_data = pd.read_csv(filepath)
-		else:
-			existing_data = pd.DataFrame(columns=df.columns)
-		updated_data = pd.concat([existing_data, df], axis=0, ignore_index=True)
-		updated_data.to_csv(filepath, index=False)
-		print(f"Result updated...!")
-		return updated_data
-		
+    @staticmethod
+    def write_data(df, filepath):
+        if os.path.exists(filepath):
+            existing_data = pd.read_csv(filepath)
+        else:
+            existing_data = pd.DataFrame(columns=df.columns)
+        updated_data = pd.concat([existing_data, df], axis=0, ignore_index=True)
+        updated_data.to_csv(filepath, index=False)
+        print(f"Result updated...!")
+        return updated_data
+        
 
 
-	@staticmethod
-	def load_data(filename):
-		"""Loads/creates dataframe containing normalizers"""
-		filepath = os.path.join(
-			results_dir, 'neural_repeatibitliy', filename
-			)
-		if not os.path.exists(os.path.dirname(filepath)):
-			print(f"Creating directory structure for normalizer...!")
-			os.makedirs(os.path.dirname(filepath))
+    @staticmethod
+    def load_data(filename):
+        """Loads/creates dataframe containing normalizers"""
+        filepath = os.path.join(
+            results_dir, 'neural_repeatibitliy', filename
+            )
+        if not os.path.exists(os.path.dirname(filepath)):
+            print(f"Creating directory structure for normalizer...!")
+            os.makedirs(os.path.dirname(filepath))
 
-		if os.path.exists(filepath):
-			print(f"Reading existing dataframe.")
-			dataframe = pd.read_csv(filepath)
-		else:
-			print(f"Creating new dataframe.")
-			columns = ['session', 'channel','bin_width',
-					   'delay', 'normalizer']
-			dataframe = pd.DataFrame(columns=columns)
-		return dataframe, filepath
-	
-	@staticmethod
-	def inter_trial_corr_all_possible_pairs(spikes_all_trials, num_trials=None):
-		"""Computes correlations between all possible trial pairs,
-		and returns the distribution. For example for input of shape (11,:, 64),
-		there are 11 trials, so number of possible pairs are 11C2 = 11*10/2 = 55.
-		
-		Args:
-			spikes_all_trials: ndarray = (num_trials, seq_length, channels)
+        if os.path.exists(filepath):
+            print(f"Reading existing dataframe.")
+            dataframe = pd.read_csv(filepath)
+        else:
+            print(f"Creating new dataframe.")
+            columns = ['session', 'channel','bin_width',
+                       'delay', 'normalizer']
+            dataframe = pd.DataFrame(columns=columns)
+        return dataframe, filepath
+    
+    @staticmethod
+    def inter_trial_corr_all_possible_pairs(spikes_all_trials, num_trials=None):
+        """Computes correlations between all possible trial pairs,
+        and returns the distribution. For example for input of shape (11,:, 64),
+        there are 11 trials, so number of possible pairs are 11C2 = 11*10/2 = 55.
+        
+        Args:
+            spikes_all_trials: ndarray = (num_trials, seq_length, channels)
 
-		Returns:
-			sent_corr_dist: ndarray = shape = (all_possible_pairs, ch) 
-		"""
-		if num_trials is None:
-			num_trials = spikes_all_trials.shape[0]
-		sent_corr_dist = []
-		num_channels = spikes_all_trials.shape[-1]
-		# imagine upper half of the matrix, with diagonal entries included..
-		possible_pairs = int((num_trials**2 - num_trials)/2)
-		sent_corr_dist = np.zeros((possible_pairs, num_channels))
-		index = 0
-		for i in range(num_trials):
-			for j in range(i+1, num_trials):
-				for ch in range(num_channels):
-					trial1 = spikes_all_trials[i,:,ch]
-					trial2 = spikes_all_trials[j,:,ch]
-					sent_corr_dist[index, ch] = np.corrcoef(
-						trial1, trial2
-						)[0,1]
-				index += 1
-		return sent_corr_dist
+        Returns:
+            sent_corr_dist: ndarray = shape = (all_possible_pairs, ch) 
+        """
+        if num_trials is None:
+            num_trials = spikes_all_trials.shape[0]
+        sent_corr_dist = []
+        num_channels = spikes_all_trials.shape[-1]
+        # imagine upper half of the matrix, with diagonal entries included..
+        possible_pairs = int((num_trials**2 - num_trials)/2)
+        sent_corr_dist = np.zeros((possible_pairs, num_channels))
+        index = 0
+        for i in range(num_trials):
+            for j in range(i+1, num_trials):
+                for ch in range(num_channels):
+                    trial1 = spikes_all_trials[i,:,ch]
+                    trial2 = spikes_all_trials[j,:,ch]
+                    sent_corr_dist[index, ch] = np.corrcoef(
+                        trial1, trial2
+                        )[0,1]
+                index += 1
+        return sent_corr_dist
 
-	@staticmethod
-	def inter_trial_corr(spikes, n=100000):
-		"""Compute distribution of inter-trials correlations.
+    @staticmethod
+    def inter_trial_corr(spikes, n=100000):
+        """Compute distribution of inter-trials correlations.
 
-		Args: 
-			spikes (ndarray): (repeats, samples/time, channels)
+        Args: 
+            spikes (ndarray): (repeats, samples/time, channels)
 
-		Returns:
-			trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
-		"""
-		num_channels = spikes.shape[-1]
-		trials_corr = np.zeros((n, num_channels))
-		for t in range(n):
-			trials = np.random.choice(np.arange(0,spikes.shape[0]), size=2, replace=False)
-			for ch in range(num_channels):
-				trials_corr[t, ch] = np.corrcoef(
-					spikes[trials[0],:,ch].squeeze(), spikes[trials[1],:,ch].squeeze()
-					)[0,1]
-		return trials_corr
+        Returns:
+            trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
+        """
+        num_channels = spikes.shape[-1]
+        trials_corr = np.zeros((n, num_channels))
+        for t in range(n):
+            trials = np.random.choice(np.arange(0,spikes.shape[0]), size=2, replace=False)
+            for ch in range(num_channels):
+                trials_corr[t, ch] = np.corrcoef(
+                    spikes[trials[0],:,ch].squeeze(), spikes[trials[1],:,ch].squeeze()
+                    )[0,1]
+        return trials_corr
 
-	@staticmethod
-	def inter_trial_corr_using_random_pairing(sent_wise_repeated_spikes, num_itr=100000):
-		"""Compute distribution of inter-trials correlations, using bootstrapping.
-		At each iteration randomly selects trial pair for each sentence. Assigns one
-		trial to first long sequence and second trial to second long sequence. 
+    @staticmethod
+    def inter_trial_corr_using_random_pairing(sent_wise_repeated_spikes, num_itr=100000):
+        """Compute distribution of inter-trials correlations, using bootstrapping.
+        At each iteration randomly selects trial pair for each sentence. Assigns one
+        trial to first long sequence and second trial to second long sequence. 
 
-		Args: 
-			spikes dict(stim: ndarray): {stim: (repeats, samples/time, channels)}
+        Args: 
+            spikes dict(stim: ndarray): {stim: (repeats, samples/time, channels)}
 
-		Returns:
-			trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
-		"""
-		num_channels = next(iter(sent_wise_repeated_spikes.values())).shape[-1]
-		trials_corr = np.zeros((num_itr, num_channels))
-		stim_ids = list(sent_wise_repeated_spikes.keys())
-		num_trials = sent_wise_repeated_spikes[stim_ids[0]].shape[0]
-		trial_ids = np.arange(num_trials)
-		for t in range(num_itr):
-			long_seq1 = []
-			long_seq2 = []
+        Returns:
+            trials_corr (ndarray): (n, channels) distribution of inter-trial correlations
+        """
+        num_channels = next(iter(sent_wise_repeated_spikes.values())).shape[-1]
+        trials_corr = np.zeros((num_itr, num_channels))
+        stim_ids = list(sent_wise_repeated_spikes.keys())
+        num_trials = sent_wise_repeated_spikes[stim_ids[0]].shape[0]
+        trial_ids = np.arange(num_trials)
+        for t in range(num_itr):
+            long_seq1 = []
+            long_seq2 = []
 
-			for sent, spikes in sent_wise_repeated_spikes.items():
-				tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)
+            for sent, spikes in sent_wise_repeated_spikes.items():
+                tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)
 
-				long_seq1.append(spikes[tr1])
-				long_seq2.append(spikes[tr2])
-			long_seq1 = np.concatenate(long_seq1, axis=0)
-			long_seq2 = np.concatenate(long_seq2, axis=0)
+                long_seq1.append(spikes[tr1])
+                long_seq2.append(spikes[tr2])
+            long_seq1 = np.concatenate(long_seq1, axis=0)
+            long_seq2 = np.concatenate(long_seq2, axis=0)
 
-			for ch in range(num_channels):
-				corr_ch = np.corrcoef(
-					long_seq1[...,ch].squeeze(), long_seq2[...,ch].squeeze()
-					)[0,1]
-				# nan might result from entires sequence being zero, 
-				# penalize that by setting corr equal to zero.
-				if np.isnan(corr_ch):
-					corr_ch = 0
-				trials_corr[t, ch] = corr_ch
-		return trials_corr
-	
-	@staticmethod
-	def inter_trial_corr_for_bootstrap_analysis(
-		sent_wise_repeated_spikes, stim_ids=None, n=10000, num_trials=3, 
-		):
+            for ch in range(num_channels):
+                corr_ch = np.corrcoef(
+                    long_seq1[...,ch].squeeze(), long_seq2[...,ch].squeeze()
+                    )[0,1]
+                # nan might result from entires sequence being zero, 
+                # penalize that by setting corr equal to zero.
+                if np.isnan(corr_ch):
+                    corr_ch = 0
+                trials_corr[t, ch] = corr_ch
+        return trials_corr
+    
+    @staticmethod
+    def inter_trial_corr_for_bootstrap_analysis(
+        sent_wise_repeated_spikes, stim_ids=None, n=10000, num_trials=3, 
+        ):
 
-		if stim_ids is None:
-			stim_ids = list(sent_wise_repeated_spikes.keys())
-		# num_channels = next(iter(sent_wise_repeated_spikes.values())).shape[-1]
-		max_num_trials, _, num_channels = sent_wise_repeated_spikes[stim_ids[0]].shape
-		trials_corr = np.zeros((n, num_channels))
-		# if mVocs:
-		# 	max_num_trials = 15
-			
-		# else:
-		# 	max_num_trials = 11
-		assert num_trials <= max_num_trials and num_trials >= 2, "num_trials must be between 1 and {}".format(max_num_trials)
-		# trial_ids = np.arange(max_num_trials)
-		# trial_ids = np.random.choice(trial_ids, size=num_trials, replace=False)
-		trial_ids = np.random.choice(max_num_trials, size=num_trials, replace=True)
+        if stim_ids is None:
+            stim_ids = list(sent_wise_repeated_spikes.keys())
+        # num_channels = next(iter(sent_wise_repeated_spikes.values())).shape[-1]
+        max_num_trials, _, num_channels = sent_wise_repeated_spikes[stim_ids[0]].shape
+        trials_corr = np.zeros((n, num_channels))
+        # if mVocs:
+        # 	max_num_trials = 15
+            
+        # else:
+        # 	max_num_trials = 11
+        assert num_trials <= max_num_trials and num_trials >= 2, "num_trials must be between 1 and {}".format(max_num_trials)
+        # trial_ids = np.arange(max_num_trials)
+        # trial_ids = np.random.choice(trial_ids, size=num_trials, replace=False)
+        trial_ids = np.random.choice(max_num_trials, size=num_trials, replace=True)
 
-		for t in range(n):
-			long_seq1 = []
-			long_seq2 = []
+        for t in range(n):
+            long_seq1 = []
+            long_seq2 = []
 
-			for stim_id in stim_ids:
-				spikes = sent_wise_repeated_spikes[stim_id]
-				tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)   
-				# replace=False is important here, because, we wouldn't want to 
+            for stim_id in stim_ids:
+                spikes = sent_wise_repeated_spikes[stim_id]
+                tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)   
+                # replace=False is important here, because, we wouldn't want to 
                 # compute correlation between identical sequence. 
 
-				long_seq1.append(spikes[tr1])
-				long_seq2.append(spikes[tr2])
-			long_seq1 = np.concatenate(long_seq1, axis=0)
-			long_seq2 = np.concatenate(long_seq2, axis=0)
+                long_seq1.append(spikes[tr1])
+                long_seq2.append(spikes[tr2])
+            long_seq1 = np.concatenate(long_seq1, axis=0)
+            long_seq2 = np.concatenate(long_seq2, axis=0)
 
-			for ch in range(num_channels):
-				corr_ch = np.corrcoef(
-					long_seq1[...,ch].squeeze(), long_seq2[...,ch].squeeze()
-					)[0,1]
-				# nan might result from entires sequence being zero, 
-				# penalize that by setting corr equal to zero.
-				if np.isnan(corr_ch):
-					corr_ch = 0
-				trials_corr[t, ch] = corr_ch
-		return trials_corr
+            for ch in range(num_channels):
+                corr_ch = np.corrcoef(
+                    long_seq1[...,ch].squeeze(), long_seq2[...,ch].squeeze()
+                    )[0,1]
+                # nan might result from entires sequence being zero, 
+                # penalize that by setting corr equal to zero.
+                if np.isnan(corr_ch):
+                    corr_ch = 0
+                trials_corr[t, ch] = corr_ch
+        return trials_corr
 
 
