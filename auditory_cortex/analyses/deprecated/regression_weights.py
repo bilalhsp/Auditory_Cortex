@@ -7,7 +7,7 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 
 from auditory_cortex import opt_inputs_dir
 from auditory_cortex import utils
-from auditory_cortex.analyses.regression_correlations import Correlations
+from auditory_cortex.analyses.deprecated.regression_correlations import Correlations
 from auditory_cortex.neural_data.deprecated.neural_meta_data import NeuralMetaData
 from auditory_cortex.neural_data.deprecated.recording_config import RecordingConfig
 

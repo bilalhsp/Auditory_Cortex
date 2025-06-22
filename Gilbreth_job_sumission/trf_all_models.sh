@@ -87,27 +87,27 @@ args_sets=(
     "-m wav2letter_modified -l 12"
     "-m wav2letter_modified -l 13"
     # w2v2_generic
-    "-m w2v2_generic -l 0"
-    "-m w2v2_generic -l 1"
-    "-m w2v2_generic -l 2"
-    "-m w2v2_generic -l 3"
-    "-m w2v2_generic -l 4"
-    "-m w2v2_generic -l 5"
-    "-m w2v2_generic -l 6"
-    "-m w2v2_generic -l 7"
-    "-m w2v2_generic -l 8"
-    "-m w2v2_generic -l 9"
-    "-m w2v2_generic -l 10"
-    "-m w2v2_generic -l 11"
-    "-m w2v2_generic -l 12"
-    "-m w2v2_generic -l 13"
-    "-m w2v2_generic -l 14"
-    "-m w2v2_generic -l 15"
-    "-m w2v2_generic -l 16"
-    "-m w2v2_generic -l 17"
-    "-m w2v2_generic -l 18"
-    "-m w2v2_generic -l 19"
-    "-m w2v2_generic -l 20"
+    # "-m w2v2_generic -l 0"
+    # "-m w2v2_generic -l 1"
+    # "-m w2v2_generic -l 2"
+    # "-m w2v2_generic -l 3"
+    # "-m w2v2_generic -l 4"
+    # "-m w2v2_generic -l 5"
+    # "-m w2v2_generic -l 6"
+    # "-m w2v2_generic -l 7"
+    # "-m w2v2_generic -l 8"
+    # "-m w2v2_generic -l 9"
+    # "-m w2v2_generic -l 10"
+    # "-m w2v2_generic -l 11"
+    # "-m w2v2_generic -l 12"
+    # "-m w2v2_generic -l 13"
+    # "-m w2v2_generic -l 14"
+    # "-m w2v2_generic -l 15"
+    # "-m w2v2_generic -l 16"
+    # "-m w2v2_generic -l 17"
+    # "-m w2v2_generic -l 18"
+    # "-m w2v2_generic -l 19"
+    # "-m w2v2_generic -l 20"
 
 )
 # # Replace the placeholder with the actual base identifier
@@ -337,69 +337,69 @@ do
             suff="_l13"
             ;;
         #w2v2_generic
-        70)
-            suff="_l0"
-            ;;        
-        71)
-            suff="_l1"
-            ;;
-        72)
-            suff="_l2"
-            ;; 
-        73)
-            suff="_l3"
-            ;;
-        74)
-            suff="_l4"
-            ;;
-        75)
-            suff="_l5"
-            ;;
-        76)
-            suff="_l6"
-            ;;
-        77)
-            suff="_l7"
-            ;;
-        78)
-            suff="_l8"
-            ;;        
-        79)
-            suff="_l9"
-            ;;
-        80)
-            suff="_l10"
-            ;; 
-        81)
-            suff="_l11"
-            ;;
-        82)
-            suff="_l12"
-            ;;
-        83)
-            suff="_l13"
-            ;;
-        84)
-            suff="_l14"
-            ;;
-        85)
-            suff="_l15"
-            ;; 
-        86)
-            suff="_l16"
-            ;;
-        87)
-            suff="_l17"
-            ;;
-        88)
-            suff="_l18"
-            ;;
-        89)
-            suff="_l19"
-            ;;
-        90)
-            suff="_l20"
-            ;;
+        # 70)
+        #     suff="_l0"
+        #     ;;        
+        # 71)
+        #     suff="_l1"
+        #     ;;
+        # 72)
+        #     suff="_l2"
+        #     ;; 
+        # 73)
+        #     suff="_l3"
+        #     ;;
+        # 74)
+        #     suff="_l4"
+        #     ;;
+        # 75)
+        #     suff="_l5"
+        #     ;;
+        # 76)
+        #     suff="_l6"
+        #     ;;
+        # 77)
+        #     suff="_l7"
+        #     ;;
+        # 78)
+        #     suff="_l8"
+        #     ;;        
+        # 79)
+        #     suff="_l9"
+        #     ;;
+        # 80)
+        #     suff="_l10"
+        #     ;; 
+        # 81)
+        #     suff="_l11"
+        #     ;;
+        # 82)
+        #     suff="_l12"
+        #     ;;
+        # 83)
+        #     suff="_l13"
+        #     ;;
+        # 84)
+        #     suff="_l14"
+        #     ;;
+        # 85)
+        #     suff="_l15"
+        #     ;; 
+        # 86)
+        #     suff="_l16"
+        #     ;;
+        # 87)
+        #     suff="_l17"
+        #     ;;
+        # 88)
+        #     suff="_l18"
+        #     ;;
+        # 89)
+        #     suff="_l19"
+        #     ;;
+        # 90)
+        #     suff="_l20"
+        #     ;;
     esac
 
     # Submit the job with the current set of arguments

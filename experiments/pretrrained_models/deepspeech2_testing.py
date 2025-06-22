@@ -1,7 +1,7 @@
 import os
 import torch
 
-import auditory_cortex.models as Reg
+import auditory_cortex.deprecated.models as Reg
 from deepspeech_pytorch.model import DeepSpeech
 import deepspeech_pytorch.loader.data_loader as data_loader
 from deepspeech_pytorch.configs.train_config import SpectConfig

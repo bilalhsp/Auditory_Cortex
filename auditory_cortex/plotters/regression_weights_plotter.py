@@ -6,11 +6,11 @@ import matplotlib.patches as patches
 from palettable.colorbrewer import qualitative
 from auditory_cortex import utils
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
-from auditory_cortex.analyses.regression_weights import BetaAnalyzer
+from auditory_cortex.analyses.deprecated.regression_weights import BetaAnalyzer
 from auditory_cortex.neural_data.deprecated.neural_meta_data import NeuralMetaData
 from auditory_cortex.neural_data.deprecated.recording_config import RecordingConfig
 from auditory_cortex.plotters.coordinates_plotter import CoordinatesPlotter
-from auditory_cortex.analyses.rsa import RSA
+from auditory_cortex.analyses.deprecated.rsa import RSA
 
 from auditory_cortex.plotters.hierarchical_plotter import Tree, linkage_to_edges
 

@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.WARNING)
 import os
 import pickle
 from auditory_cortex import optimal_input, opt_inputs_dir
-from auditory_cortex.analyses import regression_correlations
+from auditory_cortex.analyses.deprecated import regression_correlations
 
 # model_name = 'deepspeech2'
 # model_name = 'speech2text'

@@ -133,9 +133,10 @@ def write_bootstrap_median_dist(
 #-----------      cache TRF parameters    -----------#
 
 def read_trf_parameters(
-        model_name, session, bin_width=50, shuffled=False,
-        verbose=True, LPF=False, mVocs=False, bias=False,
-        dataset_name='ucsf'
+        model_name, session, bin_width=50,
+        shuffled=False, layer_ID=None, LPF=False,
+        mVocs=False, dataset_name='ucsf',
+        lag=300
         ):
     """Reads parameters of GLM alongthwith neural spikes and natural parameters 
     model_name, returns a dictionary.
@@ -144,7 +145,7 @@ def read_trf_parameters(
     bin_width = int(bin_width)
     # layer_ID = int(layer_ID)
     logger.info(f"Reading TRF parameters for {model_name}, session-{session}," +\
-           f"bin-width-{bin_width}ms, shuffled-{shuffled}, LPF-{LPF}, bias-{bias}")
+           f"bin-width-{bin_width}ms, shuffled-{shuffled}, LPF-{LPF}")
     path_dir = os.path.join(cache_dir, 'trf', f'{model_name}')
     if dataset_name != 'ucsf':
         path_dir = os.path.join(path_dir, dataset_name)
@@ -154,25 +155,27 @@ def read_trf_parameters(
         path_dir = os.path.join(path_dir, 'shuffled')
     if LPF:
         path_dir = os.path.join(path_dir, 'LPF')
-    if bias:
-        path_dir = os.path.join(path_dir, 'bias')
-    filename = f'{model_name}_sess_{session}_trf_{bin_width}ms.pkl'   
-    file_path = os.path.join(path_dir, filename)
+
+    if model_name == 'strf':
+        filename = f'{model_name}_sess_{session}_trf{lag}_{bin_width}ms.pkl' 
+    else:
+        filename = f'{model_name}_layer_{layer_ID}_sess_{session}_trf{lag}_{bin_width}ms.pkl'
     
+    file_path = os.path.join(path_dir, filename)
     if os.path.exists(file_path):
-        if verbose:
-            logger.info(f"Reading from file: {file_path}")
+        logger.info(f"Reading from file: {file_path}")
         with open(file_path, 'rb') as F: 
-            reg_results = pickle.load(F)
-        return reg_results
+            parameters = pickle.load(F)
+        return parameters
     else:
         logger.info(f"Results not found.")
         return None
 
 def write_trf_parameters(
-        model_name, session, betas, bin_width=50,
+        model_name, session, parameters, bin_width=50,
         shuffled=False, layer_ID=None, LPF=False,
-        mVocs=False, bias=False, dataset_name='ucsf'
+        mVocs=False, dataset_name='ucsf',
+        lag=300
         ):
     """writes the lmbdas, separate file for every model..
     """
@@ -189,30 +192,98 @@ def write_trf_parameters(
         path_dir = os.path.join(path_dir, 'shuffled')
     if LPF:
         path_dir = os.path.join(path_dir, 'LPF')
-    if bias:
-        path_dir = os.path.join(path_dir, 'bias')
     if not os.path.exists(path_dir):
         os.makedirs(path_dir)
         logger.info(f"Directory path created: {path_dir}")
 
-    filename = f'{model_name}_sess_{session}_trf_{bin_width}ms.pkl' 
+    if model_name == 'strf':
+        filename = f'{model_name}_sess_{session}_trf{lag}_{bin_width}ms.pkl' 
+    else:
+        filename = f'{model_name}_layer_{layer_ID}_sess_{session}_trf{lag}_{bin_width}ms.pkl'
     file_path = os.path.join(path_dir, filename)
     
-    exisiting_results = read_trf_parameters(
-        model_name, session, bin_width=bin_width,
-        shuffled=shuffled, LPF=LPF, mVocs=mVocs, bias=bias,
-        dataset_name=dataset_name
-        )
-    if exisiting_results is None:
-        exisiting_results = {}
-    
-    if model_name == 'strf':
-        layer_ID = 'strf'
-
-    exisiting_results[layer_ID] = betas
     with open(file_path, 'wb') as F: 
-        pickle.dump(exisiting_results, F)
+        pickle.dump(parameters, F)
     logger.info(f"trf parameters saved for {model_name} at path: \n {file_path}.")
+
+# def write_alphas(
+#         model_name, session, alphas, bin_width=50,
+#         shuffled=False, layer_ID=None, LPF=False,
+#         mVocs=False, dataset_name='ucsf',
+#         lag=300
+#         ):
+#     """writes the lmbdas, separate file for every model..
+#     """
+#     session = int(session)
+#     if layer_ID is not None:
+#         layer_ID = int(layer_ID)
+
+#     path_dir = os.path.join(cache_dir, 'trf', f'{model_name}')
+#     if dataset_name != 'ucsf':
+#         path_dir = os.path.join(path_dir, dataset_name)
+#     if mVocs:
+#         path_dir = os.path.join(path_dir, 'mVocs')
+#     if shuffled:
+#         path_dir = os.path.join(path_dir, 'shuffled')
+#     if LPF:
+#         path_dir = os.path.join(path_dir, 'LPF')
+#     path_dir = os.path.join(path_dir, 'alphas')
+#     if not os.path.exists(path_dir):
+#         os.makedirs(path_dir)
+#         logger.info(f"Directory path created: {path_dir}")
+
+
+#     if model_name == 'strf':
+#         filename = f'{model_name}_sess_{session}_trf{lag}_{bin_width}ms.pkl' 
+#     else:
+#         filename = f'{model_name}_layer_{layer_ID}_sess_{session}_trf{lag}_{bin_width}ms.pkl'
+
+#     file_path = os.path.join(path_dir, filename)
+#     with open(file_path, 'wb') as F: 
+#         pickle.dump(alphas, F)
+#     logger.info(f"trf parameters saved for {model_name} at path: \n {file_path}.")
+
+# def read_alphas(
+#         model_name, session, bin_width=50,
+#         shuffled=False, layer_ID=None, LPF=False,
+#         mVocs=False, bias=False, dataset_name='ucsf',
+#         lag=300
+#         ):
+#     """writes the lmbdas, separate file for every model..
+#     """
+#     session = int(session)
+#     if layer_ID is not None:
+#         layer_ID = int(layer_ID)
+
+#     path_dir = os.path.join(cache_dir, 'trf', f'{model_name}')
+#     if dataset_name != 'ucsf':
+#         path_dir = os.path.join(path_dir, dataset_name)
+#     if mVocs:
+#         path_dir = os.path.join(path_dir, 'mVocs')
+#     if shuffled:
+#         path_dir = os.path.join(path_dir, 'shuffled')
+#     if LPF:
+#         path_dir = os.path.join(path_dir, 'LPF')
+#     path_dir = os.path.join(path_dir, 'alphas')
+#     if not os.path.exists(path_dir):
+#         os.makedirs(path_dir)
+#         logger.info(f"Directory path created: {path_dir}")
+
+
+#     if model_name == 'strf':
+#         filename = f'{model_name}_sess_{session}_trf{lag}_{bin_width}ms.pkl' 
+#     else:
+#         filename = f'{model_name}_layer_{layer_ID}_sess_{session}_trf{lag}_{bin_width}ms.pkl'
+
+#     file_path = os.path.join(path_dir, filename)
+#     if os.path.exists(file_path):
+#         logger.info(f"Reading from file: {file_path}")
+#         with open(file_path, 'rb') as F: 
+#             alphas = pickle.load(F)
+#         return alphas
+#     else:
+#         logger.info(f"Results not found.")
+#         return None
 
 
 
@@ -319,32 +390,29 @@ def write_normalizer_null_distribution_using_poisson(
 #-----------      Null distribution using sequence shifts    -----------#
 
 def read_normalizer_null_distribution_random_shifts(
-        bin_width, min_shift_frac, max_shift_frac, dataset_name='ucsf'
+        session, bin_width, dataset_name='ucsf'
         ):
     """Retrieves null distribution of correlations computed using randomly 
         shifted spike sequence of one trial vs (non-shifted) seconds trial."""
     bin_width = int(bin_width)
-    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution', 'shifted_sequence')
+    session = str(int(float(session)))
     if dataset_name != 'ucsf':
         parent_dir = os.path.join(normalizers_dir, dataset_name)
     else:
         parent_dir = normalizers_dir
     path_dir = os.path.join(parent_dir, 'null_distribution', 'shifted_sequence')
-    file_path = os.path.join(
-        path_dir,
-        f"normalizers_null_dist_sequence_shifted_bw_{bin_width}ms_shift_range_{min_shift_frac:01.2f}_{max_shift_frac:01.2f}.pkl"
-        )
+    file_path = f"shifted_null_bw_{bin_width}ms_sess_{session}.npz"
+    file_path = os.path.join(path_dir, file_path)
     if os.path.exists(file_path):
-        with open(file_path, 'rb') as F: 
-            norm_null_dist = pickle.load(F)
-        return norm_null_dist
+        data = np.load(file_path)
+        null_dist = data['null_dist']
+        return null_dist
     else:
-        logger.info(f"Null dist. not found: for bin-width {bin_width}ms and shift range {min_shift_frac:01.2f}--{max_shift_frac:01.2f}.")
+        logger.info(f"Null dist. not found: for bin-width {bin_width}ms and session {session}.")
         return None
 
 def write_normalizer_null_distribution_using_random_shifts(
-        session, bin_width, min_shift_frac,
-        max_shift_frac, null_dist_sess, dataset_name='ucsf'
+        session, bin_width, null_dist_sess, dataset_name='ucsf'
         ):
     """Writes null distribution of correlations computed using poisson sequences for the given selection."""
     bin_width = int(bin_width)
@@ -354,36 +422,25 @@ def write_normalizer_null_distribution_using_random_shifts(
     else:
         parent_dir = normalizers_dir
     path_dir = os.path.join(parent_dir, 'null_distribution', 'shifted_sequence')
-    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution', 'shifted_sequence')
-    file_path = os.path.join(
-        path_dir,
-        f"normalizers_null_dist_sequence_shifted_bw_{bin_width}ms_shift_range_{min_shift_frac:01.2f}_{max_shift_frac:01.2f}.pkl"
-        )
-    
-    if not os.path.exists(path_dir):
-        logger.info(f"Path not found, creating directories...")
-        os.makedirs(path_dir)
+    os.makedirs(path_dir, exist_ok=True)
+    file_path = f"shifted_null_bw_{bin_width}ms_sess_{session}.npz"
+    file_path = os.path.join(path_dir, file_path)
 
-    null_dict_all_sessions = read_normalizer_null_distribution_random_shifts(
-        bin_width, min_shift_frac, max_shift_frac, dataset_name=dataset_name
-        )
-        
-    if null_dict_all_sessions is None:
-        null_dict_all_sessions = {}
-
-    null_dict_all_sessions[session] = null_dist_sess
-    with open(file_path, 'wb') as F: 
-        pickle.dump(null_dict_all_sessions, F)
-    logger.info(f"Writing normalizer dictionary to the {file_path}")
-
-
+    np.savez_compressed(file_path, null_dist=null_dist_sess)
+    logger.info(f"Shifted Null dist. saved to: {file_path}")
 
 #-----------  Normalizer distribution using all possible pairs of trials  ----------#
 
 def read_normalizer_distribution(
-        bin_width, delay, method='app', mVocs=False, dataset_name='ucsf'
+        bin_width, delay, session, method='app', mVocs=False, dataset_name='ucsf'
         ):
-    """Retrieves distribution of normalizers for the given selection."""
+    """Retrieves distribution of normalizers for the given selection.
+    
+    Args:
+        bin_width: int = bin width in ms
+        delay: int = delay in ms
+        session: str = session ID (e.g. 200206)
+    """
     bin_width = int(bin_width)
     delay = int(delay)
     if method == 'app':
@@ -400,14 +457,22 @@ def read_normalizer_distribution(
         parent_dir = os.path.join(parent_dir, 'mVocs')
 
     path_dir = os.path.join(parent_dir, subdir)
-    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
+    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.npz")
     if os.path.exists(file_path):
-        with open(file_path, 'rb') as F: 
-            normalizers_dist = pickle.load(F)
-        return normalizers_dist
+        data = np.load(file_path)
+        norm_dist = data['dist']
+        return norm_dist
     else:
-        logger.info(f"Normalizers not found: for bin-width {bin_width}ms and delay {delay}ms.")
+        logger.info(f"Normalizer not found: for bw {bin_width}ms, delay {delay}ms and session {session}.")
         return None
+    # file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.pkl")
+    # if os.path.exists(file_path):
+    #     with open(file_path, 'rb') as F: 
+    #         normalizers_dist = pickle.load(F)
+    #     return normalizers_dist
+    # else:
+    #     logger.info(f"Normalizers not found: for bin-width {bin_width}ms and delay {delay}ms.")
+    #     return None
 
 def write_normalizer_distribution(
         session, bin_width, delay, normalizer_dist, method='app', mVocs=False, dataset_name='ucsf'
@@ -432,18 +497,22 @@ def write_normalizer_distribution(
     if not os.path.exists(path_dir):
         logger.info(f"Path not found, creating directories...")
         os.makedirs(path_dir)
-    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
-    norm_dict_all_sessions = read_normalizer_distribution(
-        bin_width, delay, method=method, mVocs=mVocs, dataset_name=dataset_name
-        )
-    
-    if norm_dict_all_sessions is None:
-        norm_dict_all_sessions = {}
 
-    norm_dict_all_sessions[session] = normalizer_dist
-    with open(file_path, 'wb') as F: 
-        pickle.dump(norm_dict_all_sessions, F)
+    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.npz")
+    np.savez_compressed(file_path, dist=normalizer_dist)
     logger.info(f"Writing normalizer dictionary to the {file_path}")
+    # file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
+    # norm_dict_all_sessions = read_normalizer_distribution(
+    #     bin_width, delay, method=method, mVocs=mVocs, dataset_name=dataset_name
+    #     )
+    
+    # if norm_dict_all_sessions is None:
+    #     norm_dict_all_sessions = {}
+
+    # norm_dict_all_sessions[session] = normalizer_dist
+    # with open(file_path, 'wb') as F: 
+    #     pickle.dump(norm_dict_all_sessions, F)
+    # logger.info(f"Writing normalizer dictionary to the {file_path}")
 
 
 
@@ -817,11 +886,11 @@ def read_cached_features(model_name, dataset_name, contextualized=False, shuffle
     assert model_name in valid_model_names, f"Invalid model name '{model_name}' specified!"
     logger.info(f"Reading features for model: {model_name}")
     
-    if contextualized:
-        logger.info(f"Reading contextualized features...")
-        file_name = f"{model_name}_raw_features_contextualized.pkl"
-    else:
-        file_name = f"{model_name}_raw_features.pkl"
+    # if contextualized:
+    #     logger.info(f"Reading contextualized features...")
+    #     file_name = f"{model_name}_raw_features_contextualized.pkl"
+    # else:
+    #     file_name = f"{model_name}_raw_features.pkl"
     
     if mVocs:
         directory = os.path.join(cache_dir, 'mVocs')
@@ -842,8 +911,9 @@ def read_cached_features(model_name, dataset_name, contextualized=False, shuffle
         filenames.sort()
     for filename in filenames:
         if '.npz' in filename:
-            loaded_data = np.load(os.path.join(dir_path, filename))
-            loaded_dict = dict(loaded_data)
+            loaded_data = np.load(os.path.join(dir_path, filename), allow_pickle=True)
+            # loaded_dict = dict(loaded_data)
+            loaded_dict = loaded_data['layer_features'].item()
             layer_id = filename.split('layer')[-1].split('.')[0]
             features[int(layer_id)] = loaded_dict
     
@@ -864,7 +934,7 @@ def read_cached_features(model_name, dataset_name, contextualized=False, shuffle
     # else:
     #     return None
 
-@profile
+# @profile
 def write_cached_features(
         model_name, features, dataset_name, verbose=True, contextualized=False, shuffled=False,
         mVocs=False):
@@ -876,9 +946,6 @@ def write_cached_features(
             'deepspeech2', 'whiper_tiny', 'whisper_base', 'whisper_small']
         features: list = features for each layers as a list of dictionaries 
     """
-    # model_choices = ['wav2letter_modified', 'wav2vec2', 'speech2text',
-    #         'deepspeech2', 'whisper_tiny', 'whisper_base', 'whisper_small',
-    #         'wav2letter_spect']
     assert model_name in valid_model_names, f"Invalid model name '{model_name}' specified!"
     logger.info(f"Saving features for model: {model_name}")
     if contextualized:
@@ -903,7 +970,7 @@ def write_cached_features(
     for layer_id, layer_features in features.items():
         logger.info(f"Saving features for layer: {layer_id}")
         file_path = os.path.join(dir_path, f"{file_name}_layer{layer_id:02}.npz")
-        np.savez_compressed(file_path, **layer_features)
+        np.savez_compressed(file_path, layer_features=layer_features)
 
     logger.info(f"All layer features saved to: {dir_path}")
 

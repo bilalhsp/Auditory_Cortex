@@ -10,7 +10,7 @@ import scipy
 import pandas as pd
 import torchaudio
 
-from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.deprecated.dataloader import DataLoader
 
 data_dir = '/scratch/gilbreth/ahmedb/data/'
 

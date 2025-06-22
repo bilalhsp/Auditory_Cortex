@@ -1,4 +1,4 @@
-from auditory_cortex.models import Regression
+from auditory_cortex.deprecated.models import Regression
 from auditory_cortex.ridge_regression import RidgeRegression 
 
 

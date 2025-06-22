@@ -9,7 +9,7 @@ import argparse
 
 from auditory_cortex.spikes_dataset import SpikesData, Network, training_epoch, evaluation_epoch, get_dataloaders
 from auditory_cortex import cache_dir
-from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.deprecated.dataloader import DataLoader
 
 SPIKE_CHANNELS = 217
 SPECT_CHANNELS = 128

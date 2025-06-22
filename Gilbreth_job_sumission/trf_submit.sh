@@ -6,30 +6,24 @@
 #SBATCH --constraint=I|J|K|N|G|F|H|C
 
 #F|G|I|K|D|B
-
 # jgmakin-n, standby, training
 # all valid: I|J|K|N|G|F|H|C|D|B
 # very high mem: I|J|K      # 80GB
-# High Mem GPUs: I|J|K|N|G|F|H|C
+# High Mem GPUs: I|J|K|N|G    # 40GB
+# High Mem GPUs: I|J|K|N|G|F|H|C    # 24GB
 # very Fast GPUs: F|G|K
 # Fast GPUs: D
 # Slow GPUs: E
 #SBATCH --nodes=1 
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
-# --mem=0
-#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=50GB
+#SBATCH --time=04:00:00
 
-hostname
-NUMBA_DISABLE_INTEL_SVML=1
-echo $CUDA_VISIBLE_DEVICES
-module purge
-module load anaconda/2020.11-py38
-module load use.own
-module load conda-env/wav2letter-py3.8.5
-# module load gcc/9.3.0
-#module load conda-env/wav2letter_pretrained-py3.8.5
+#SBATCH --job-name=run_trf2    # Job name
+# activate virtual environment
+source ./env_setup.sh
 
 python ../scripts/run_trf2.py $@
-# python deepspeech2_testing.py
+

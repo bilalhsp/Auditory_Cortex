@@ -1,5 +1,7 @@
 use_pca: False
 # shuffle_weights: False
+repo_name: "ALM/wav2vec2-base-audioset"
+sampling_rate: 16000  # sampling rate the network was trained on
 layers:
 
 - layer_name: wav2vec2.feature_extractor.conv_layers.0.layer_norm   

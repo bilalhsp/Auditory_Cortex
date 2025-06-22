@@ -1,17 +1,18 @@
 """
 Script to compute and save normalizer distributions for neural datasets.
 
-Here is the list of arguments:
-dataset_name: str ['ucsf', 'ucdavis']
-bin_width: list of int
-start_ind: int, default=0
-end_ind: int, default=45
-force_redo: bool, default=False
-app: bool, default=False
-mVocs: bool, default=False
+Args:
+    dataset_name: str ['ucsf', 'ucdavis'], -d
+    bin_width: list of int, -b
+    start_ind: int, default=0, -s
+    end_ind: int, default=45, -e
+    force_redo: bool, default=False, -f
+    app: bool, default=False, --app
+    mVocs: bool, default=False, -v
+    num_itr: int, default=100000, -n
 
 Example usage:
-python normalizer_save_results2.py -d ucsf -b 20 50 -v -s 0 -e 45 
+    python normalizer_save_results2.py -d ucsf -b 20 50 -v -s 0 -e 45 -n 100000
 """
 # ------------------  imports ----------------------#
 import time
@@ -20,15 +21,10 @@ from auditory_cortex.neural_data import NormalizerCalculator
 from auditory_cortex.neural_data import create_neural_metadata
 from auditory_cortex import NEURAL_DATASETS
 
-import sys
+# ------------------  set up logging ----------------------
 import logging
-# Set up logging configuration
-logging.basicConfig(
-    level=logging.INFO,  # Capture all logs from DEBUG level and above
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # Stream to the notebook's output
-    ]
-)
+from auditory_cortex.utils import set_up_logging
+set_up_logging()
 
 # ------------------  get parser ----------------------#
 
@@ -71,6 +67,11 @@ def get_parser():
         '-v','--mVocs', dest='mVocs', action='store_true', default=False,
         help="Specify if computing for mVoc"
     )
+    parser.add_argument(
+        '-n','--num_itr', dest='num_itr', type=int, action='store', 
+        default=100000,
+        help="Number of iterations."
+    )
 
     return parser
 
@@ -78,19 +79,16 @@ def get_parser():
 # ------------------  Normalizer computing function ----------------------#
 
 def compute_and_save_normalizers(args):
-
-
-
     dataset_name = args.dataset_name
     random_pairs = not args.app
     force_redo = args.force_redo
     mVocs = args.mVocs
-
+    num_itr = args.num_itr
     # create an object for the metadata
     metadata = create_neural_metadata(dataset_name)
     sessions = metadata.get_all_available_sessions()[args.start_ind:args.end_ind]
     logging.info(f"Running for sessions starting at index-{args.start_ind}, ending before index-{args.end_ind}..")
-    
+    norm_obj = NormalizerCalculator(dataset_name)
     excluded_sessions = ['190726', '200213']
     for session in sessions:
             
@@ -98,13 +96,11 @@ def compute_and_save_normalizers(args):
             logging.info(f"Excluding session: {session}")
             continue
         else:
-
-            norm_obj = NormalizerCalculator(dataset_name, session)
             for bin_width in args.bin_widths:
                 bin_width = int(bin_width)
                 norm_dist = norm_obj.get_normalizer_for_session(
-                    bin_width=bin_width, delay=0, force_redo=force_redo,
-                    mVocs=mVocs, random_pairs=random_pairs
+                    session, bin_width=bin_width, delay=0, force_redo=force_redo,
+                    mVocs=mVocs, random_pairs=random_pairs, num_itr=num_itr
                     )
                 
 # ------------------  main function ----------------------#

@@ -1,3 +1,7 @@
+import logging
+from auditory_cortex.utils import set_up_logging
+set_up_logging()
+
 import os
 import time
 import argparse
@@ -8,13 +12,12 @@ from sklearn.linear_model import RidgeCV, ElasticNetCV
 import auditory_cortex.io_utils.io as io
 
 # local
-from auditory_cortex.neural_data import NeuralMetaData
+
 from auditory_cortex import utils, config, saved_corr_dir
 from auditory_cortex.io_utils.io import write_model_parameters
-from auditory_cortex.computational_models import baseline
-from auditory_cortex.datasets import BaselineDataset, DNNDataset
-from auditory_cortex.computational_models.encoding import TRF
-
+from auditory_cortex.neural_data import create_neural_dataset, create_neural_metadata
+from auditory_cortex.data_assembler import STRFDataAssembler
+from auditory_cortex.encoding import TRF
 
 
 # ------------------  Baseline computing function ----------------------#
@@ -36,40 +39,39 @@ def compute_and_save_STRF_baseline(args):
     num_alphas = 8
     num_folds=3
     third = None
-    lags = [300] #[5, 10, 20, 40, 80, 160, 320]
+    lags = [args.lag] #[5, 10, 20, 40, 80, 160, 320]
     test_trial=None
     use_nonlinearity=args.non_linearity
     mVocs = args.mVocs
     mel_spectrogram = args.mel_spectrogram
+    dataset_name = args.dataset_name
+    spectrogram_type = args.spectrogram_type
 
-
-    id_details = f'trf_lags{lags[0]}_bw{bin_width}'
-    if identifier != '':
-        identifier = id_details + '_' + identifier
-    else:
-        identifier = id_details
-
-    if mVocs:
-        identifier = 'mVocs_' + identifier
-    else:
-        identifier = 'timit_' + identifier
-
-    # csv_file_name = 'corr_results.csv'
-    # # if identifier != '':
-    # csv_file_name = identifier + '_' + csv_file_name
-    # if identifier != '':
-    #     identifier = identifier + '_'
+    results_identifier = utils.get_run_id(
+            dataset_name, bin_width, identifier, mVocs=mVocs, lag=lags[0],
+        )
     if mel_spectrogram:
-        identifier = 'mel_' + identifier
+        if spectrogram_type is None or 'speech2text' in spectrogram_type:
+            substr = 'mel_'
+        elif 'whisper' in spectrogram_type:
+            substr = 'mel_wh_'
+        elif 'deepspeech2' in spectrogram_type:
+            substr = 'mel_ds_'
+        elif 'librosa' in spectrogram_type:
+            substr = 'mel_lib_'
+        else:
+            raise ValueError(f"Unknown spectrogram type: {spectrogram_type}")
+        results_identifier = substr + results_identifier
     else:
-        identifier = 'wavlet_' + identifier
+        if spectrogram_type is None or 'wavlet' in spectrogram_type:
+            substr = 'wavlet_'
+        elif 'cochleogram' in spectrogram_type:
+            substr = 'coch_'
+        results_identifier =  substr + results_identifier
 
-    
-    csv_file_name = f'STRF_freqs{num_freqs}_{identifier}_corr_results.csv'
-    # if third is None:
-    #     csv_file_name = f'STRF_freqs{num_freqs}_corr_results.csv'
-    # else:
-    #     csv_file_name = f'STRF_{third}_third_corr_results.csv'
+    logging.info(f"Results identifier: {results_identifier}")
+    csv_file_name = f'STRF_freqs{num_freqs}_{results_identifier}_corr_results.csv'
+
     # CSV file to save the results at
     file_exists = False
     file_path = os.path.join(saved_corr_dir, csv_file_name)
@@ -77,15 +79,8 @@ def compute_and_save_STRF_baseline(args):
         data = pd.read_csv(file_path)
         file_exists = True
 
-    metadata = NeuralMetaData()
+    metadata = create_neural_metadata(dataset_name)
     sessions = metadata.get_all_available_sessions()
-    # ## read the sessions available in data_dir
-    # sessions = np.array(os.listdir(data_dir))
-    # sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
-    # for s in bad_sessions:
-    #     sessions = np.delete(sessions, np.where(sessions == s))
-    # sessions = np.sort(sessions)
-
     sessions = sessions[args.start_ind:args.end_ind]
 
     if file_exists:
@@ -94,42 +89,43 @@ def compute_and_save_STRF_baseline(args):
     else:
         subjects = sessions
 
-    # strf_model = baseline.STRF(mel_spectrogram=mel_spectrogram)
-    # subjects = np.array(['200206'])
+    dataset_obj = create_neural_dataset(dataset_name, subjects[0])
+    dataset = STRFDataAssembler(
+        dataset_obj, bin_width, mVocs=mVocs,
+        mel_spectrogram=mel_spectrogram,
+        spectrogram_type=spectrogram_type,
+        )
+
     for session in subjects:
         if mVocs:
             excluded_sessions = ['190726', '200213']
             if session in excluded_sessions:
                 print(f"Excluding session: {session}")
                 continue
-        print(f"\n Working with '{session}'")
-        # obj = get_reg_obj(data_dir, sub)
+        logging.info(f"\n Working with '{session}'")
 
-        # corr, opt_lag, opt_lmbda = strf_model.grid_search_CV(
-        #     session, bin_width, lags=lags, tmin=tmin,
-        #     num_workers=num_workers, num_lmbdas=num_alphas, 
-        #     num_folds=num_folds, use_nonlinearity=use_nonlinearity,
-        #     test_trial=test_trial, mVocs=mVocs
-        # )
-
-        dataset = BaselineDataset(
-            session, bin_width, mVocs=mVocs,
-            mel_spectrogram=mel_spectrogram
-            )
+        if session != dataset.dataloader.dataset_obj.sub:
+            # no need to read features again...just reach spikes..
+            dataset_obj = create_neural_dataset(dataset_name, session)
+            dataset.read_session_spikes(dataset_obj)
+            # dataset = STRFDataAssembler(
+            #     dataset_obj, bin_width, mVocs=mVocs,
+            #     mel_spectrogram=mel_spectrogram,
+            #     spectrogram_type=spectrogram_type,
+            #     )
         model_name = 'strf'
         trf_obj = TRF(model_name, dataset)
         
         corr, opt_lag, opt_lmbda, trf_model = trf_obj.grid_search_CV(
                 lags=lags, tmin=tmin,
-                num_workers=num_workers, num_folds=num_folds,
-                use_nonlinearity=use_nonlinearity,
+                num_folds=num_folds,
                 test_trial=test_trial
             )
 
-        betas = trf_model.coef_
-        io.write_trf_parameters(
-            model_name, session, betas, bin_width=bin_width,
-            )
+        # betas = trf_model.coef_
+        # io.write_trf_parameters(
+        #     model_name, session, betas, bin_width=bin_width,
+        #     )
         if mVocs:
             mVocs_corr = corr
             timit_corr = np.zeros_like(corr)
@@ -150,10 +146,6 @@ def compute_and_save_STRF_baseline(args):
             }
         df = utils.write_STRF(results_dict, file_path)
 
-        # writing coefficients...
-        # coeff = strf_model.get_coefficients()
-
-        # write_model_parameters(strf_model.model_name, session, coeff)
 
 # ------------------  get parser ----------------------#
 
@@ -163,25 +155,28 @@ def get_parser():
         description='This is to compute and save WER for pretrained models ',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
-    # parser.add_argument(
-    #     '-l','--lags', dest='lags', nargs='+', type=int,
-    #     action='store', default=[80],
-    #     help="Specify the maximum lag used for STRF."
-    # )
+    parser.add_argument(
+        '--lag', dest='lag', type=int, action='store', 
+        default=200,
+        help="Specify the maximum lag used for STRF."
+    )
     # parser.add_argument(
     #     '--tmin', dest='tmin', type=float, action='store', default=0.0,
     #     help="Specify the minimum lag used for STRF."
     # )
     parser.add_argument(
+        '-d','--dataset_name', dest='dataset_name', type= str, action='store',
+        choices=['ucsf', 'ucdavis'],
+        help = "Name of neural data to be used."
+    )
+    parser.add_argument(
         '-s','--start', dest='start_ind', type=int, action='store', 
         default=0,
-        # choices=[],
         help="Choose sessions starting index to compute results at."
     )
     parser.add_argument(
         '-e','--end', dest='end_ind', type=int, action='store', 
         default=41,
-        # choices=[],
         help="Choose sessions ending index to compute results at."
     )
     parser.add_argument(
@@ -206,7 +201,10 @@ def get_parser():
         '--mel', dest='mel_spectrogram', action='store_true', default=False,
         help="Specify if mel_spectrogram to be used as baseline."
     )
-
+    parser.add_argument(
+        '--type', dest='spectrogram_type', type= str, action='store',
+        help="Specify the type of spectrogram to be used as baseline."
+    )
     
     return parser
 

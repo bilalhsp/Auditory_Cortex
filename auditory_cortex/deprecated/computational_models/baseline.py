@@ -5,7 +5,7 @@ from scipy.signal import resample
 import naplib as nl
 from auditory_cortex import config
 # from auditory_cortex.neural_data import dataset
-from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.deprecated.dataloader import DataLoader
 from auditory_cortex import utils
 from sklearn.linear_model import RidgeCV, ElasticNet, Ridge, PoissonRegressor
 from transformers import Speech2TextProcessor

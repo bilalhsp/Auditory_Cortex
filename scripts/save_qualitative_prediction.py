@@ -17,12 +17,13 @@ def save_qualititive_plots(args):
     bin_width = args.bin_width
     threshold = args.threshold
     sent_ids = args.sent_ids
+    layer = args.layer 
 
     figs_dir = os.path.join(cache_dir, 'qualitative_plots', model_name)
     if not os.path.exists(figs_dir):
         os.makedirs(figs_dir)
-
-    corr_obj = Correlations(model_name=model_name+'_test_all_trials')
+    identifier = 'ucsf_timit_trf_lags200_bw50_regression_improved'
+    corr_obj = Correlations(model_name=model_name+'_'+ identifier)
     # sessions = corr_obj.get_significant_sessions(bin_width=bin_width, threshold=threshold)
     sessions = ['180731', '200206']
     for session in sessions:
@@ -40,6 +41,7 @@ def save_qualititive_plots(args):
                         sent_id=sent_id,
                         session=session,
                         ch=ch,
+                        layer=layer,
                         bin_width=bin_width,
                         save_tikz=False
                     )
@@ -78,6 +80,10 @@ def get_parser():
     parser.add_argument(
         '-b','--bin_width', dest='bin_width', type= int, action='store', default=50,
         help="Specify the bin_width to use for predictions."
+    )
+    parser.add_argument(
+        '-l','--layer', dest='layer', type= int, action='store', default=None,
+        help="Specify the layer to be used for predictions."
     )
     return parser
 

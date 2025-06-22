@@ -1,3 +1,23 @@
+"""
+This script is used to cache features for a given DNN model and neural dataset.
+
+Args:
+    dataset_name: str ['ucsf', 'ucdavis'], -d
+    ind: int, index of the DNN model to be used (read from config), -i
+    contextualized: bool, -c
+    shuffle: bool, -s
+    mVocs: bool, -v
+    factor: float, relevant for shuffled -f
+
+Example usage:  
+    python cache_features.py -d ucsf -i 3 -s -v
+    python cache_features.py -d ucdavis -i 1 -s -v
+"""
+# ------------------  set up logging ----------------------
+import logging
+from auditory_cortex.utils import set_up_logging
+set_up_logging()
+
 import time
 import argparse
 
@@ -5,16 +25,6 @@ from auditory_cortex import valid_model_names
 from auditory_cortex.dataloader2 import DataLoader
 from auditory_cortex.neural_data import create_neural_dataset
 from auditory_cortex.dnn_feature_extractor import create_feature_extractor
-
-import logging
-
-# Configure the logging system
-logging.basicConfig(
-    level=logging.INFO,  # Logging level for the logger DEBUG, INFO, WARNING, ERROR, CRITICAL
-    # format="%(name)s - %(levelname)s - %(message)s",
-)
-
-logger = logging.getLogger(__name__)
 
 # ------------------  cache features function ----------------------
 
@@ -54,7 +64,7 @@ def cache_features(args):
 	# 		scale_factor=factor
 	# 		)
 
-	logger.info(f"Done...!")
+	logging.info(f"Done...!")
 
 # ------------------  get parser ----------------------#
 
@@ -71,7 +81,6 @@ def get_parser():
 		choices=['ucsf', 'ucdavis'], required=True,
 		help = "Name of neural data to be used."
 	)
-
 	parser.add_argument(
 		'-i','--ind', dest='ind', type= int, action='store',
 		required=True,
@@ -83,17 +92,14 @@ def get_parser():
 	)
 	parser.add_argument(
 		'-s','--shuffle', dest='shuffled', action='store_true', default=False,
-		# choices=[],
 		help="Specify if shuffled network to be used."
 	)
 	parser.add_argument(
 		'-v','--mVocs', dest='mVocs', action='store_true', default=False,
-		# choices=[],
 		help="Specify if loading for mVocs."
 	)
 	parser.add_argument(
 		'-f','--factor', dest='factor', type=float, action='store', default=1,
-		# choices=[],
 		help="Specify the scale factor."
 	)
 
@@ -111,8 +117,8 @@ if __name__ == '__main__':
 
 	# display the arguments passed
 	for arg in vars(args):
-		logger.info(f"{arg:15} : {getattr(args, arg)}")
+		logging.info(f"{arg:15} : {getattr(args, arg)}")
 
 	cache_features(args)
 	elapsed_time = time.time() - start_time
-	logger.info(f"It took {elapsed_time/60:.1f} min. to run.")
+	logging.info(f"It took {elapsed_time/60:.1f} min. to run.")

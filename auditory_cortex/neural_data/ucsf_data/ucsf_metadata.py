@@ -1,3 +1,39 @@
+"""
+
+Notes:
+-04-28-2025:
+    mVoc stimulus ids are complicated.
+    - stimulus related information like duration, sampling rate and audio 
+    are indexed by trial ids [0, 779].
+    - Unique mVocs stimulus ids are [1, 303], out of these:
+        + 11 are repeated 15 times, hence reserved for testing.
+        + 292 have different number of presentations, mostly presented once,
+            but some are presented multiple times (not exactly 15).
+    - So ideally, we would like to use stimulus ids (both train and test)
+        to keep track of features and spikes, but that has two problems:
+        + 1. For some of the sessions, some stimuli with single presentation 
+            have bad trials (no spikes against those), so we need to remove
+            those trials. That leaves us with less than 200 trials for training data
+            in some sessions (compared to 292 if we take all unique presentations).
+        + 2. For some of the sessions, some stimuli with multiple presentations
+            so we would like to use them as training data. But we cannot track them
+            using stimulus ids, because they are not unique.
+    - Using trial ids is not a good idea either, because it does not make sense
+        to talk about ids having repeats since each trial (but stimuli are not) is unique.
+    - So I am making new ids (nids) for mVocs.
+        + Load and track features using trial ids.
+        + For training data, nids = trial_ids
+        + For testing data, nids = first_trial_id for each stim_id in all testing_stim_ids. 
+    - Impact:
+        + Since all stimulus data is anyways indexed by trial ids, we can use nids to get 
+            stimulus info like audio, duration, sampling rate etc.
+        + For extracting spikes:
+            * training data can be directly extracted using trial ids.
+            * For testing data...
+                nids --> stim_ids --> list of trials --> get spikes for all trials
+                store them in dict indexed by nids. 
+"""
+
 import os
 import numpy as np
 from scipy import io
@@ -40,6 +76,79 @@ class UCSFMetaData:
         self.mVoc_silence_dur = 0.0 # seconds
         self.mVocs_all_stim_ids = list(self.mVocId_to_trialId.keys())
 
+
+    def total_stimuli_duration(self, mVocs=False):
+        """Returns the total duration of all the stimuli in the experiment,
+        separately for unique and repeated stimuli
+        
+        Returns:
+            {'unique': float, 'repeated': float}
+        """
+        stim_ids = self.get_stim_ids(mVocs)
+        stim_duration = {}
+        for stim_type, stim_ids in stim_ids.items():
+            stim_duration[stim_type] = sum([self.get_stim_duration(stim_id, mVocs) for stim_id in stim_ids])
+        return stim_duration
+    
+    def get_stim_ids(self, mVocs=False):
+        """Returns the set of stimulus ids for both unique and repeated stimuli
+        Returns:
+            {'unique': (n,), 'repeated': (m,)}
+        """
+        return {
+            'unique': self.get_training_stim_ids(mVocs),
+            'repeated': self.get_testing_stim_ids(mVocs),
+            }
+
+    def get_training_stim_ids(self, mVocs=False):
+        """Returns the set of training stimulus ids"""
+        if mVocs:
+            # mVocs_all_stim_ids = np.array(self.mVocs_all_stim_ids)
+            # test_stim_ids = np.array(self.mVoc_test_stimIds)
+            # return mVocs_all_stim_ids[np.isin(mVocs_all_stim_ids, test_stim_ids, invert=True)]
+            all_trials = self.mVocTrialIds
+            test_trial_ids = np.concatenate([
+                self.get_mVoc_tr_id(stim_id) for stim_id in self.mVoc_test_stimIds]
+                )
+            train_nids = all_trials[np.isin(all_trials, test_trial_ids, invert=True)]
+            return train_nids
+        else:
+            sent_IDs = self.sent_IDs
+            testing_sent_ids = self.test_sent_IDs
+            return sent_IDs[np.isin(sent_IDs, testing_sent_ids, invert=True)]
+
+    def get_testing_stim_ids(self, mVocs=False):
+        """Returns the set of testing stimulus ids"""
+        if mVocs:
+            # return np.array(self.mVoc_test_stimIds)
+            test_trial_ids = np.array(
+                [self.get_mVoc_tr_id(stim_id)[0] for stim_id in self.mVoc_test_stimIds]
+                )
+            return test_trial_ids
+        else:
+            return self.test_sent_IDs
+        
+    def get_stim_audio(self, stim_id, mVocs=False):
+        """Return audio for stimulus (timit or mVocs) id, resampled at 16kHz"""
+        if mVocs:
+            # tr_id = self.get_mVoc_tr_id(stim_id)[0]
+            # Since in the new system, we are dealing with nids,
+            # which are actualy trial ids, we can use them directly.
+            tr_id = stim_id #
+            return self.get_mVoc_aud(tr_id)
+        else:
+            return self.stim_audio(stim_id)
+        
+    def get_stim_duration(self, stim_id, mVocs=False):
+        """Return duration for stimulus (timit or mVocs) id"""
+        if mVocs:
+            # tr_id = self.get_mVoc_tr_id(stim_id)[0]
+            # Since in the new system, we are dealing with nids,
+            # which are actualy trial ids, we can use them directly.
+            tr_id = stim_id #
+            return self.get_mVoc_dur(tr_id)
+        else:
+            return self.stim_duration(stim_id)
 
 
     def get_sampling_rate(self, mVocs=False):
@@ -100,37 +209,43 @@ class UCSFMetaData:
     def get_total_test_duration(self, mVocs=False):
         """Returns combined duration (seconds) of test set stimuli."""
         duration = 0
-        if mVocs:
-            for stim_id in self.mVoc_test_stimIds:
-                tr_id = self.get_mVoc_tr_id(stim_id)[0]
-                duration += self.get_mVoc_dur(tr_id)
-        else:
-            for sent in self.test_sent_IDs:
-                duration += self.stim_duration(sent)
+        for nid in self.get_testing_stim_ids(mVocs=mVocs):
+            duration += self.get_stim_duration(nid, mVocs=mVocs)
+
+        # if mVocs:
+        #     for stim_id in self.get_testing_stim_ids(mVocs=True):
+        #         tr_id = self.get_mVoc_tr_id(stim_id)[0]
+        #         # Since in the new system, we are dealing with nids,
+        #         # which are actualy trial ids, we can use them directly.
+        #         tr_id = stim_id #
+        #         duration += self.get_mVoc_dur(tr_id)
+        # else:
+        #     for sent in self.test_sent_IDs:
+        #         duration += self.stim_duration(sent)
         return duration
 
-    def get_total_stimuli_duration(self, stim_ids=None, mVocs=False):
-        """Returns the total duration of the unique stimuli in seconds.
+    # def get_total_stimuli_duration(self, stim_ids=None, mVocs=False):
+    #     """Returns the total duration of the unique stimuli in seconds.
         
-        Args:
-            stim_ids: list = list of stimulus IDs, default=None.
-                if stim_ids is None, then all the stimuli are considered,
-                including the test set..
-        """
-        duration = 0
-        if mVocs:
-            if stim_ids is None:
-                stim_ids = self.mVocs_all_stim_ids
-            for stim_id in stim_ids:
-                tr_id = self.get_mVoc_tr_id(stim_id)[0]
-                duration += self.get_mVoc_dur(tr_id)
-        else:
-            if stim_ids is None:
-                stim_ids = self.sent_IDs
+    #     Args:
+    #         stim_ids: list = list of stimulus IDs, default=None.
+    #             if stim_ids is None, then all the stimuli are considered,
+    #             including the test set..
+    #     """
+    #     duration = 0
+    #     if mVocs:
+    #         if stim_ids is None:
+    #             stim_ids = self.mVocs_all_stim_ids
+    #         for stim_id in stim_ids:
+    #             tr_id = self.get_mVoc_tr_id(stim_id)[0]
+    #             duration += self.get_mVoc_dur(tr_id)
+    #     else:
+    #         if stim_ids is None:
+    #             stim_ids = self.sent_IDs
 
-            for sent in stim_ids:
-                duration += self.stim_duration(sent)
-        return duration
+    #         for sent in stim_ids:
+    #             duration += self.stim_duration(sent)
+    #     return duration
 
     def audio_phoneme_data(self):
         audio = {}
@@ -336,6 +451,19 @@ class UCSFMetaData:
     def get_mVoc_tr_id(self, stim_id):
         """Returns trial id for given stim_id"""
         return self.mVocId_to_trialId[stim_id]
+    
+    def nid_to_tr_id(self, nid):
+        """Returns trial id for given nid"""
+        result = next(
+            ((k,v) for k, v in self.mVocId_to_trialId.items() if nid in v),    # only for test nids
+                None)
+        if result is None:
+            raise ValueError(f"Not a valid nid: {nid}") 
+        stim_id, trial_ids = result
+        if trial_ids.size == 15:    # test nids
+            return self.mVocId_to_trialId[stim_id]
+        else:   # training nids are same as trial ids
+            return np.array([nid])
         
 
     @staticmethod

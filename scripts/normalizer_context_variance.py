@@ -1,7 +1,7 @@
 import time
 import argparse
 
-import auditory_cortex.models as models
+import auditory_cortex.deprecated.models as models
 from auditory_cortex.io_utils.io import write_context_dependent_normalizer
 
 

@@ -21,14 +21,10 @@ import argparse
 from auditory_cortex.neural_data import NormalizerCalculator
 from auditory_cortex import NEURAL_DATASETS
 
-import sys
+# ------------------  set up logging ----------------------
 import logging
-logging.basicConfig(
-    level=logging.INFO,                     # Capture all logs from this level and above
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # Stream to the output
-    ]
-)
+from auditory_cortex.utils import set_up_logging
+set_up_logging()
 
 # ------------------  get parser ----------------------#
 
@@ -55,8 +51,8 @@ def get_parser():
         help="Choose the spike rate for normalizers."
     )
     parser.add_argument(
-        '-n','--n_itr', dest='n_itr', type=int, action='store', 
-        default=1000000,
+        '-n','--num_itr', dest='num_itr', type=int, action='store', 
+        default=100000,
         help="Number of iterations."
     )
     parser.add_argument(
@@ -78,7 +74,7 @@ def compute_and_save_null_dist(args):
 
     # create an object for the normalizer
     spike_rates = args.spike_rates
-    n_itr = args.n_itr
+    num_itr = args.num_itr
     force_redo = args.force_redo
     mVocs=args.mVocs
     dataset_name = args.dataset_name
@@ -89,7 +85,7 @@ def compute_and_save_null_dist(args):
         for spike_rate in spike_rates:
             bin_width = int(bin_width)
             null_dist_poisson = norm_obj.get_normalizer_null_dist_using_poisson(
-                bin_width, spike_rate=spike_rate, num_itr=n_itr, force_redo=force_redo,
+                bin_width, spike_rate=spike_rate, num_itr=num_itr, force_redo=force_redo,
                 mVocs=mVocs
             )
 

@@ -1,4 +1,4 @@
-from ..base_dataset import BaseDataset
+
 
 from scipy import io
 import numpy as np
@@ -10,6 +10,7 @@ import auditory_cortex.utils as utils
 from auditory_cortex import neural_data_dir, NEURAL_DATASETS
 # from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
 from .ucsf_metadata import UCSFMetaData
+from ..base_dataset import BaseDataset
 import logging
 logger = logging.getLogger(__name__)
 
@@ -61,27 +62,31 @@ class UCSFDataset(BaseDataset):
         Returns:
             {'unique': float, 'repeated': float}
         """
-        stim_ids = self.get_stim_ids(mVocs)
-        stim_duration = {}
-        for stim_type, stim_ids in stim_ids.items():
-            stim_duration[stim_type] = sum([self.get_stim_duration(stim_id, mVocs) for stim_id in stim_ids])
+        stim_duration = self.metadata.total_stimuli_duration(mVocs)
         return stim_duration
+        # stim_ids = self.get_stim_ids(mVocs)
+        # stim_duration = {}
+        # for stim_type, stim_ids in stim_ids.items():
+        #     stim_duration[stim_type] = sum([self.get_stim_duration(stim_id, mVocs) for stim_id in stim_ids])
+        # return stim_duration
 
     def get_stim_audio(self, stim_id, mVocs=False):
         """Return audio for stimulus (timit or mVocs) id, resampled at 16kHz"""
-        if mVocs:
-            tr_id = self.metadata.get_mVoc_tr_id(stim_id)[0]
-            return self.metadata.get_mVoc_aud(tr_id)
-        else:
-            return self.metadata.stim_audio(stim_id)
+        return self.metadata.get_stim_audio(stim_id, mVocs)
+        # if mVocs:
+        #     tr_id = self.metadata.get_mVoc_tr_id(stim_id)[0]
+        #     return self.metadata.get_mVoc_aud(tr_id)
+        # else:
+        #     return self.metadata.stim_audio(stim_id)
         
     def get_stim_duration(self, stim_id, mVocs=False):
         """Return duration for stimulus (timit or mVocs) id"""
-        if mVocs:
-            tr_id = self.metadata.get_mVoc_tr_id(stim_id)[0]
-            return self.metadata.get_mVoc_dur(tr_id)
-        else:
-            return self.metadata.stim_duration(stim_id)
+        return self.metadata.get_stim_duration(stim_id, mVocs)
+        # if mVocs:
+        #     tr_id = self.metadata.get_mVoc_tr_id(stim_id)[0]
+        #     return self.metadata.get_mVoc_dur(tr_id)
+        # else:
+        #     return self.metadata.stim_duration(stim_id)
         
     def get_num_bins(self, stim_id, bin_width, mVocs=False):
         """Returns number of bins for the given duration and bin_width"""
@@ -99,28 +104,31 @@ class UCSFDataset(BaseDataset):
         Returns:
             {'unique': (n,), 'repeated': (m,)}
         """
-        return {
-            'unique': self.get_training_stim_ids(mVocs),
-            'repeated': self.get_testing_stim_ids(mVocs),
-            }
+        return self.metadata.get_stim_ids(mVocs)
+        # return {
+        #     'unique': self.get_training_stim_ids(mVocs),
+        #     'repeated': self.get_testing_stim_ids(mVocs),
+        #     }
 
     def get_training_stim_ids(self, mVocs=False):
         """Returns the set of training stimulus ids"""
-        if mVocs:
-            mVocs_all_stim_ids = np.array(self.metadata.mVocs_all_stim_ids)
-            test_stim_ids = np.array(self.metadata.mVoc_test_stimIds)
-            return mVocs_all_stim_ids[np.isin(mVocs_all_stim_ids, test_stim_ids, invert=True)]
-        else:
-            sent_IDs = self.metadata.sent_IDs
-            testing_sent_ids = self.metadata.test_sent_IDs
-            return sent_IDs[np.isin(sent_IDs, testing_sent_ids, invert=True)]
+        return self.metadata.get_training_stim_ids(mVocs)
+        # if mVocs:
+        #     mVocs_all_stim_ids = np.array(self.metadata.mVocs_all_stim_ids)
+        #     test_stim_ids = np.array(self.metadata.mVoc_test_stimIds)
+        #     return mVocs_all_stim_ids[np.isin(mVocs_all_stim_ids, test_stim_ids, invert=True)]
+        # else:
+        #     sent_IDs = self.metadata.sent_IDs
+        #     testing_sent_ids = self.metadata.test_sent_IDs
+        #     return sent_IDs[np.isin(sent_IDs, testing_sent_ids, invert=True)]
 
     def get_testing_stim_ids(self, mVocs=False):
         """Returns the set of testing stimulus ids"""
-        if mVocs:
-            return np.array(self.metadata.mVoc_test_stimIds)
-        else:
-            return self.metadata.test_sent_IDs
+        return self.metadata.get_testing_stim_ids(mVocs)
+        # if mVocs:
+        #     return np.array(self.metadata.mVoc_test_stimIds)
+        # else:
+        #     return self.metadata.test_sent_IDs
 
     def load_data(self, verbose):
         """ Loads data from __MUspk.mat files and returns a tuple of dictionaries. 
@@ -210,7 +218,7 @@ class UCSFDataset(BaseDataset):
         """Returns the binned spike counts for mVocs experiment."""
         # choose appropriate function to get trial IDs and spike counts
         if mVocs:
-            get_trial_ids = self.metadata.get_mVoc_tr_id
+            get_trial_ids = self.metadata.nid_to_tr_id
             get_spike_counts = self.retrieve_mVocs_spike_counts
         else:
             get_trial_ids = self.get_trials
@@ -227,8 +235,19 @@ class UCSFDataset(BaseDataset):
 
             all_tr_spikes = []
             for tr_id in tr_ids:
-                tr_spikes = get_spike_counts(trial=tr_id, win=bin_width, delay=delay)
-                all_tr_spikes.append(tr_spikes)
+                # if mVocs:
+                #     tr_id = tr_id + self.mVocs_first_tr
+                try:
+                    tr_spikes = get_spike_counts(trial=tr_id, win=bin_width, delay=delay)
+                    all_tr_spikes.append(tr_spikes)
+                except:
+                    logger.debug(f"Missing trial id: {tr_id}, skipping...")
+                    continue
+
+
+            if len(all_tr_spikes) == 0:
+                # this can happen if all trials for a stim_id are missing
+                continue
 
             num_channels = len(all_tr_spikes[0])
             all_ch_spikes_dict = {}
@@ -239,6 +258,43 @@ class UCSFDataset(BaseDataset):
 
             spikes[stim_id] = all_ch_spikes_dict
         return spikes
+ 
+    # 04-28-2025: adjusting for nid regime, can be removed after testing..
+    # def extract_spikes(self, bin_width=50, delay=0, repeated=False, mVocs=False):
+    #     """Returns the binned spike counts for mVocs experiment."""
+    #     # choose appropriate function to get trial IDs and spike counts
+    #     if mVocs:
+    #         get_trial_ids = self.metadata.get_mVoc_tr_id
+    #         get_spike_counts = self.retrieve_mVocs_spike_counts
+    #     else:
+    #         get_trial_ids = self.get_trials
+    #         get_spike_counts = self.retrieve_spike_counts
+
+    #     stim_group = 'repeated' if repeated else 'unique'
+    #     stim_ids = self.get_stim_ids(mVocs=mVocs)[stim_group]
+    #     spikes = {}
+    #     for stim_id in stim_ids:
+    #         tr_ids = get_trial_ids(stim_id)
+    #         if not repeated:
+    #             # only one trial for unique stimuli
+    #             tr_ids = tr_ids[:1]
+
+    #         all_tr_spikes = []
+    #         for tr_id in tr_ids:
+    #             if mVocs:
+    #                 tr_id = tr_id + self.mVocs_first_tr
+    #             tr_spikes = get_spike_counts(trial=tr_id, win=bin_width, delay=delay)
+    #             all_tr_spikes.append(tr_spikes)
+
+    #         num_channels = len(all_tr_spikes[0])
+    #         all_ch_spikes_dict = {}
+    #         for ch in range(num_channels):
+    #             channel_spikes = [tr_spikes[ch] for tr_spikes in all_tr_spikes]
+    #             channel_spikes = np.stack(channel_spikes, axis=0)
+    #             all_ch_spikes_dict[ch] = channel_spikes
+
+    #         spikes[stim_id] = all_ch_spikes_dict
+    #     return spikes
     
 
     # Deprecated...
@@ -643,7 +699,7 @@ class UCSFDataset(BaseDataset):
             delay: int = miliseconds specifying the time delay, Default=0.
         """
         if trial in self.missing_trial_ids:
-            raise ModuleNotFoundError("No trial data found...!")
+            raise ModuleNotFoundError(f"Missing trial id: {trial}...!")
         duration = self.metadata.get_mVoc_dur(trial)
 
         # map trial Id [0, 779] to session specific trial Id.. 

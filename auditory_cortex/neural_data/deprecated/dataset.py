@@ -21,7 +21,7 @@ class NeuralData:
 		self.sub = str(int(sub))
 		if dir is None:
 			dir = neural_data_dir
-		self.dir = dir
+		self.dir = os.path.join(dir, 'ucsf')
 		self.sentences = io.loadmat(os.path.join(self.dir, mat_file), struct_as_record = False, squeeze_me = True, )
 		self.features = self.sentences['features']
 		self.phn_names = self.sentences['phnnames']

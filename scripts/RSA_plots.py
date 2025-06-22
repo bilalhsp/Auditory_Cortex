@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from auditory_cortex.analyses.rsa import RSA
+from auditory_cortex.analyses.deprecated.rsa import RSA
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
 from auditory_cortex.plotters.rsa_plotter import plot_line_with_shaded_region
 from auditory_cortex.plotters.rsa_plotter import bar_plot_with_model_colors

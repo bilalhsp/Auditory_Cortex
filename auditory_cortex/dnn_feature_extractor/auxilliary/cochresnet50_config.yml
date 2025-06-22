@@ -1,0 +1,46 @@
+base_directory: /home/ahmedb/projects/Wav2Letter/cochdnn/model_directories
+model: resnet50_word_speaker_audioset
+sampling_rate: 20000  # sampling rate the network was trained on
+signal_length: 40000  # length of the input signal in samples
+use_pca: False
+# shuffle_weights: True
+layers:
+- layer_name: model.0
+  layer_id: 0
+  layer_type: conv
+  RF: 120 # ms
+  rate: 195 # rate of the layer in Hz
+- layer_name: model.1.relu
+  layer_id: 1
+  layer_type: conv
+  RF: 320 # ms
+  rate: 97.5 # rate of the layer in Hz
+- layer_name: model.1.maxpool
+  layer_id: 2
+  layer_type: conv
+  RF: 320 # ms
+  rate: 49 # rate of the layer in Hz
+- layer_name: model.1.layer1
+  layer_id: 3
+  layer_type: conv
+  RF: 0
+  rate: 49 # rate of the layer in Hz
+- layer_name: model.1.layer2
+  layer_id: 4
+  layer_type: conv
+  RF: 0
+  rate: 24.5 # rate of the layer in Hz
+- layer_name: model.1.layer3
+  layer_id: 5
+  layer_type: conv
+  RF: 0
+  rate: 12.5 # rate of the layer in Hz
+- layer_name: model.1.layer4
+  layer_id: 6
+  layer_type: conv
+  RF: 0
+  rate: 6.5 # rate of the layer in Hz
+# - layer_name: model.1.avgpool
+#   layer_id: 7
+#   layer_type: conv
+#   RF: 0

@@ -1,6 +1,6 @@
 import time
 import argparse
-from auditory_cortex.analyses.rsa import RSA 
+from auditory_cortex.analyses.deprecated.rsa import RSA 
 
 
 # ------------------  get parser ----------------------#

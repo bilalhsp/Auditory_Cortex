@@ -5,7 +5,7 @@ logging.getLogger('matplotlib').setLevel(logging.WARNING)
 import os
 import argparse
 import matplotlib.pyplot as plt
-from auditory_cortex.PCA_topography import PCATopography 
+from auditory_cortex.deprecated.PCA_topography import PCATopography 
 # from auditory_cortex import pretrained_dir
 
 # axis_lim = {

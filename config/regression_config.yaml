@@ -22,12 +22,16 @@ dnn_models:
 - 'whisper_tiny'            # 3
 - 'whisper_base'            # 4
 - 'wav2vec2'                # 5
-- 'wav2letter_spect'        # 6
-- 'w2v2_audioset'           # 7
-- 'MERT'                    # 8
-- 'CLAP'                    # 9
-- 'w2v2_generic'            # 10
-- 'spect2vec'               # 11
+- 'w2v2_audioset'           # 6
+- 'cochresnet50'            # 7
+- 'cochcnn9'                # 8
+
+
+# - 'wav2letter_spect'        # 7
+# - 'MERT'                    # 8
+# - 'CLAP'                    # 9
+# - 'w2v2_generic'            # 10
+# - 'spect2vec'               # 11
 
 model_name: wav2letter_modified
 identifier: sampling_rate_opt_neural_delay_feature_extractor

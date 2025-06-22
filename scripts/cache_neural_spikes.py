@@ -1,6 +1,6 @@
 import time
 import argparse
-from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.deprecated.dataloader import DataLoader
 
 
 

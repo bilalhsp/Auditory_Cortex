@@ -10,12 +10,12 @@ import gc
 from auditory_cortex import saved_corr_dir
 from auditory_cortex import config
 import auditory_cortex.utils as utils
-import auditory_cortex.models as models
+import auditory_cortex.deprecated.models as models
 import auditory_cortex.io_utils.io as io
 from auditory_cortex.io_utils.io import write_lmbdas
 from auditory_cortex import valid_model_names
 from auditory_cortex.neural_data import NeuralMetaData
-from auditory_cortex.datasets import BaselineDataset, DNNDataset
+from auditory_cortex.deprecated.datasets import BaselineDataset, DNNDataset
 from auditory_cortex.computational_models.encoding import TRF
 
 

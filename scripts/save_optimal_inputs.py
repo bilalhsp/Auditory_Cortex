@@ -6,7 +6,7 @@ from scipy.io import wavfile
 
 # local
 from auditory_cortex import opt_inputs_dir
-from auditory_cortex.analyses.regression_correlations import Correlations
+from auditory_cortex.analyses.deprecated.regression_correlations import Correlations
 from auditory_cortex.optimal_input import OptimalInput
  
 

@@ -74,7 +74,7 @@ class BaseCorrelations(ABC):
 
     # ---------------- methods using normalizer dist. using all-possible-pairs (app) ---------#
 
-    def set_normalizers_using_app(self):
+    def set_normalizers_using_app(self, mVocs=False):
         """Uses normalizer distribution computed using all-possible-pairs (app),
         and takes following steps:
             - adds a column 'normalizer_app' containig the new normalizer.
@@ -93,8 +93,11 @@ class BaseCorrelations(ABC):
                     channels = select_data['channel'].unique()
 
                     # reading the normalizer...
-                    normalizers_dist = self.norm_obj.get_normalizer_for_session_app(
-                        session=session, bin_width=bin_width 
+                    # normalizers_dist = self.norm_obj.get_normalizer_for_session_app(
+                    #     session=session, bin_width=bin_width 
+                    # )
+                    normalizers_dist = self.norm_obj.get_normalizer_for_session(
+                        session=session, bin_width=bin_width, mVocs=mVocs, random_pairs=False,
                     )
                     normalizers_dist = np.mean(normalizers_dist, axis=0)
 
@@ -149,8 +152,11 @@ class BaseCorrelations(ABC):
                         bw_norm = bin_width
                     else:
                         bw_norm = norm_bin_width
-                    normalizers_dist = self.norm_obj.get_normalizer_for_session_random_pairs(
-                        session=session, bin_width=bw_norm, mVocs=mVocs, verbose=verbose
+                    # normalizers_dist = self.norm_obj.get_normalizer_for_session_random_pairs(
+                    #     session=session, bin_width=bw_norm, mVocs=mVocs, verbose=verbose
+                    # )
+                    normalizers_dist = self.norm_obj.get_normalizer_for_session(
+                        session=session, bin_width=bw_norm, mVocs=mVocs, random_pairs=True,
                     )
                     normalizers_dist = np.median(normalizers_dist, axis=0)
 
@@ -593,6 +599,7 @@ class Correlations(BaseCorrelations):
         # self.sig_threshold = sig_threshold
 
         # loading STRF baseline
+        third = None
         if third is None:
             STRF_filename = 'STRF_corr_results.csv'
         else:

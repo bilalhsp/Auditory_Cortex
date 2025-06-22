@@ -15,7 +15,7 @@ from auditory_cortex import config
 import auditory_cortex.utils as utils
 # from auditory_cortex.dataset import NeuralData
 from auditory_cortex.neural_data import NeuralData
-import auditory_cortex.dataloader as dataloader
+import auditory_cortex.deprecated.dataloader as dataloader
 from auditory_cortex import LPF_analysis_bw
 # from auditory_cortex.computational_models.feature_extractors import DNNFeatureExtractor
 

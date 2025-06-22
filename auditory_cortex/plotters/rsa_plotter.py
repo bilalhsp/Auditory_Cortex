@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from auditory_cortex.analyses.rsa import RSA
+from auditory_cortex.analyses.deprecated.rsa import RSA
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
 from auditory_cortex import results_dir
 from utils_jgm.tikz_pgf_helpers import tpl_save

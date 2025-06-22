@@ -57,7 +57,7 @@ do
     esac
 
     # Submit the job with the current set of arguments
-    echo trf_submit.sh $args $base_args$suff
+    echo "sbatch trf_submit.sh $args $base_args$suff"
 
     # Submit the job
     sbatch trf_submit.sh $args $base_args$suff

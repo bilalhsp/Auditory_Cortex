@@ -1,8 +1,8 @@
 from auditory_cortex.analyses import Correlations
-from auditory_cortex.models import Regression
+from auditory_cortex.deprecated.models import Regression
 from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
 from auditory_cortex.plotters.correlation_plotter import RegPlotter
-from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.deprecated.dataloader import DataLoader
 import auditory_cortex.utils as utils
 
 import os

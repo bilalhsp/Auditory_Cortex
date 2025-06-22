@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.WARNING)
 
 import numpy as np
 from auditory_cortex import utils, saved_corr_dir, config
-from auditory_cortex.models import Regression
+from auditory_cortex.deprecated.models import Regression
 import pandas as pd
 
 # using the following models (best layers for each) for ensemble results.

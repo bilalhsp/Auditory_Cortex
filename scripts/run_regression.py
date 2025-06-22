@@ -15,7 +15,7 @@ import argparse
 # local
 from auditory_cortex import config
 import auditory_cortex.utils as utils
-import auditory_cortex.models as models
+import auditory_cortex.deprecated.models as models
 from auditory_cortex.io_utils.io import write_lmbdas
 from auditory_cortex import valid_model_names
 # from wav2letter.datasets import DataModuleRF 

@@ -6,7 +6,7 @@ import numpy as np
 from scipy.signal import resample
 
 import naplib as nl
-from auditory_cortex.dataloader import DataLoader
+from auditory_cortex.deprecated.dataloader import DataLoader
 
 
 class SpikesData(torch.utils.data.Dataset):

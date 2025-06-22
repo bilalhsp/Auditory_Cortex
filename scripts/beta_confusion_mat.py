@@ -1,7 +1,7 @@
 # adjsut the basic logging lovel of notebook
 import logging
 
-from auditory_cortex.analyses import regression_correlations
+from auditory_cortex.analyses.deprecated import regression_correlations
 logging.basicConfig(level=logging.WARNING)
 
 import os

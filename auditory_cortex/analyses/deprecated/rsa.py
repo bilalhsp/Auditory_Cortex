@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # from auditory_cortex.models import Regression
-from auditory_cortex.dataloader import DataLoader
-from auditory_cortex.analyses.regression_correlations import Correlations
+from auditory_cortex.deprecated.dataloader import DataLoader
+from auditory_cortex.analyses.deprecated.regression_correlations import Correlations
 from auditory_cortex.neural_data.deprecated.neural_meta_data import NeuralMetaData
 from auditory_cortex.io_utils.io import write_RDM, read_RDM
 from auditory_cortex.io_utils.io import write_cached_RDM_correlations

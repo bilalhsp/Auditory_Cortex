@@ -8,7 +8,7 @@ import numpy as np
 # from scipy import linalg, signal
 
 # local
-import auditory_cortex.models as models
+import auditory_cortex.deprecated.models as models
 from auditory_cortex.utils import SyntheticInputUtils
 
 # import matplotlib.pyplot as plt
