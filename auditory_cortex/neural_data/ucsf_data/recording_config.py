@@ -119,6 +119,17 @@ class RecordingConfig:
             ]),          
     }
 
+
+    bad_sessions = [
+        '200312', '200401', '191002', '180619', '180405', '180406',
+        # this row (included) onwards added 01/24/24 (getting errors for inter-stimulus dead intervals)
+        '180725', '191212', '200226', '200610', '200325', '191002',
+        '180619', '200323', '200312',                         # belt sessions here on..
+        '190607',  # SPECIAL case: doesn't give any error, but has different distribution of dead intervals..
+        '180801',  # PB sessions here on...
+        '180417', '200617', '200401',
+    ]
+
     # ### Earlier area assignments (reading off the M-file)
     # area_wise_sessions = {
     #     'core': np.array([

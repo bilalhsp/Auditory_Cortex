@@ -1,7 +1,6 @@
 #!/bin/sh
 
-#SBATCH	-A jgmakin-n 
-# --constraint=F|G|I|K|D|B|H|J|N 
+#SBATCH	-A training
 
 # standby
 # jgmakin-n 
@@ -17,11 +16,11 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --time=2-04:00:00
 # --mem=40GB
-# --output=./result_normalizer50.out
+#SBATCH --output=./output_logs/%j.out
 #SBATCH --job-name=normalizers    # Job name
 
 # activate virtual environment
 source ./env_setup.sh
 
-python ../scripts/normalizer_save_results2.py $@
+python ../scripts/cache_norm_dists.py $@
 

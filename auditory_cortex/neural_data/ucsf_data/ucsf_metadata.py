@@ -42,14 +42,15 @@ import fnmatch
 import pickle
 import wave
 
-from auditory_cortex import neural_data_dir, config, NEURAL_DATASETS
+from auditory_cortex import neural_data_dir, NEURAL_DATASETS
 # from auditory_cortex.neural_data.config import RecordingConfig
 from .recording_config import RecordingConfig
+from ..base_metadata import BaseMetaData
 
 DATASET_NAME = NEURAL_DATASETS[0]
 DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)
 
-class UCSFMetaData:
+class UCSFMetaData(BaseMetaData):
     def __init__(self) -> None:
     
         self.cfg = RecordingConfig()
@@ -378,7 +379,7 @@ class UCSFMetaData:
     
     def get_all_available_sessions(self):
         """Retrieves the session IDs for which data is available in 'neural_data_dir'"""  
-        bad_sessions = config['bad_sessions']
+        bad_sessions = self.cfg.bad_sessions
         # sessions = np.array(os.listdir(neural_data_dir))
         # sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
         # for s in bad_sessions:

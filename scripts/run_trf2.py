@@ -39,7 +39,7 @@ import gc
 # local
 from auditory_cortex import saved_corr_dir
 import auditory_cortex.utils as utils
-import auditory_cortex.io_utils.io as io
+from auditory_cortex.io_utils import ResultsManager
 from auditory_cortex.io_utils.io import write_lmbdas
 from auditory_cortex import valid_model_names
 
@@ -50,7 +50,6 @@ from auditory_cortex.encoding import TRF
 
 def compute_and_save_regression(args):
 
-    START = time.time()
     # bin_widths = config['bin_widths']
     bin_widths = args.bin_widths
     dataset_name = args.dataset_name
@@ -77,10 +76,10 @@ def compute_and_save_regression(args):
     lags = [args.lag]
     use_nonlinearity=False
 
-    results_identifier = utils.get_run_id(
+    results_identifier = ResultsManager.get_run_id(
             dataset_name, bin_widths[0], identifier, mVocs=mVocs, shuffled=shuffled, lag=lags[0],
         )
-    csv_file_name = model_name + '_' + results_identifier + '_' + 'corr_results.csv'
+    csv_file_name = model_name + '_' + results_identifier + '_corr_results.csv'
 
     # CSV file to save the results at
     file_exists = False
@@ -97,7 +96,6 @@ def compute_and_save_regression(args):
 
     feature_extractor = create_feature_extractor(model_name, shuffled=shuffled)
     metadata = create_neural_metadata(dataset_name)
-    # metadata = NeuralMetaData()
     sessions = metadata.get_all_available_sessions()
     # ################################################################
     # # list of significant sessions only...
@@ -111,8 +109,6 @@ def compute_and_save_regression(args):
     sessions = sessions[args.start_ind:args.end_ind]
     # sessions = sessions[:20]
     # sessions = sessions[20:]
-    current_time = time.time()
-    elapsed_time = current_time - START
 
     for bin_width in bin_widths:
         # sessions = np.array(['200206'])
@@ -131,16 +127,16 @@ def compute_and_save_regression(args):
             logging.info(f"All sessions already done for bin_width: {bin_width}.")
             continue
 
-        dataset_obj = create_neural_dataset(dataset_name, '180413')
+        neural_dataset = create_neural_dataset(dataset_name)
         if random_proj:
             logging.info(f"Using random linear projections instead of actual layers of the model.")
-            dataset = RandProjAssembler(
-                dataset_obj, feature_extractor, layer_ID, bin_width=bin_width, mVocs=mVocs,
+            data_assembler = RandProjAssembler(
+                neural_dataset, feature_extractor, layer_ID, bin_width=bin_width, mVocs=mVocs,
                 LPF=LPF, LPF_analysis_bw=LPF_analysis_bw, conv_layers=conv_layers, non_linearity=False
                 )
         else:
-            dataset = DNNDataAssembler(
-                dataset_obj, feature_extractor, layer_ID, bin_width=bin_width, mVocs=mVocs,
+            data_assembler = DNNDataAssembler(
+                neural_dataset, feature_extractor, layer_ID, bin_width=bin_width, mVocs=mVocs,
                 LPF=LPF, LPF_analysis_bw=LPF_analysis_bw
                 )
 
@@ -151,12 +147,12 @@ def compute_and_save_regression(args):
                 if session in excluded_sessions:
                     logging.info(f"Excluding session: {session}")
                     continue
-            if session != dataset.dataloader.dataset_obj.sub:
+            if session != data_assembler.get_session_id():
                 # no need to read features again...just reach spikes..
                 dataset_obj = create_neural_dataset(dataset_name, session)
-                dataset.read_session_spikes(dataset_obj)
+                data_assembler.read_session_spikes(dataset_obj)
             
-            trf_obj = TRF(model_name, dataset)
+            trf_obj = TRF(model_name, data_assembler)
             
             corr, opt_lag, opt_lmbda, trf_model = trf_obj.grid_search_CV(
                     lags=lags, tmin=tmin,
@@ -190,23 +186,40 @@ def compute_and_save_regression(args):
                 timit_corr = corr
 
 
+            channel_ids = data_assembler.channel_ids
+            num_channels = len(channel_ids)
             corr_dict = {
-                'test_cc_raw': timit_corr[None,...],
-                'mVocs_test_cc_raw': mVocs_corr[None,...],
-                'win': bin_width,
-                'delay': delay, 
-                'session': session,
-                'model': model_name,
-                'N_sents': N_sents,
-                'layer_ids': [layer_ID],
-                'opt_lag': opt_lag,
-                'opt_lmbda': np.log10(opt_lmbda),
-                'poiss_entropy': np.zeros_like(corr[None,...]),
-                'uncertainty_per_spike': np.zeros_like(corr[None,...]),
-                'bits_per_spike_NLB': np.zeros_like(corr[None,...]),
+                'session': num_channels*[session],
+                'layer': num_channels*[layer_ID],
+                'channel': channel_ids,
+                'bin_width': num_channels*[bin_width],
+                'delay': num_channels*[delay],
+                'test_cc_raw': timit_corr.squeeze(),
+                'normalizer': num_channels*[0.0],  # placeholder for normalizer
+                'mVocs_test_cc_raw': mVocs_corr.squeeze(),
+                'mVocs_normalizer': num_channels*[0.0],  # placeholder for mVocs normalizer
+                'opt_lag': num_channels*[opt_lag],
+                'opt_lmbda': np.log10(opt_lmbda).squeeze(),
+                'N_sents': num_channels*[N_sents],
                 }
 
-            df = utils.write_to_disk(corr_dict, file_path, normalizer=None)
+            # corr_dict = {
+            #     'test_cc_raw': timit_corr[None,...],
+            #     'mVocs_test_cc_raw': mVocs_corr[None,...],
+            #     'win': bin_width,
+            #     'delay': delay, 
+            #     'session': session,
+            #     'model': model_name,
+            #     'N_sents': N_sents,
+            #     'layer_ids': [layer_ID],
+            #     'opt_lag': opt_lag,
+            #     'opt_lmbda': np.log10(opt_lmbda),
+            #     'poiss_entropy': np.zeros_like(corr[None,...]),
+            #     'uncertainty_per_spike': np.zeros_like(corr[None,...]),
+            #     'bits_per_spike_NLB': np.zeros_like(corr[None,...]),
+            #     }
+
+            df = utils.write_to_disk(corr_dict, file_path)
 
             # make sure to delete the objects to free up memory
             # del dataset
@@ -216,8 +229,6 @@ def compute_and_save_regression(args):
             del trf_model
             gc.collect()
 
-    END = time.time()
-    logging.info(f"Took {(END-START)/60:.2f} min., for bin_widths: '{bin_widths}'.")
 
 
 

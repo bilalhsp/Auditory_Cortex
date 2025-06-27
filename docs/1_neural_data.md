@@ -53,7 +53,7 @@ Approximately 40 recording sessions are available. Each session is identified by
 
 These files and directories should be placed inside the `neural_data_dir` specified in the config file (`config.yml`).
 
-**Example Structure:**
+**Directory Structure:**
 ```
 neural_data_dir/ucsf/
 ├── SqMoPhys_MVOCStimcodes.mat
@@ -68,9 +68,29 @@ neural_data_dir/ucsf/
 
 Neural data recorded at the Recanzone Lab from macaque monkeys. This dataset is currently in the early stages, and more sessions are being collected.
 
-**Required Files:**
+- Neural recordings
+    + a separate .mat file for every session
+    + all files placed in ./Data directory
+- Metadata files:
+    + **recanzone_timit_details.mat**: details about TIMIT stimuli presentations
+    + **MSL.mat**: details about mVocs stimuli presentations
+- Stimuli (audio files):
+    + **NIMH_Mvoc_WFM**: directory containing files for all mVocs stimuli
+    + **TIMIT_48000**: directory containing files for all TIMIT stimuli 
 
-- Session directories (containing neural recordings)
-- Metadata files specific to each session (format TBD)
+**Directory Structure:**
+```
+neural_data_dir/ucdavis/
+├── MSL.mat
+├── recanzone_timit_details.mat
+├── Data/
+│   └── ...                     # recordings for all sessions
+├── NIMH_Mvoc_WFM/
+│   ├── 9-Cue-41-Grunt.wfm
+│   └── ...                     # mVocs audio files
+├── TIMIT_48000/
+│   ├── 127-fsdc0_si2234.wfm
+│   └── ...                     # TIMIT audio files
+```
 
 Ensure these are placed under the `neural_data_dir/ucdavis/` directory as defined in the config file.

@@ -68,6 +68,14 @@ class BaseDataAssembler(ABC):
         """
         ...
     
+    def get_layer_id(self):
+        """Returns the layer id for the DNN features."""
+        return self.layer_id
+
+    def get_session_id(self):
+        """Returns the session ID for the dataset."""
+        return self.dataloader.dataset_obj.session_id
+
     def get_bin_width(self):
         """Returns the bin width (sampling rate) for the dataset."""
         if self.LPF:
@@ -143,7 +151,11 @@ class BaseDataAssembler(ABC):
             features_list.append(features[stim])
             # each ch_spikes has shape (n_trial, time), for unique stimuli n_trial=1
             # np.stack([spikes for spikes in training_spikes[1].values()], axis=-1)
-            stim_spikes = np.stack([ch_spikes for ch_spikes in training_spikes[stim].values()], axis=-1).squeeze()
+            # stim_spikes = np.stack([ch_spikes for ch_spikes in training_spikes[stim].values()], axis=-1).squeeze()
+            stim_spikes = np.stack(
+                [training_spikes[stim][ch] for ch in self.channel_ids],
+                axis=-1
+                ).squeeze()
             spikes_list.append(stim_spikes)
         
         return features_list, spikes_list
@@ -167,7 +179,11 @@ class BaseDataAssembler(ABC):
         for stim in stim_ids:
             features_list.append(features[stim])
             # each ch_spikes has shape (n_trial, time), for unique stimuli n_trial=num_repeats
-            stim_spikes = np.stack([ch_spikes for ch_spikes in testing_spikes[stim].values()], axis=-1).squeeze()
+            # stim_spikes = np.stack([ch_spikes for ch_spikes in testing_spikes[stim].values()], axis=-1).squeeze()
+            stim_spikes = np.stack(
+                [testing_spikes[stim][ch] for ch in self.channel_ids],
+                axis=-1
+                ).squeeze()
             spikes_list.append(stim_spikes)
         return features_list, spikes_list
     

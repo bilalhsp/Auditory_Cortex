@@ -25,7 +25,7 @@ import auditory_cortex.utils as utils
 # from auditory_cortex.neural_data import NeuralMetaData
 
 # from auditory_cortex.neural_data.normalizer import Normalizer
-from auditory_cortex import session_to_coordinates, session_to_subject, session_to_area, area_to_sessions #, CMAP_2D
+# from auditory_cortex import session_to_coordinates, session_to_subject, session_to_area, area_to_sessions #, CMAP_2D
 from auditory_cortex import saved_corr_dir, aux_dir, valid_model_names
 from auditory_cortex.io_utils import io
 # from pycolormap_2d import ColorMap2DBremm, config, results_dir
@@ -61,6 +61,10 @@ class BaseCorrelations(ABC):
         self.norm_obj = NormalizerCalculator(self.dataset_name)
 
         self.data = pd.read_csv(self.corr_file_path)
+
+        ##############################################################
+        ###     The following might not be needed anymore! (06-26-25)
+        ##############################################################
         # check if 'test_cc_raw' not one of the columns
         # this will be the case for STRF correlations
         # in that case, copy 'strf_corr' to 'test_cc_raw'
@@ -82,8 +86,6 @@ class BaseCorrelations(ABC):
             all_bad_ids = np.concatenate(all_bad_ids)
             self.data.drop(all_bad_ids, inplace=True)
 
-            # self.set_normalizers_using_app()
-            # self.set_normalizers_using_bootsrap()
 
     @abstractmethod
     def get_selected_data(self, *args, **kwargs):
@@ -113,53 +115,17 @@ class BaseCorrelations(ABC):
         return select_data
 
 
-
-    # # ---------------- methods using normalizer dist. using all-possible-pairs (app) ---------#
-
-    # def set_normalizers_using_app(self, mVocs=False):
-    #     """Uses normalizer distribution computed using all-possible-pairs (app),
-    #     and takes following steps:
-    #         - adds a column 'normalizer_app' containig the new normalizer.
-    #         - adds a column 'corr_normalized_app' containing corrected correlations.
-    #     """
-    #     bin_widths = self.data['bin_width'].unique()
-    #     for bin_width in bin_widths:
-    #         select_data = self.get_selected_data(bin_width=bin_width)
-    #         sessions = select_data['session'].unique()
-    #         delays = select_data['delay'].unique()
-    #         for session in sessions:
-    #             for delay in delays:
-    #                 select_data = self.get_selected_data(
-    #                     sessions=[session], bin_width=bin_width, delay=delay
-    #                 )
-    #                 channels = select_data['channel'].unique()
-
-    #                 # reading the normalizer...
-    #                 # normalizers_dist = self.norm_obj.get_normalizer_for_session_app(
-    #                 #     session=session, bin_width=bin_width 
-    #                 # )
-    #                 normalizers_dist = self.norm_obj.get_normalizer_for_session(
-    #                     session=session, bin_width=bin_width, mVocs=mVocs, random_pairs=False,
-    #                 )
-    #                 normalizers_dist = np.mean(normalizers_dist, axis=0)
-
-    #                 for ch in channels:
-    #                     ch = int(ch)
-    #                     ch_normalizer = normalizers_dist[ch]
-    #                     ids = select_data[select_data['channel']==ch].index
-    #                     self.data.loc[ids, 'normalizer_app'] = ch_normalizer 
-
-    #     self.data['corr_normalized_app'] = self.data['test_cc_raw']/(self.data['normalizer_app'].apply(np.sqrt))
-    #     print(f"Normalizers updated using normalizer (app) dist , writing back now...")
-    #     self.write_back()
-
     # ---------------- methods using normalizer dist. using all-possible-pairs (app) ---------#
-
     def set_normalizers_using_bootsrap(self, mVocs=False, norm_bin_width=None, verbose=False):
-        """Uses normalizer distribution computed using 100k runs 
-        with random concatenation order of trials, and takes following steps:
-            - adds a column 'normalizer' containig the new normalizer.
-            - adds a column 'normalized_test_cc' containing corrected correlations.
+        """Reads normalizer distributions (both True & Null) from the memory and
+        incorporates them to the current file by following steps:
+            - add the following columns (filled by appropriate values):
+                + 'normalizer': mean of the normalizer distribution.
+                + 'null_mean': mean of the null distribution.
+                + 'null_std': std of the null distribution.
+            - adds a columns of normalized correlations:
+                + 'normalized_test_cc': test_cc_raw / sqrt(normalizer)
+            In case of mVocs, all the columns are prefixed with 'mVocs_'.
 
         Args:
             mVocs: bool = IF True, update normalizer for monkey vocalizations, 
@@ -199,22 +165,24 @@ class BaseCorrelations(ABC):
                     else:
                         bw_norm = norm_bin_width
 
-                    norm_dist = self.norm_obj.get_normalizer_for_session(
-                        session=session, bin_width=bw_norm, mVocs=mVocs, random_pairs=True,
-                    )
-                    null_dist = self.norm_obj.get_normalizer_null_dist_using_random_shifts(
-                        session, bin_width=bw_norm, mVocs=mVocs, 
-                    )
-                    # normalizers_dist = np.median(normalizers_dist, axis=0)
-                    norm_means = np.mean(norm_dist, axis=0)
-                    null_means = np.mean(null_dist, axis=0)
-                    null_std = np.std(null_dist, axis=0)
+                    norm_dist, null_dist = self.norm_obj.get_inter_trial_corr_dists_for_session(
+                        session=session, bin_width=bw_norm, mVocs=mVocs,
+                        )
+
+                    # norm_means = np.mean(norm_dist, axis=0)
+                    # null_means = np.mean(null_dist, axis=0)
+                    # null_std = np.std(null_dist, axis=0)
 
                     for ch in channels:
-                        ch = int(ch)
-                        ch_normalizer = norm_means[ch]
-                        ch_null_mean = null_means[ch]
-                        ch_null_std = null_std[ch]
+                        # ch = int(ch)
+                        # ch_normalizer = norm_means[ch]
+                        # ch_null_mean = null_means[ch]
+                        # ch_null_std = null_std[ch]
+
+                        ch_normalizer = np.mean(norm_dist[ch])
+                        ch_null_mean = np.mean(null_dist[ch])
+                        ch_null_std = np.std(null_dist[ch])
+
                         ids = select_data[select_data['channel']==ch].index
                         self.data.loc[ids, normalizer_col] = ch_normalizer
                         self.data.loc[ids, null_mean_col] = ch_null_mean
@@ -237,43 +205,6 @@ class BaseCorrelations(ABC):
         self.write_back()
         #                 self.data.loc[ids, 'normalizer'] = ch_normalizer 
 
-        # self.data['normalized_test_cc'] = self.data['test_cc_raw']/(self.data['normalizer'].apply(np.sqrt))
-        # print(f"Columns: '{normalizer_col}', '{raw_corr_col}', '{norm_corr_col}' updated using normalizer (random pairs) dist, writing back now...")
-        # self.write_back()
-
-    # def get_selected_data(
-    #             self, sessions: list=None, bin_width=None, delay=None, channel=None
-    #     ):
-    #     """Retrieves selected data based on provided arguments. 
-    #     If an argument if 'None', no filter is applied on that column.
-
-    #     Args:
-    #         sessions: list of ints = list of sessions IDs to get data for.
-    #         bin_width: int = bin_width in ms.
-    #         delay: int = delay in ms.
-        
-    #     Returns:
-    #         pandas DataFrame
-    #     """
-    #     select_data = self.data
-    #     if bin_width is not None:
-    #         select_data = select_data[select_data['bin_width']==float(bin_width)]
-        
-    #     if delay is not None:
-    #         select_data = select_data[select_data['delay']==float(delay)]
-        
-    #     if channel is not None:
-    #         select_data = select_data[select_data['channel']==float(channel)]
-
-    #     if sessions is not None:
-    #         session_data = []
-    #         # sessions is a list...
-    #         for session in sessions:
-    #             session_data.append(select_data[
-    #                     (select_data['session']==float(session))
-    #                 ])
-    #         select_data = pd.concat(session_data)
-    #     return select_data
 
 
 # ------------------  Retrieve data for analysis ----------------#
@@ -352,45 +283,6 @@ class BaseCorrelations(ABC):
     def get_filepath(self):
         """Returns abs path of corr result file."""
         return self.corr_file_path
-
-
-    # @staticmethod
-    # def merge_correlation_results(model_name, identifiers_list, output_id, output_identifier=None):
-    #     """
-    #     Args:
-
-    #         model_name: Name of the pre-trained network
-    #         file_identifiers: List of filename identifiers 
-    #         idx:    id of the file identifier to use for saving the merged results
-    #         output_identifier: if output_identifier is given, it takes preference..
-    #     """
-    #     # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
-    #     print("Combining results...")
-    #     corr_dfs = []
-    #     for identifier in identifiers_list:
-    #         filename = f"{model_name}_{identifier}_corr_results.csv"
-    #         file_path = os.path.join(saved_corr_dir, filename)
-
-    #         corr_dfs.append(pd.read_csv(file_path))
-
-    #     # save the merged results at the very first filename...
-    #     if output_identifier is None:
-    #         output_identifier = identifiers_list[output_id]    
-    #     filename = f"{model_name}_{output_identifier}_corr_results.csv"
-    #     file_path = os.path.join(saved_corr_dir, filename)
-
-    #     data = pd.concat(corr_dfs)
-    #     data.to_csv(file_path, index=False)
-    #     print(f"Output saved at: \n {file_path}")
-
-    #     # once all the files have been merged, remove the files..
-    #     for identifier in identifiers_list:
-    #         if identifier != output_identifier:
-    #             filename = f"{model_name}_{identifier}_corr_results.csv"
-    #             file_path = os.path.join(saved_corr_dir, filename)
-    #             # remove the file
-    #             os.remove(file_path)
-
 
 
 class STRFCorrelations(BaseCorrelations):
@@ -570,23 +462,23 @@ class STRFCorrelations(BaseCorrelations):
 
 
 
-    @staticmethod
-    def combine_and_ready(
-            model_name, identifiers_list, output_id, normalizer_filename=None,
-            output_identifier=None
-        ):
-        """Merges results for all identifiers, copies layer types and
-        sets normalizer."""
+    # @staticmethod
+    # def combine_and_ready(
+    #         model_name, identifiers_list, output_id, normalizer_filename=None,
+    #         output_identifier=None
+    #     ):
+    #     """Merges results for all identifiers, copies layer types and
+    #     sets normalizer."""
 
-        BaseCorrelations.merge_correlation_results(
-                model_name=model_name,
-                identifiers_list=identifiers_list,
-                output_id=output_id,
-                output_identifier=output_identifier
-            )
+    #     BaseCorrelations.merge_correlation_results(
+    #             model_name=model_name,
+    #             identifiers_list=identifiers_list,
+    #             output_id=output_id,
+    #             output_identifier=output_identifier
+    #         )
         
-        if output_identifier is None:
-            output_identifier = identifiers_list[output_id]
+    #     if output_identifier is None:
+    #         output_identifier = identifiers_list[output_id]
 
         # print("Updating Normalizer...!")
         # res = model_name + '_' + output_identifier

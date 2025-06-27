@@ -23,7 +23,7 @@ class UCSFDataset(BaseDataset):
     'dir_path': (String) Path to the directory containing data files and the json_file.
     'json_file': (String) Default: 'Neural_data_files.json' specifies data files to be loaded.
     """
-    def __init__(self, sub=200206, data_dir=None, mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
+    def __init__(self, sub=180413, data_dir=None, mat_file = 'out_sentence_details_timit_all_loudness.mat', verbose=False):
         logger.info(f"NeuralData:  Creating object for session: {sub} ... ")
         self.sub = str(int(sub))
         self.dataset_name = DATASET_NAME
@@ -52,7 +52,6 @@ class UCSFDataset(BaseDataset):
             self.mVocs_first_tr, self.missing_trial_ids = self.get_mVocs_trial_details()
 
         logger.info("Done.")
-        # print(f"Data from {self.num_channels} channels loaded...!")
 
 
     def total_stimuli_duration(self, mVocs=False):
@@ -64,36 +63,19 @@ class UCSFDataset(BaseDataset):
         """
         stim_duration = self.metadata.total_stimuli_duration(mVocs)
         return stim_duration
-        # stim_ids = self.get_stim_ids(mVocs)
-        # stim_duration = {}
-        # for stim_type, stim_ids in stim_ids.items():
-        #     stim_duration[stim_type] = sum([self.get_stim_duration(stim_id, mVocs) for stim_id in stim_ids])
-        # return stim_duration
 
     def get_stim_audio(self, stim_id, mVocs=False):
         """Return audio for stimulus (timit or mVocs) id, resampled at 16kHz"""
         return self.metadata.get_stim_audio(stim_id, mVocs)
-        # if mVocs:
-        #     tr_id = self.metadata.get_mVoc_tr_id(stim_id)[0]
-        #     return self.metadata.get_mVoc_aud(tr_id)
-        # else:
-        #     return self.metadata.stim_audio(stim_id)
         
     def get_stim_duration(self, stim_id, mVocs=False):
         """Return duration for stimulus (timit or mVocs) id"""
         return self.metadata.get_stim_duration(stim_id, mVocs)
-        # if mVocs:
-        #     tr_id = self.metadata.get_mVoc_tr_id(stim_id)[0]
-        #     return self.metadata.get_mVoc_dur(tr_id)
-        # else:
-        #     return self.metadata.stim_duration(stim_id)
         
     def get_num_bins(self, stim_id, bin_width, mVocs=False):
         """Returns number of bins for the given duration and bin_width"""
         duration = self.get_stim_duration(stim_id, mVocs)
-        # return int(np.ceil(duration/(bin_width/1000)))
         return BaseDataset.calculate_num_bins(duration, bin_width/1000)
-        # return int(np.ceil(round(duration/(bin_width/1000), 3)))
 
     def get_sampling_rate(self, mVocs=False):
         """Returns the sampling rate of the neural data"""
@@ -113,22 +95,10 @@ class UCSFDataset(BaseDataset):
     def get_training_stim_ids(self, mVocs=False):
         """Returns the set of training stimulus ids"""
         return self.metadata.get_training_stim_ids(mVocs)
-        # if mVocs:
-        #     mVocs_all_stim_ids = np.array(self.metadata.mVocs_all_stim_ids)
-        #     test_stim_ids = np.array(self.metadata.mVoc_test_stimIds)
-        #     return mVocs_all_stim_ids[np.isin(mVocs_all_stim_ids, test_stim_ids, invert=True)]
-        # else:
-        #     sent_IDs = self.metadata.sent_IDs
-        #     testing_sent_ids = self.metadata.test_sent_IDs
-        #     return sent_IDs[np.isin(sent_IDs, testing_sent_ids, invert=True)]
 
     def get_testing_stim_ids(self, mVocs=False):
         """Returns the set of testing stimulus ids"""
         return self.metadata.get_testing_stim_ids(mVocs)
-        # if mVocs:
-        #     return np.array(self.metadata.mVoc_test_stimIds)
-        # else:
-        #     return self.metadata.test_sent_IDs
 
     def load_data(self, verbose):
         """ Loads data from __MUspk.mat files and returns a tuple of dictionaries. 
@@ -215,8 +185,18 @@ class UCSFDataset(BaseDataset):
             raise ModuleNotFoundError("No trial data found...!")
         
     def extract_spikes(self, bin_width=50, delay=0, repeated=False, mVocs=False):
-        """Returns the binned spike counts for mVocs experiment."""
-        # choose appropriate function to get trial IDs and spike counts
+        """Returns the spike counts within small time windows.
+
+        Args:
+            bin_width: int = width of the time window in milliseconds.
+            delay: int = delay in milliseconds, default is 0.
+            repeated: bool = if True, returns spikes for repeated trials, else for unique trials.
+            mVocs: bool = if True, returns spikes for mVocs trials, else for TIMIT trials.
+
+        Returns:
+            spikes: dict = a dictionary where keys are stimulus IDs and values are dictionaries
+                containing channel-wise spike counts for each trial.    
+        """
         if mVocs:
             get_trial_ids = self.metadata.nid_to_tr_id
             get_spike_counts = self.retrieve_mVocs_spike_counts

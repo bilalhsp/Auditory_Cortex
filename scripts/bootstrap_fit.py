@@ -18,7 +18,8 @@ from auditory_cortex import valid_model_names
 # from auditory_cortex.datasets import BaselineDataset, DNNDataset
 # from auditory_cortex.computational_models.encoding import TRF
 
-from auditory_cortex.neural_data import create_neural_dataset
+from auditory_cortex.io_utils import ResultsManager
+from auditory_cortex.neural_data import create_neural_dataset, create_neural_metadata
 from auditory_cortex.dnn_feature_extractor import create_feature_extractor
 from auditory_cortex.data_assembler import STRFDataAssembler, DNNDataAssembler
 from auditory_cortex.encoding import TRF
@@ -58,32 +59,17 @@ def compute_and_save_regression(args):
     LPF_analysis_bw = 20
     # LPF_analysis_bw = 10
     
-    lags=[300]
+    lags=[200]
     # use_nonlinearity=False
 
-    id_details = f'trf_lags{lags[0]}_bw{bin_widths[0]}'
-    if identifier != '':
-        if test_bootstrap:
-            identifier = id_details + '_boot_test_' + identifier
-        else:
-            identifier = id_details + '_boot_' + identifier
-    else:
-        identifier = id_details
+    results_identifier = ResultsManager.get_run_id(
+            dataset_name, bin_widths[0], identifier, mVocs=mVocs, shuffled=shuffled, lag=lags[0],
+            bootstrap=True, test_bootstrap=test_bootstrap
+        )
+    csv_file_name = model_name + '_' + results_identifier + '_corr_results.csv'
 
-    if mVocs:
-        identifier = 'mVocs_' + identifier
-    else:
-        identifier = 'timit_' + identifier
 
-    identifier = f'{dataset_name}_'+identifier
-    csv_file_name = 'corr_results.csv'
-    # if identifier != '':
-    csv_file_name = identifier + '_' + csv_file_name
 
-    if shuffled:
-        csv_file_name = model_name + '_reset_' + csv_file_name
-    else:
-        csv_file_name = model_name + '_' + csv_file_name
     # CSV file to save the results at
     file_exists = False
     file_path = os.path.join(saved_corr_dir, csv_file_name)
@@ -97,6 +83,10 @@ def compute_and_save_regression(args):
         logger.info(f"Running TRF for 'Trained' networks...")
 
 
+    feature_extractor = create_feature_extractor(model_name, shuffled=shuffled)
+    metadata = create_neural_metadata(dataset_name)
+
+
     if dataset_name == 'ucsf':
         sessions = np.array([
                 '200205', '191121', '191210', # non-primary sessions 27/35 channels...
@@ -104,13 +94,8 @@ def compute_and_save_regression(args):
                 '200207', '180807',      # primary sessions 195/227 channels...
                 ])
     elif dataset_name == 'ucdavis':
-        sessions = np.array([0,1,2])
-    feature_extractor = create_feature_extractor(model_name, shuffled=shuffled)
-
-    
-
+        sessions = metadata.get_all_available_sessions()
     for bin_width in bin_widths:
-        
         # Session in data_dir that we do not have results for...
         if file_exists:
             sessions_done = data[
@@ -121,6 +106,12 @@ def compute_and_save_regression(args):
             subjects = sessions[np.isin(sessions,sessions_done.astype(int).astype(str), invert=True)]
         else:
             subjects = sessions
+
+        if len(subjects) == 0:
+            logging.info(f"All sessions already done for bin_width: {bin_width}.")
+            continue
+
+        dataset_obj = create_neural_dataset(dataset_name)
 
         for session in subjects:
             if mVocs:
@@ -141,7 +132,7 @@ def compute_and_save_regression(args):
             if test_bootstrap:
                 trf_model = trf_obj.load_saved_model(
                     model_name, session, layer_ID, bin_width, shuffled=shuffled, dataset_name=dataset_name,
-                    mVocs=mVocs
+                    mVocs=mVocs, tmax=lags[0], LPF=LPF,
                     )
                 if trf_model is None:
                     corr, opt_lag, opt_lmbda, trf_model = trf_obj.grid_search_CV(
@@ -149,7 +140,7 @@ def compute_and_save_regression(args):
                     )
                     trf_obj.save_model_parameters(
                         trf_model, model_name, layer_ID, session, bin_width, shuffled=shuffled,
-                        LPF=LPF, mVocs=mVocs, dataset_name=dataset_name
+                        LPF=LPF, mVocs=mVocs, dataset_name=dataset_name, tmax=lags[0]
                     )
                 corr = trf_obj.evaluate(trf_model, test_trial=N_test_trials)
                 opt_lag = [0]*corr.size

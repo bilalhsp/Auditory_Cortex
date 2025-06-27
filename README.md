@@ -13,9 +13,10 @@ auditory_cortex/
 │   ├── neural_data/             ← Neural data handling
 │   ├── plotters/                ← Plotting utilities
 │   ├── analyses/                ← Analysis utilities
+│   ├── io_utils/                ← To save/load/cache results
 │   ├── dataloader.py            ← Data loading
 │   ├── encoding.py              ← Encoding models
-│   ├── utils.py                 ← Helper functions
+│   └── utils.py                 ← Helper functions
 ├── docs/                        ← Documentation
 ├── scripts/                     ← Experiment scripts
 ├── notebooks/                   ← Analysis notebooks

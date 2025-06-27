@@ -112,8 +112,8 @@ class TRF:
 
         test_spect_list, all_test_spikes = self.dataset_assembler.get_testing_data()
         predicted_response = trf_model.predict(X=test_spect_list, n_offset=self.dataset_assembler.n_offset)
-        predicted_response = np.concatenate(predicted_response, axis=0)
-        all_test_spikes = np.concatenate(all_test_spikes, axis=1)
+        predicted_response = np.concatenate(predicted_response, axis=0)     # gives (total_time, num_channels)
+        all_test_spikes = np.concatenate(all_test_spikes, axis=1)           # gives (n_repeats, total_time, num_channels)
         
         corr = utils.compute_avg_test_corr(
             all_test_spikes, predicted_response, test_trial, mVocs=self.dataset_assembler.mVocs)
@@ -126,7 +126,7 @@ class TRF:
         if N_sents is None or N_sents >= 100:	
             return mapping_set
         else:
-            required_duration = N_sents*10
+            required_duration = N_sents*10  # why is this 10?
             print(f"Mapping set for stim duration={required_duration:.2f} sec")
             stimili_duration=0
             for n in range(5, len(mapping_set)):

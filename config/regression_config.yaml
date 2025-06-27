@@ -10,6 +10,7 @@ cache_dir: /scratch/gilbreth/ahmedb/cache
 # device that is being used...
 hpc_cluster: True
 use_cpu: False
+# LPF_analysis_bw: 10
 
 neural_datasets:
 - 'ucsf'
@@ -33,56 +34,36 @@ dnn_models:
 # - 'w2v2_generic'            # 10
 # - 'spect2vec'               # 11
 
-model_name: wav2letter_modified
-identifier: sampling_rate_opt_neural_delay_feature_extractor
-# identifier: testing_changes
+# model_name: wav2letter_modified
+# identifier: sampling_rate_opt_neural_delay_feature_extractor
+# # identifier: testing_changes
 
-# identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
-delay_features: False
-audio_zeropad: False
-third: False
-delays_grid_search: True
+# # identifier: opt_delay_L6_D4 #opt_delay  #_with_audio_zeropad #test7 #RF_delayed_l10-11 #opt_delays_l10-11
+# delay_features: False
+# audio_zeropad: False
+# third: False
+# delays_grid_search: True
 
 #### Ensure these settings before submitting every job..
 
-bad_sessions:
-- '200312'
-- '200401'
-- '191002'
-- '180619'
-- '180405'
-- '180406'
-- '180725'  # this row (included) onwards added 01/24/24 (getting errors for inter-stimulus dead intervals)
-- '191212'
-- '200226'
-- '200610'
-- '200325'
-- '191002'
-- '180619'  # belt sessions here on..
-- '200323'
-- '200312'
-- '190607'  # SPECIAL case: doesn't give any error, but has different distribution of dead intervals..
-- '180801'  # PB sessions here on...
-- '180417'
-- '200617'
-- '200401'
-delays_param:
-  start: 0
-  stop: 1
-  step: 10
-delays:
-# - 60
-- 0
-bin_widths:
-- 40
-dataset_sizes:
-# - 10
-- 500
-- 501
-- 5
-k_folds_validation: 3
-iterations: 1
-LPF_analysis_bw: 10
+
+# delays_param:
+#   start: 0
+#   stop: 1
+#   step: 10
+# delays:
+# # - 60
+# - 0
+# bin_widths:
+# - 40
+# dataset_sizes:
+# # - 10
+# - 500
+# - 501
+# - 5
+# k_folds_validation: 3
+# iterations: 1
+
 
 
 # optimal_inputs_param:

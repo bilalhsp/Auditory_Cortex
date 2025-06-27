@@ -1,9 +1,9 @@
 from typing import Union
 import numpy as np
+from scipy.io.matlab import mio5_params  # For mat_struct
 from abc import ABC, abstractmethod
 
 class BaseDataset(ABC):
-    
     @abstractmethod
     def total_stimuli_duration(self, mVocs=False):
         """Returns the total duration of all the stimuli in the experiment,
@@ -115,3 +115,25 @@ class BaseDataset(ABC):
         # adding epsilon to make sure that the last bin is included when on threshold
         duration += 1e-6
         return int((duration + bin_width/2)/bin_width)
+
+
+    @staticmethod
+    def get_all_keys(data: Union[dict, mio5_params.mat_struct]) -> list:
+        """Returns keys or field names from dict or mat_struct, or empty list otherwise."""
+        if isinstance(data, dict):
+            list_keys = list(data.keys())
+        elif isinstance(data, mio5_params.mat_struct):
+            list_keys = data._fieldnames
+        else:
+            raise TypeError(f"Unsupported type {type(data)} for data")
+        list_keys = [key for key in list_keys if not key.startswith('__')]
+        return list_keys
+    
+    @staticmethod
+    def get_value(data: Union[dict, mio5_params.mat_struct], key: str):
+        if isinstance(data, dict):
+            return data.get(key)
+        elif isinstance(data, mio5_params.mat_struct):
+            return getattr(data, key)
+        else:
+            raise TypeError(f"Unsupported type {type(data)} for data")

@@ -2,7 +2,7 @@
 
 # --output=./result_regression_w2l_spect.out
 
-#SBATCH	-A jgmakin-n
+#SBATCH	-A standby
 #SBATCH --constraint=I|J|K|N|G|F|H|C
 
 #F|G|I|K|D|B
@@ -19,7 +19,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=50GB
-#SBATCH --time=04:00:00
+#SBATCH --time=00:30:00
 
 #SBATCH --job-name=run_trf2    # Job name
 # activate virtual environment

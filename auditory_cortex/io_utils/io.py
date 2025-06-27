@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import pandas as pd
 import gzip
@@ -9,62 +10,218 @@ from memory_profiler import profile
 import logging
 logger = logging.getLogger(__name__)
 
-def read_bootstrap_normalizer_dist(
-        session, itr, percent_dur, num_trial, bin_width, dataset_name='ucsf', mVocs=False
-        ):
-    """Reads distribution of medians for standard error of mean using
-     bootstrap method.
-    """
-    bin_width = int(bin_width)
-    session = int(session)
-    percent_dur = int(percent_dur)
-    num_trial = int(num_trial)
-    # layer_ID = int(layer_ID)
-    path_dir = os.path.join(cache_dir, 'bootstrap', 'normalizer')
-    if dataset_name != 'ucsf':
-        path_dir = os.path.join(path_dir, dataset_name)
-    if mVocs:
-        path_dir = os.path.join(path_dir, 'mVocs')
-    filename = f'norm_bootstrap_dist_session_{session}_{bin_width}ms_dur_{percent_dur}_trials_{num_trial}_itr_{itr}.pkl'   
-    file_path = os.path.join(path_dir, filename)
 
-    if os.path.exists(file_path):
-        logger.info(f"Reading from file: {file_path}")
-        logger.info
-        with open(file_path, 'rb') as F: 
-            reg_results = pickle.load(F)
-        return reg_results
-    else:
-        logger.info(f"Results not found.")
+def sanitize_string(s):
+    """Sanitize strings for safe filenames."""
+    return re.sub(r'[^\w.-]', '_', str(s))
+
+def settings_to_name(settings: dict) -> str:
+    parts = [f"{k}-{sanitize_string(v)}" for k, v in sorted(settings.items())]
+    return "_".join(parts)
+
+def write_dict(dict, filepath):
+    """Writes a dictionary to a file using gzip compression."""
+    with gzip.open(filepath, 'wb') as f:
+        pickle.dump(dict, f)
+    logger.info(f"Dictionary saved to {filepath}")
+
+def read_dict(filepath):
+    try:
+        with gzip.open(filepath, 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        logger.warning(f"File not found: {filepath}")
         return None
-
-def write_bootstrap_normalizer_dist(
-        normalizer_dist, session, itr, percent_dur, num_trial, bin_width, dataset_name='ucsf', mVocs=False
+################################################################
+######      Normalizer read/write functions....STARTS HERE
+def read_inter_trial_corr_dists(
+        session, bin_width, delay, mVocs=False, dataset_name='ucsf'
         ):
-    """Reads distribution of medians for standard error of mean using
-     bootstrap method.
+    """Writes distributions (True & Null both) of trial-trial correlations
+    for the given selection.
     """
     bin_width = int(bin_width)
-    session = int(session)
-    percent_dur = int(percent_dur)
-    num_trial = int(num_trial)
-    # layer_ID = int(layer_ID)
-    path_dir = os.path.join(cache_dir, 'bootstrap', 'normalizer')
+    delay = int(delay)
     if dataset_name != 'ucsf':
-        path_dir = os.path.join(path_dir, dataset_name)
+        parent_dir = os.path.join(normalizers_dir, dataset_name)
+    else:
+        parent_dir = normalizers_dir
     if mVocs:
-        path_dir = os.path.join(path_dir, 'mVocs')
-    filename = f'norm_bootstrap_dist_session_{session}_{bin_width}ms_dur_{percent_dur}_trials_{num_trial}_itr_{itr}.pkl'   
-    file_path = os.path.join(path_dir, filename)
+        parent_dir = os.path.join(parent_dir, 'mVocs')
 
-    if not os.path.exists(path_dir):
-        os.makedirs(path_dir)
-        logger.info(f"Directory path created: {path_dir}")
+    norm_dir = os.path.join(parent_dir, 'norm_dist')
+    null_dir = os.path.join(parent_dir, 'null_dist')
+
+    norm_dist = read_dict(
+        os.path.join(norm_dir, f"norm_bw_{bin_width}ms_sess_{session}.pkl.gz")
+        )
+    null_dist = read_dict(
+        os.path.join(null_dir, f"null_bw_{bin_width}ms_sess_{session}.pkl.gz")
+        )
+    return norm_dist, null_dist
+
+# def write_inter_trial_corr_dists(
+#         norm_dist, null_dist, 
+#         session, bin_width, delay, mVocs=False, dataset_name='ucsf'
+#         ):
+#     """Writes distributions (True & Null both) of trial-trial correlations
+#     for the given selection.
+#     """
+#     bin_width = int(bin_width)
+#     delay = int(delay)
+#     if dataset_name != 'ucsf':
+#         parent_dir = os.path.join(normalizers_dir, dataset_name)
+#     else:
+#         parent_dir = normalizers_dir
+#     if mVocs:
+#         parent_dir = os.path.join(parent_dir, 'mVocs')
+
+#     norm_dir = os.path.join(parent_dir, 'norm_dist')
+#     null_dir = os.path.join(parent_dir, 'null_dist')
+
+#     os.makedirs(norm_dir, exist_ok=True)
+#     os.makedirs(null_dir, exist_ok=True)
+
+#     write_dict(
+#         norm_dist,
+#         os.path.join(norm_dir, f"norm_bw_{bin_width}ms_sess_{session}.pkl.gz")
+#     )
+#     write_dict(
+#         null_dist,
+#         os.path.join(null_dir, f"null_bw_{bin_width}ms_sess_{session}.pkl.gz")
+#     )
+
+
+def read_inter_trial_corr_dists(
+        session, bin_width, mVocs=False, dataset_name='ucsf', 
+        **kwargs,
+        ):
+    """Reads the distribution of normalizers (both True & Null) from cache.
+
+    Args:
+        session: int = session ID (e.g. 200206)
+        bin_width: int = bin width in ms
+        mVocs: bool = if True, uses mVocs directory
+        dataset_name: str = name of the dataset (default: 'ucsf')
+
+        Kwargs:
+            bootstrap: bool = if True, uses bootstrap method (default: False)
+            epoch: int = epoch index (default: None)   
+                None means no bootstrap, just save the distribution
+            percent_dur: int = percentage of duration to consider for bootstrap (default: None)
+            num_trial: int = number of trials to consider for bootstrap (default: None)
+
+    Returns:
+        norm_dist: dict = distribution of normalizers
+        null_dist: dict = distribution of null correlations
+    """
+    bootstrap = kwargs.get('bootstrap', False)
+    epoch = kwargs.get('epoch', None)
+    percent_dur = kwargs.get('percent_dur', None)
+    num_trial = kwargs.get('num_trial', None)
+    if bootstrap:
+        assert epoch is not None, "epoch id must be specified for bootstrap method"
+        assert percent_dur is not None, "percent_dur must be specified for bootstrap method"
+        assert num_trial is not None, "num_trial must be specified for bootstrap method"
+
+        percent_dur = int(percent_dur)
+        num_trial = int(num_trial)
+        epoch = int(epoch)
+
+    bin_width = int(bin_width)
+    session = int(session)
     
+    if dataset_name != 'ucsf':
+        parent_dir = os.path.join(normalizers_dir, dataset_name)
+    else:
+        parent_dir = normalizers_dir
+    if mVocs:
+        parent_dir = os.path.join(parent_dir, 'mVocs')
+    if bootstrap:
+        parent_dir = os.path.join(parent_dir, 'bootstrap')
 
-    with open(file_path, 'wb') as F: 
-        pickle.dump(normalizer_dist, F)
-    logger.info(f"Normalizer dist at path: \n {file_path}.")
+    norm_dir = os.path.join(parent_dir, 'norm_dist')
+    null_dir = os.path.join(parent_dir, 'null_dist')
+
+    os.makedirs(norm_dir, exist_ok=True)
+    os.makedirs(null_dir, exist_ok=True)
+
+    settings = {
+        'epoch': epoch, 
+        'percent_dur': percent_dur,
+        'num_trial': num_trial, 
+        'session': session,
+        'bin_width': bin_width, 
+    }
+    filename = f"{settings_to_name(settings)}.pkl.gz"
+    norm_dist = read_dict(os.path.join(norm_dir, filename))
+    null_dist = read_dict(os.path.join(null_dir, filename))
+    return norm_dist, null_dist
+
+
+def write_inter_trial_corr_dists(
+        norm_dist, null_dist, 
+        session, bin_width, mVocs=False, dataset_name='ucsf', 
+        **kwargs,
+        ):
+    """Writes the distribution of normalizers (both True & Null) to cache.
+
+    Args:
+        norm_dist: dict = distribution of normalizers
+        null_dist: dict = distribution of null correlations
+        session: int = session ID (e.g. 200206)
+        bin_width: int = bin width in ms
+        mVocs: bool = if True, uses mVocs directory
+        dataset_name: str = name of the dataset (default: 'ucsf')
+
+        Kwargs:
+            bootstrap: bool = if True, uses bootstrap method (default: False)
+            itr: int = number of bootstrap iterations (default: None)   
+                None means no bootstrap, just save the distribution
+            percent_dur: int = percentage of duration to consider for bootstrap (default: None)
+            num_trial: int = number of trials to consider for bootstrap (default: None)
+    """
+    bootstrap = kwargs.get('bootstrap', False)
+    epoch = kwargs.get('epoch', None)
+    percent_dur = kwargs.get('percent_dur', None)
+    num_trial = kwargs.get('num_trial', None)
+    if bootstrap:
+        assert epoch is not None, "itr must be specified for bootstrap method"
+        assert percent_dur is not None, "percent_dur must be specified for bootstrap method"
+        assert num_trial is not None, "num_trial must be specified for bootstrap method"
+
+        percent_dur = int(percent_dur)
+        num_trial = int(num_trial)
+        epoch = int(epoch)
+
+    bin_width = int(bin_width)
+    session = int(session)
+    
+    if dataset_name != 'ucsf':
+        parent_dir = os.path.join(normalizers_dir, dataset_name)
+    else:
+        parent_dir = normalizers_dir
+    if mVocs:
+        parent_dir = os.path.join(parent_dir, 'mVocs')
+    if bootstrap:
+        parent_dir = os.path.join(parent_dir, 'bootstrap')
+
+    norm_dir = os.path.join(parent_dir, 'norm_dist')
+    null_dir = os.path.join(parent_dir, 'null_dist')
+
+    os.makedirs(norm_dir, exist_ok=True)
+    os.makedirs(null_dir, exist_ok=True)
+
+    settings = {
+        'epoch': epoch, 
+        'percent_dur': percent_dur,
+        'num_trial': num_trial, 
+        'session': session,
+        'bin_width': bin_width, 
+    }
+    filename = f"{settings_to_name(settings)}.pkl.gz"
+    write_dict(norm_dist, os.path.join(norm_dir, filename))
+    write_dict(null_dist, os.path.join(null_dir, filename))
 
 #-----------      cache bootstrap median dist    -----------
 
@@ -127,6 +284,190 @@ def write_bootstrap_median_dist(
     with open(file_path, 'wb') as F: 
         pickle.dump(median_dist, F)
     logger.info(f"trf parameters saved for {model_name} at path: \n {file_path}.")
+
+
+#-----------      Null distribution using poisson sequences    -----------#
+
+def read_normalizer_null_distribution_using_poisson(bin_width, spike_rate, mVocs=False, dataset_name='ucsf'):
+    """Retrieves null distribution of correlations computed using poisson sequences."""
+    bin_width = int(bin_width)
+    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
+    if dataset_name != 'ucsf':
+        parent_dir = os.path.join(normalizers_dir, dataset_name)
+    else:
+        parent_dir = normalizers_dir
+        
+    post_str = ''
+    if mVocs:
+        parent_dir = os.path.join(parent_dir, 'mVocs')
+        post_str = ' (mVocs)'
+
+    path_dir = os.path.join(parent_dir, 'null_distribution')
+    file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as F: 
+            norm_null_dist = pickle.load(F)
+        return norm_null_dist
+    else:
+        logger.info(f"Null dist.{post_str} not found: for bin-width {bin_width}ms and {spike_rate}Hz spike rate.")
+        return None
+
+def write_normalizer_null_distribution_using_poisson(
+        bin_width, spike_rate, null_dist_poisson, mVocs=False, dataset_name='ucsf'):
+    """Writes null distribution of correlations computed using poisson sequences for the given selection."""
+    bin_width = int(bin_width)
+    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
+    if dataset_name != 'ucsf':
+        parent_dir = os.path.join(normalizers_dir, dataset_name)
+    else:
+        parent_dir = normalizers_dir
+        
+    if mVocs:
+        parent_dir = os.path.join(parent_dir, 'mVocs')
+    
+    path_dir = os.path.join(parent_dir, 'null_distribution')
+    if not os.path.exists(path_dir):
+        logger.info(f"Path not found, creating directories...")
+        os.makedirs(path_dir)
+    file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
+    
+    with open(file_path, 'wb') as F: 
+        pickle.dump(null_dist_poisson, F)
+    logger.info(f"Null dist. poisson saved to: {file_path}")
+
+
+# #-----------      Null distribution using sequence shifts    -----------#
+
+# def read_normalizer_null_distribution_random_shifts(
+#         session, bin_width, dataset_name='ucsf'
+#         ):
+#     """Retrieves null distribution of correlations computed using randomly 
+#         shifted spike sequence of one trial vs (non-shifted) seconds trial."""
+#     bin_width = int(bin_width)
+#     session = str(int(float(session)))
+#     if dataset_name != 'ucsf':
+#         parent_dir = os.path.join(normalizers_dir, dataset_name)
+#     else:
+#         parent_dir = normalizers_dir
+#     path_dir = os.path.join(parent_dir, 'null_distribution', 'shifted_sequence')
+#     file_path = f"shifted_null_bw_{bin_width}ms_sess_{session}.npz"
+#     file_path = os.path.join(path_dir, file_path)
+#     if os.path.exists(file_path):
+#         data = np.load(file_path)
+#         null_dist = data['null_dist']
+#         return null_dist
+#     else:
+#         logger.info(f"Null dist. not found: for bin-width {bin_width}ms and session {session}.")
+#         return None
+
+# def write_normalizer_null_distribution_using_random_shifts(
+#         session, bin_width, null_dist_sess, dataset_name='ucsf'
+#         ):
+#     """Writes null distribution of correlations computed using poisson sequences for the given selection."""
+#     bin_width = int(bin_width)
+#     session = str(int(float(session)))
+#     if dataset_name != 'ucsf':
+#         parent_dir = os.path.join(normalizers_dir, dataset_name)
+#     else:
+#         parent_dir = normalizers_dir
+#     path_dir = os.path.join(parent_dir, 'null_distribution', 'shifted_sequence')
+#     os.makedirs(path_dir, exist_ok=True)
+#     file_path = f"shifted_null_bw_{bin_width}ms_sess_{session}.npz"
+#     file_path = os.path.join(path_dir, file_path)
+
+#     np.savez_compressed(file_path, null_dist=null_dist_sess)
+#     logger.info(f"Shifted Null dist. saved to: {file_path}")
+
+# #-----------  Normalizer distribution using all possible pairs of trials  ----------#
+
+# def read_normalizer_distribution(
+#         bin_width, delay, session, method='app', mVocs=False, dataset_name='ucsf'
+#         ):
+#     """Retrieves distribution of normalizers for the given selection.
+    
+#     Args:
+#         bin_width: int = bin width in ms
+#         delay: int = delay in ms
+#         session: str = session ID (e.g. 200206)
+#     """
+#     bin_width = int(bin_width)
+#     delay = int(delay)
+#     if method == 'app':
+#         subdir = 'all_possible_pairs'
+#     else:
+#         subdir = 'random_pairs'
+
+#     if dataset_name != 'ucsf':
+#         parent_dir = os.path.join(normalizers_dir, dataset_name)
+#     else:
+#         parent_dir = normalizers_dir
+
+#     if mVocs:
+#         parent_dir = os.path.join(parent_dir, 'mVocs')
+
+#     path_dir = os.path.join(parent_dir, subdir)
+#     file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.npz")
+#     if os.path.exists(file_path):
+#         data = np.load(file_path)
+#         norm_dist = data['dist']
+#         return norm_dist
+#     else:
+#         logger.info(f"Normalizer not found: for bw {bin_width}ms, delay {delay}ms and session {session}.")
+#         return None
+#     # file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.pkl")
+#     # if os.path.exists(file_path):
+#     #     with open(file_path, 'rb') as F: 
+#     #         normalizers_dist = pickle.load(F)
+#     #     return normalizers_dist
+#     # else:
+#     #     logger.info(f"Normalizers not found: for bin-width {bin_width}ms and delay {delay}ms.")
+#     #     return None
+
+# def write_normalizer_distribution(
+#         session, bin_width, delay, normalizer_dist, method='app', mVocs=False, dataset_name='ucsf'
+#         ):
+#     """Writes distribution of normalizers for the given selection."""
+#     bin_width = int(bin_width)
+#     delay = int(delay)
+#     if method == 'app':
+#         subdir = 'all_possible_pairs'
+#     else:
+#         subdir = 'random_pairs'
+#     # path_dir = os.path.join(results_dir, 'normalizer', subdir)
+#     if dataset_name != 'ucsf':
+#         parent_dir = os.path.join(normalizers_dir, dataset_name)
+#     else:
+#         parent_dir = normalizers_dir
+
+#     if mVocs:
+#         parent_dir = os.path.join(parent_dir, 'mVocs')
+
+#     path_dir = os.path.join(parent_dir, subdir)
+#     if not os.path.exists(path_dir):
+#         logger.info(f"Path not found, creating directories...")
+#         os.makedirs(path_dir)
+
+#     file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.npz")
+#     np.savez_compressed(file_path, dist=normalizer_dist)
+#     logger.info(f"Writing normalizer dictionary to the {file_path}")
+#     # file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
+#     # norm_dict_all_sessions = read_normalizer_distribution(
+#     #     bin_width, delay, method=method, mVocs=mVocs, dataset_name=dataset_name
+#     #     )
+    
+#     # if norm_dict_all_sessions is None:
+#     #     norm_dict_all_sessions = {}
+
+#     # norm_dict_all_sessions[session] = normalizer_dist
+#     # with open(file_path, 'wb') as F: 
+#     #     pickle.dump(norm_dict_all_sessions, F)
+#     # logger.info(f"Writing normalizer dictionary to the {file_path}")
+
+
+######      Normalizer read/write functions....END HERE
+################################################################
+
+
     
 
 
@@ -337,182 +678,6 @@ def write_significant_sessions_and_channels(
     logger.info(f"Sigificant sessions/channels saved to: {file_path}")
 
 
-#-----------      Null distribution using poisson sequences    -----------#
-
-def read_normalizer_null_distribution_using_poisson(bin_width, spike_rate, mVocs=False, dataset_name='ucsf'):
-    """Retrieves null distribution of correlations computed using poisson sequences."""
-    bin_width = int(bin_width)
-    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
-    if dataset_name != 'ucsf':
-        parent_dir = os.path.join(normalizers_dir, dataset_name)
-    else:
-        parent_dir = normalizers_dir
-        
-    post_str = ''
-    if mVocs:
-        parent_dir = os.path.join(parent_dir, 'mVocs')
-        post_str = ' (mVocs)'
-
-    path_dir = os.path.join(parent_dir, 'null_distribution')
-    file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
-    if os.path.exists(file_path):
-        with open(file_path, 'rb') as F: 
-            norm_null_dist = pickle.load(F)
-        return norm_null_dist
-    else:
-        logger.info(f"Null dist.{post_str} not found: for bin-width {bin_width}ms and {spike_rate}Hz spike rate.")
-        return None
-
-def write_normalizer_null_distribution_using_poisson(
-        bin_width, spike_rate, null_dist_poisson, mVocs=False, dataset_name='ucsf'):
-    """Writes null distribution of correlations computed using poisson sequences for the given selection."""
-    bin_width = int(bin_width)
-    # path_dir = os.path.join(results_dir, 'normalizers', 'null_distribution')
-    if dataset_name != 'ucsf':
-        parent_dir = os.path.join(normalizers_dir, dataset_name)
-    else:
-        parent_dir = normalizers_dir
-        
-    if mVocs:
-        parent_dir = os.path.join(parent_dir, 'mVocs')
-    
-    path_dir = os.path.join(parent_dir, 'null_distribution')
-    if not os.path.exists(path_dir):
-        logger.info(f"Path not found, creating directories...")
-        os.makedirs(path_dir)
-    file_path = os.path.join(path_dir, f"normalizers_null_dist_poisson_bw_{bin_width}ms_spike_rate_{spike_rate}hz.pkl")
-    
-    with open(file_path, 'wb') as F: 
-        pickle.dump(null_dist_poisson, F)
-    logger.info(f"Null dist. poisson saved to: {file_path}")
-
-
-#-----------      Null distribution using sequence shifts    -----------#
-
-def read_normalizer_null_distribution_random_shifts(
-        session, bin_width, dataset_name='ucsf'
-        ):
-    """Retrieves null distribution of correlations computed using randomly 
-        shifted spike sequence of one trial vs (non-shifted) seconds trial."""
-    bin_width = int(bin_width)
-    session = str(int(float(session)))
-    if dataset_name != 'ucsf':
-        parent_dir = os.path.join(normalizers_dir, dataset_name)
-    else:
-        parent_dir = normalizers_dir
-    path_dir = os.path.join(parent_dir, 'null_distribution', 'shifted_sequence')
-    file_path = f"shifted_null_bw_{bin_width}ms_sess_{session}.npz"
-    file_path = os.path.join(path_dir, file_path)
-    if os.path.exists(file_path):
-        data = np.load(file_path)
-        null_dist = data['null_dist']
-        return null_dist
-    else:
-        logger.info(f"Null dist. not found: for bin-width {bin_width}ms and session {session}.")
-        return None
-
-def write_normalizer_null_distribution_using_random_shifts(
-        session, bin_width, null_dist_sess, dataset_name='ucsf'
-        ):
-    """Writes null distribution of correlations computed using poisson sequences for the given selection."""
-    bin_width = int(bin_width)
-    session = str(int(float(session)))
-    if dataset_name != 'ucsf':
-        parent_dir = os.path.join(normalizers_dir, dataset_name)
-    else:
-        parent_dir = normalizers_dir
-    path_dir = os.path.join(parent_dir, 'null_distribution', 'shifted_sequence')
-    os.makedirs(path_dir, exist_ok=True)
-    file_path = f"shifted_null_bw_{bin_width}ms_sess_{session}.npz"
-    file_path = os.path.join(path_dir, file_path)
-
-    np.savez_compressed(file_path, null_dist=null_dist_sess)
-    logger.info(f"Shifted Null dist. saved to: {file_path}")
-
-#-----------  Normalizer distribution using all possible pairs of trials  ----------#
-
-def read_normalizer_distribution(
-        bin_width, delay, session, method='app', mVocs=False, dataset_name='ucsf'
-        ):
-    """Retrieves distribution of normalizers for the given selection.
-    
-    Args:
-        bin_width: int = bin width in ms
-        delay: int = delay in ms
-        session: str = session ID (e.g. 200206)
-    """
-    bin_width = int(bin_width)
-    delay = int(delay)
-    if method == 'app':
-        subdir = 'all_possible_pairs'
-    else:
-        subdir = 'random_pairs'
-
-    if dataset_name != 'ucsf':
-        parent_dir = os.path.join(normalizers_dir, dataset_name)
-    else:
-        parent_dir = normalizers_dir
-
-    if mVocs:
-        parent_dir = os.path.join(parent_dir, 'mVocs')
-
-    path_dir = os.path.join(parent_dir, subdir)
-    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.npz")
-    if os.path.exists(file_path):
-        data = np.load(file_path)
-        norm_dist = data['dist']
-        return norm_dist
-    else:
-        logger.info(f"Normalizer not found: for bw {bin_width}ms, delay {delay}ms and session {session}.")
-        return None
-    # file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.pkl")
-    # if os.path.exists(file_path):
-    #     with open(file_path, 'rb') as F: 
-    #         normalizers_dist = pickle.load(F)
-    #     return normalizers_dist
-    # else:
-    #     logger.info(f"Normalizers not found: for bin-width {bin_width}ms and delay {delay}ms.")
-    #     return None
-
-def write_normalizer_distribution(
-        session, bin_width, delay, normalizer_dist, method='app', mVocs=False, dataset_name='ucsf'
-        ):
-    """Writes distribution of normalizers for the given selection."""
-    bin_width = int(bin_width)
-    delay = int(delay)
-    if method == 'app':
-        subdir = 'all_possible_pairs'
-    else:
-        subdir = 'random_pairs'
-    # path_dir = os.path.join(results_dir, 'normalizer', subdir)
-    if dataset_name != 'ucsf':
-        parent_dir = os.path.join(normalizers_dir, dataset_name)
-    else:
-        parent_dir = normalizers_dir
-
-    if mVocs:
-        parent_dir = os.path.join(parent_dir, 'mVocs')
-
-    path_dir = os.path.join(parent_dir, subdir)
-    if not os.path.exists(path_dir):
-        logger.info(f"Path not found, creating directories...")
-        os.makedirs(path_dir)
-
-    file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms_sess_{session}.npz")
-    np.savez_compressed(file_path, dist=normalizer_dist)
-    logger.info(f"Writing normalizer dictionary to the {file_path}")
-    # file_path = os.path.join(path_dir, f"normalizers_bw_{bin_width}ms_delay_{delay}ms.pkl")
-    # norm_dict_all_sessions = read_normalizer_distribution(
-    #     bin_width, delay, method=method, mVocs=mVocs, dataset_name=dataset_name
-    #     )
-    
-    # if norm_dict_all_sessions is None:
-    #     norm_dict_all_sessions = {}
-
-    # norm_dict_all_sessions[session] = normalizer_dist
-    # with open(file_path, 'wb') as F: 
-    #     pickle.dump(norm_dict_all_sessions, F)
-    # logger.info(f"Writing normalizer dictionary to the {file_path}")
 
 
 

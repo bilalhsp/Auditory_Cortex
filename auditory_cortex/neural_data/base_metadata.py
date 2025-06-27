@@ -24,17 +24,27 @@ class BaseMetaData(ABC):
     
     @abstractmethod
     def get_training_stim_ids(self, mVocs=False):
-        """Returns the set of training stimulus ids"""
+        """Returns the set of training stimulus ids (stimuli with unique presentations)
+        
+        Returns:    
+            (n,) - array of training stimulus ids
+        """
         pass
 
     @abstractmethod
     def get_testing_stim_ids(self, mVocs=False):
-        """Returns the set of testing stimulus ids"""
+        """Returns the set of testing stimulus ids (stimuli with repeated presentations)
+        
+        Returns:    
+            (n,) - array of testing stimulus ids
+        """
         pass
     
     @abstractmethod
     def get_all_available_sessions(self):
-        """Returns all the available sessions in the metadata"""
+        """Returns sessions IDs of all available sessions 
+        (with neural data available)
+        """
         pass
 
     @abstractmethod
@@ -51,3 +61,5 @@ class BaseMetaData(ABC):
     def get_stim_duration(self, stim_id, mVocs=False):
         """Returns duration of the stimulus in seconds"""
         pass
+
+    

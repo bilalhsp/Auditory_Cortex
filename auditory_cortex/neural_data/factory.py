@@ -6,6 +6,10 @@ from .ucsf_data.ucsf_metadata import UCSFMetaData
 
 from auditory_cortex import NEURAL_DATASETS
 
+def list_neural_datasets():
+    """Returns the list of available neural datasets."""
+    return NEURAL_DATASETS
+
 
 # mapping strings to classes
 NEURAL_DATASET_MAP = {

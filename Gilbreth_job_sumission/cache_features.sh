@@ -2,7 +2,7 @@
 
 # --output=./result_cache_features_5.out
 
-#SBATCH	-A standby
+#SBATCH	-A jgmakin-n
 #standby
 #jgmakin-n
 #training
@@ -21,9 +21,9 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=40GB
 #SBATCH --time=4:00:00
+#SBATCH --output=./output_logs/%j.out
 
 # activate virtual environment
 source ./env_setup.sh
 
 python ../scripts/cache_features.py $@
-# python deepspeech2_testing.py

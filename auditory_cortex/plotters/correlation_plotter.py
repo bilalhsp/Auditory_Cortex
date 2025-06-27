@@ -11,7 +11,7 @@ import matplotlib.patches as mpatches
 from functools import reduce
 
 # local imports
-from auditory_cortex import results_dir
+from auditory_cortex import results_dir, utils, DNN_MODELS
 from auditory_cortex.analyses import Correlations, STRFCorrelations
 from auditory_cortex.plotters.plotter_utils import PlotterUtils
 from auditory_cortex.io_utils.io import read_reg_corr, write_reg_corr
@@ -1553,8 +1553,11 @@ class RegPlotter:
         """
 
         neural_areas = list(peak_layers_areawise.keys())
-        if model_name in cls.num_layers.keys():
-            layer_ids = np.arange(cls.num_layers[model_name])
+
+        if model_name in DNN_MODELS:
+            model_config = utils.load_dnn_config(model_name=model_name)
+            num_layers = len(model_config['layers'])
+            layer_ids = np.arange(num_layers)
             highest_id = max(1, max(layer_ids))
             bins = np.arange(0, highest_id+1, 1)
         else:
