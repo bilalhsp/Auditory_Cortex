@@ -87,8 +87,17 @@ class UCDavisMetaData(BaseMetaData):
 
         self.timit_stim_ids, self.mVocs_stim_ids = self.read_stim_ids()
 
-    def num_repeats_for_sess(self, sess_id):
-        """Returns the number of repeats (of test data) for the given session id"""
+    def num_repeats_for_sess(self, sess_id, mVocs=False):
+        """Returns the number of repeats (of test data) for the given session id
+        
+        Args:
+            sess_id (int): Session ID to get the number of repeats for
+            mVocs (bool): Number of repeats for mVocs and TIMIT are the same,
+                so this argument is not used, but kept for consistency.
+
+        Returns:
+            int: Number of repeats for the given session id
+        """
         full_session_name = self.full_session_name(sess_id)
         return self.cfg.sess_wise_num_repeats[full_session_name]
 

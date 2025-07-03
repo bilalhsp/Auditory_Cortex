@@ -19,11 +19,12 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=50GB
-#SBATCH --time=00:30:00
+#SBATCH --time=04:00:00
+#SBATCH --output=./output_logs/%j.out
 
-#SBATCH --job-name=run_trf2    # Job name
+#SBATCH --job-name=run_trf    # Job name
 # activate virtual environment
 source ./env_setup.sh
 
-python ../scripts/run_trf2.py $@
+python ../scripts/run_trf.py $@
 

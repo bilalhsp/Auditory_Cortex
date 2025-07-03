@@ -4,6 +4,13 @@ import numpy as np
 
 @dataclass
 class RecordingConfig:
+
+    stim_wise_num_repeats = {
+        'timit': 11,
+        'mVocs': 15,
+    }
+
+
     # session ID's per subject and hemisphere
     c_RH_sessions = np.array([
         190606, 190604, 190726, 190801, 180725, 180720, 180731,

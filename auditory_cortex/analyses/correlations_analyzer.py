@@ -151,42 +151,42 @@ class BaseCorrelations(ABC):
         for bin_width in bin_widths:
             select_data = self.get_selected_data(bin_width=bin_width)
             sessions = select_data['session'].unique()
-            delays = select_data['delay'].unique()
+            # delays = select_data['delay'].unique()
             for session in sessions:
-                for delay in delays:
-                    select_data = self.get_selected_data(
-                        sessions=[session], bin_width=bin_width, delay=delay
+                # for delay in delays:
+                select_data = self.get_selected_data(
+                    sessions=[session], bin_width=bin_width, #delay=delay
+                )
+                channels = select_data['channel'].unique()
+
+                # reading the normalizer...
+                if norm_bin_width is None:
+                    bw_norm = bin_width
+                else:
+                    bw_norm = norm_bin_width
+
+                norm_dist, null_dist = self.norm_obj.get_inter_trial_corr_dists_for_session(
+                    session=session, bin_width=bw_norm, mVocs=mVocs,
                     )
-                    channels = select_data['channel'].unique()
 
-                    # reading the normalizer...
-                    if norm_bin_width is None:
-                        bw_norm = bin_width
-                    else:
-                        bw_norm = norm_bin_width
+                # norm_means = np.mean(norm_dist, axis=0)
+                # null_means = np.mean(null_dist, axis=0)
+                # null_std = np.std(null_dist, axis=0)
 
-                    norm_dist, null_dist = self.norm_obj.get_inter_trial_corr_dists_for_session(
-                        session=session, bin_width=bw_norm, mVocs=mVocs,
-                        )
+                for ch in channels:
+                    # ch = int(ch)
+                    # ch_normalizer = norm_means[ch]
+                    # ch_null_mean = null_means[ch]
+                    # ch_null_std = null_std[ch]
 
-                    # norm_means = np.mean(norm_dist, axis=0)
-                    # null_means = np.mean(null_dist, axis=0)
-                    # null_std = np.std(null_dist, axis=0)
+                    ch_normalizer = np.mean(norm_dist[ch])
+                    ch_null_mean = np.mean(null_dist[ch])
+                    ch_null_std = np.std(null_dist[ch])
 
-                    for ch in channels:
-                        # ch = int(ch)
-                        # ch_normalizer = norm_means[ch]
-                        # ch_null_mean = null_means[ch]
-                        # ch_null_std = null_std[ch]
-
-                        ch_normalizer = np.mean(norm_dist[ch])
-                        ch_null_mean = np.mean(null_dist[ch])
-                        ch_null_std = np.std(null_dist[ch])
-
-                        ids = select_data[select_data['channel']==ch].index
-                        self.data.loc[ids, normalizer_col] = ch_normalizer
-                        self.data.loc[ids, null_mean_col] = ch_null_mean
-                        self.data.loc[ids, null_std_col] = ch_null_std 
+                    ids = select_data[select_data['channel']==ch].index
+                    self.data.loc[ids, normalizer_col] = ch_normalizer
+                    self.data.loc[ids, null_mean_col] = ch_null_mean
+                    self.data.loc[ids, null_std_col] = ch_null_std 
 
         if 'layer_type' not in self.data.columns and self.model_name is not None:
             config = utils.load_dnn_config(self.model_name)

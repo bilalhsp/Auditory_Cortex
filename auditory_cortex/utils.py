@@ -691,28 +691,25 @@ def cc_norm(y, y_hat, sp=1, normalize=False):
 # 		tr: int = integer in range=[0, 11], Default=None.
 
 # 	"""
-def compute_avg_test_corr(y_all_trials, y_pred, test_trial=None, mVocs=False):
+def compute_avg_test_corr(y_all_trials, y_pred, n_test_trials=None):
     """Computes correlation for each trial and averages across all trials.
     
     Args:
         y_all_trials: (num_trials, num_bins)
         y_pred: (num_bins,)
-        test_trial: int = integer in range=[0, 11], Default=None.
-            specifies number of trials to be tested on.
+        n_test_trials: int = number of trials to be tested on.
+            Choices=[0, num_repeats], If None, test on all trial    
+            repeats. Default=None
 
+    Returns:
+        trial_corr: ndarray = (num_channels,) correlation values averaged across trials.
     """
     trial_corr = []
-    # if mVocs:
-    # 	total_trial_repeats = 15
-    # else:
-    # 	total_trial_repeats = 11
     total_trial_repeats = y_all_trials.shape[0]
-    if test_trial is None:
+    if n_test_trials is None:
         trial_ids = np.arange(total_trial_repeats)
     else:
-        trial_ids = np.random.choice(total_trial_repeats, size=test_trial, replace=True)
-        # np.random.shuffle(trial_ids)
-        # trial_ids = trial_ids[:test_trial]
+        trial_ids = np.random.choice(total_trial_repeats, size=n_test_trials, replace=True) # with replacement for bootstrapping
     for tr in trial_ids:
         trial_corr.append(cc_norm(y_all_trials[tr], y_pred))
     trial_corr = np.stack(trial_corr, axis=0)

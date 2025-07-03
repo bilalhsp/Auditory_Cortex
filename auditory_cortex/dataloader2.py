@@ -89,6 +89,25 @@ class DataLoader:
         return self.dataset_obj.get_testing_stim_ids(mVocs=mVocs)
     
 
+    def sample_stim_ids_by_duration(self, percent_duration=None, repeated=False, mVocs=False):
+        """Returns random choice of stimulus ids, for the desired fraction of total 
+            duration of test set as specified by percent_duration.
+            
+            Args:
+                percent_duration: float = Fraction of total duration to consider.
+                    If None or >= 100, returns all stimulus ids.
+                repeated: bool = if True, returns spikes for repeated trials, else for unique trials.
+                mVocs: bool = If True, mVocs trials are considered otherwise TIMIT
+            
+            Returns:
+                list: stimulus subset for the fraction of duration.
+            """
+        stim_ids, stim_duration = self.dataset_obj.metadata.sample_stim_ids_by_duration(
+            percent_duration, repeated=repeated, mVocs=mVocs
+            )
+        return stim_ids, stim_duration
+    
+
     def get_session_spikes(self, bin_width=50, delay=0, repeated=False, mVocs=False):
         """Reads neural spikes from the cache directiory, extracts again
         if not found there.

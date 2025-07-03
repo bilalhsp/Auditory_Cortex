@@ -317,10 +317,10 @@ class FeatureExtractorWhisper(BaseFeatureExtractor):
         repo_name = config['repo_name']    
         model = WhisperForConditionalGeneration.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
 
-        # changing for RFs
-        logger.info(f"Changing convolution kernels for: {model_name}")
-        model.model.encoder.conv1 = nn.Conv1d(80, 384, kernel_size=(11,), stride=(1,), padding=(5,))
-        model.model.encoder.conv2 = nn.Conv1d(384, 384, kernel_size=(11,), stride=(2,), padding=(5,))
+        # # changing for RFs
+        # logger.info(f"Changing convolution kernels for: {model_name}")
+        # model.model.encoder.conv1 = nn.Conv1d(80, 384, kernel_size=(11,), stride=(1,), padding=(5,))
+        # model.model.encoder.conv2 = nn.Conv1d(384, 384, kernel_size=(11,), stride=(2,), padding=(5,))
 
         super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
         self.processor = AutoProcessor.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)

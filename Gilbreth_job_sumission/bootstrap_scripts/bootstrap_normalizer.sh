@@ -20,8 +20,8 @@
 #SBATCH --job-name=bootstrap_norm    # Job name
 
 # activate virtual environment
-source ./env_setup.sh
+source ../env_setup.sh
 
-python ../scripts/bootstrap_normalizer.py $@
+python ../../scripts/bootstrap_normalizer.py $@
 
 

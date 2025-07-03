@@ -64,21 +64,11 @@ class NormalizerCalculator:
         Returns:
             list: List of stimulus ids to consider for testing.
         """
-        test_duration = self.get_testing_stim_duration(mVocs)
-        all_stim_ids = self.metadata.get_testing_stim_ids(mVocs)
-        np.random.shuffle(all_stim_ids)
-        if percent_duration is None or percent_duration >= 100:	
-            return all_stim_ids
-        else:
-            required_duration = percent_duration*test_duration/100
-            logger.info(f"Stim ids for duration={required_duration:.2f} sec")
-            stimili_duration=0
-            for idx, stim_id in enumerate(all_stim_ids):
-                stimili_duration += self.metadata.get_stim_duration(stim_id, mVocs=mVocs)
-                if stimili_duration >= required_duration:
-                    break
-        logger.info(f"Total duration={stimili_duration:.2f} sec")
-        return all_stim_ids[:idx+1]
+        stim_ids, stim_duration = self.metadata.sample_stim_ids_by_duration(
+            percent_duration, repeated=True, mVocs=mVocs
+            )
+        logger.info(f"Total duration={stim_duration:.2f} sec")
+        return stim_ids
 
     def _compute_inter_trial_corr_dists(
             self, session, bin_width=50, num_itr=1000000, mVocs=False
@@ -151,39 +141,51 @@ class NormalizerCalculator:
             )
         return norm_dist, null_dist
     
-    def get_normalizer_bootstrap_distributions(
-        self, session, iterations:list, percent_durs:list, num_trials: list,
-        bin_width=50, dataset_name='ucsf', mVocs=False
+    def get_bootstrap_distributions(
+        self, session, percent_durations:list, epoch_ids:list, 
+        bin_width=50, mVocs=False
         ):
         """Retrieves distributions of normalizer for bootstrap analysis,
         for the specified session.
 
         Args:
             session: str = session id
-            iterations: list = iteration ids of bootstrap analysis
-            percent_durs: list = list of percent durations
-            num_trials: list = list of number of trials for each percent duration
+            percent_durations: list = List of percent durations to consider for bootstrapping.
+            epoch_ids: list = List of epoch indices for bootstrapping. If None, defaults to [1].
             bin_width: int = bin width in ms
-            dataset_name: str = Name of the dataset
-            mVocs: bool = If True, 
+            mVocs: bool = If True, mVocs trials are considered otherwise TIMIT
 
         Returns:
-            dict of dict: {num_trials: {percent_dur: np.array(num_ch, num_samples)}}
+            dict of dists: { (percent_dur, num_trials): (norm_dists, null_dists) }
+            where norm_dists and null_dists are dictionaries of the form
+            {ch: dist} where dist is a numpy.ndarray of shape (num_epochs, num_itr)
         """
-        # std_devs = np.zeros((len(num_trials), len(percent_durs)))
-        std_devs = {}
-        for i, num_tr in enumerate(num_trials):
-            std_devs_dur = {}
-            for j, pd in enumerate(percent_durs):
-                dist_all_itr = []
-                for itr in iterations:
-                    bootstrap_dist = io.read_bootstrap_normalizer_dist(
-                        session, itr, pd, num_tr, bin_width, dataset_name=dataset_name, mVocs=mVocs
+        num_repeats = self.metadata.num_repeats_for_sess(session)
+        num_trials_list = np.arange(2, num_repeats+1)
+        bootstrap_dists = {}
+        for percent_dur in percent_durations:
+            for num_trials in num_trials_list:
+                norm_dist_all_epochs = {}
+                null_dist_all_epochs = {}
+                for epoch in epoch_ids:
+                    norm_dist, null_dist = io.read_inter_trial_corr_dists(
+                        session, bin_width, mVocs=mVocs, dataset_name=self.dataset_name,
+                        bootstrap=True, epoch=epoch, percent_dur=percent_dur, num_trial=num_trials
                     )
-                    dist_all_itr.append(np.median(bootstrap_dist, axis=0))				
-                std_devs_dur[pd] = np.array(dist_all_itr).transpose() #	np.std(dist_all_itr, axis=0)
-            std_devs[num_tr] = std_devs_dur
-        return std_devs
+                    norm_dist_all_epochs[epoch] = norm_dist
+                    null_dist_all_epochs[epoch] = null_dist
+                
+                ch_list = norm_dist_all_epochs[epoch].keys()
+                all_norm_dists = {
+                    ch: np.stack([norm_dist_all_epochs[epoch][ch] for epoch in epoch_ids])
+                    for ch in ch_list
+                }
+                all_null_dists = {
+                    ch: np.stack([null_dist_all_epochs[epoch][ch] for epoch in epoch_ids])
+                    for ch in ch_list
+                }
+                bootstrap_dists[(percent_dur, num_trials)] = (all_norm_dists, all_null_dists)
+        return bootstrap_dists
     
     def save_bootstrapped_distributions(
         self, session, percent_durations, epoch_ids=None, bin_width=50, num_itr=1000, mVocs=False
@@ -298,7 +300,7 @@ class NormalizerCalculator:
         if num_trials is not None:
             assert num_trials <= total_trial_repeats and num_trials >= 2, \
                 "num_trials must be between 1 and {}".format(total_trial_repeats)
-            trial_ids = np.random.choice(trial_ids, size=num_trials, replace=False)
+            trial_ids = np.random.choice(trial_ids, size=num_trials, replace=True)  # bootsraping step
 
         norm_dists = {ch: np.zeros((num_itr,)) for ch in channel_ids}
         null_dists = {ch: np.zeros((num_itr,)) for ch in channel_ids}
@@ -307,7 +309,7 @@ class NormalizerCalculator:
             seq_U = {ch: [] for ch in channel_ids}
             seq_V = {ch: [] for ch in channel_ids}
             for stim_id in np.random.permutation(stim_ids):
-                tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)
+                tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)   # distinct pair required
                 for ch in channel_ids:
                     seq_U[ch].append(repeated_spikes[stim_id][ch][tr1])
                     seq_V[ch].append(repeated_spikes[stim_id][ch][tr2])

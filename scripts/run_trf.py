@@ -22,7 +22,7 @@ Args:
 
 
 Example usage:
-    python run_trf2.py -d ucsf -m whisper_tiny -b 50 -l 0 -i plos_test -v -s 
+    python run_trf.py -d ucsf -m whisper_tiny -b 50 -l 0 -i plos_test -v -s 
 """
 # ------------------  set up logging ----------------------
 import logging
@@ -56,28 +56,23 @@ def compute_and_save_regression(args):
     model_name = args.model_name
     layer_ID = args.layer_ID
     shuffled = args.shuffled
-    test_trial = args.test_trial
     identifier = args.identifier
     mVocs = args.mVocs
     LPF = args.LPF
     save_param = args.save_param
     random_proj = args.random_proj
     conv_layers= args.conv_layers
+    lag = args.lag
     # fixed parameters..
     
     tmin=0
     delay=0
     N_sents=500
-    num_workers=16
     num_folds=3
     LPF_analysis_bw = 20
-    
-    # lags=[300]
-    lags = [args.lag]
-    use_nonlinearity=False
 
     results_identifier = ResultsManager.get_run_id(
-            dataset_name, bin_widths[0], identifier, mVocs=mVocs, shuffled=shuffled, lag=lags[0],
+            dataset_name, bin_widths[0], identifier, mVocs=mVocs, shuffled=shuffled, lag=lag,
         )
     csv_file_name = model_name + '_' + results_identifier + '_corr_results.csv'
 
@@ -93,25 +88,13 @@ def compute_and_save_regression(args):
     else:
         logging.info(f"Running TRF for 'Trained' networks...")
 
-
     feature_extractor = create_feature_extractor(model_name, shuffled=shuffled)
     metadata = create_neural_metadata(dataset_name)
     sessions = metadata.get_all_available_sessions()
-    # ################################################################
-    # # list of significant sessions only...
-    # sig_sessions = np.array([180613., 180627., 180719., 180720., 180728., 180730., 180731.,
-    # 					180807., 180808., 180814., 190606., 191113., 191121., 191125.,
-    # 					191206., 191210., 200205., 200206., 200207., 200213., 200219.])
-
-    # sessions = sig_sessions.astype(int)
-    ###############################################################
     sessions = np.sort(sessions)
     sessions = sessions[args.start_ind:args.end_ind]
-    # sessions = sessions[:20]
-    # sessions = sessions[20:]
 
     for bin_width in bin_widths:
-        # sessions = np.array(['200206'])
         # Session in data_dir that we do not have results for...
         if file_exists:
             sessions_done = data[
@@ -154,29 +137,15 @@ def compute_and_save_regression(args):
             
             trf_obj = TRF(model_name, data_assembler)
             
-            corr, opt_lag, opt_lmbda, trf_model = trf_obj.grid_search_CV(
-                    lags=lags, tmin=tmin,
-                    num_folds=num_folds,
-                    test_trial=test_trial
+            corr, opt_lmbda, trf_model = trf_obj.grid_search_CV(
+                    lag=lag, tmin=tmin, num_folds=num_folds,
                 )
             
             if save_param:
                 trf_obj.save_model_parameters(
                     trf_model, model_name, layer_ID, session, bin_width, shuffled=shuffled,
-                LPF=LPF, mVocs=mVocs, dataset_name=dataset_name, tmax=lags[0],
+                LPF=LPF, mVocs=mVocs, dataset_name=dataset_name, tmax=lag,
                 )
-            # weights, biases = trf_model.coef_
-            # if save_param:
-            #     io.write_trf_parameters(
-            #         model_name, session, weights, bin_width=bin_width, 
-            #         shuffled=shuffled, layer_ID=layer_ID, LPF=LPF, mVocs=mVocs,
-            #         lag=lags[0],
-            #         )
-            #     io.write_trf_parameters(
-            #         model_name, session, biases, bin_width=bin_width, 
-            #         shuffled=shuffled, layer_ID=layer_ID, LPF=LPF, mVocs=mVocs,
-            #         bias=True, lag=lags[0],
-            #         )
                 
             if mVocs:
                 mVocs_corr = corr
@@ -198,34 +167,16 @@ def compute_and_save_regression(args):
                 'normalizer': num_channels*[0.0],  # placeholder for normalizer
                 'mVocs_test_cc_raw': mVocs_corr.squeeze(),
                 'mVocs_normalizer': num_channels*[0.0],  # placeholder for mVocs normalizer
-                'opt_lag': num_channels*[opt_lag],
+                'opt_lag': num_channels*[lag],
                 'opt_lmbda': np.log10(opt_lmbda).squeeze(),
                 'N_sents': num_channels*[N_sents],
                 }
 
-            # corr_dict = {
-            #     'test_cc_raw': timit_corr[None,...],
-            #     'mVocs_test_cc_raw': mVocs_corr[None,...],
-            #     'win': bin_width,
-            #     'delay': delay, 
-            #     'session': session,
-            #     'model': model_name,
-            #     'N_sents': N_sents,
-            #     'layer_ids': [layer_ID],
-            #     'opt_lag': opt_lag,
-            #     'opt_lmbda': np.log10(opt_lmbda),
-            #     'poiss_entropy': np.zeros_like(corr[None,...]),
-            #     'uncertainty_per_spike': np.zeros_like(corr[None,...]),
-            #     'bits_per_spike_NLB': np.zeros_like(corr[None,...]),
-            #     }
 
             df = utils.write_to_disk(corr_dict, file_path)
 
             # make sure to delete the objects to free up memory
-            # del dataset
             del trf_obj
-            # del weights
-            # del biases
             del trf_model
             gc.collect()
 
@@ -287,11 +238,6 @@ def get_parser():
         help="Specify if features are to be low pass filtered."
     )
     parser.add_argument(
-        '-t','--test_trial', dest='test_trial', type= int, action='store',
-        default=None,
-        help="trial to test on."
-    )
-    parser.add_argument(
         '--start', dest='start_ind', type=int, action='store', 
         default=0,
         help="Choose sessions starting index to compute results at."
@@ -299,7 +245,6 @@ def get_parser():
     parser.add_argument(
         '--end', dest='end_ind', type=int, action='store', 
         default=41,
-        # choices=[],
         help="Choose sessions ending index to compute results at."
     )
     parser.add_argument(

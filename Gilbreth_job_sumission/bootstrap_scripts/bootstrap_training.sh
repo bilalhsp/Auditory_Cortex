@@ -1,5 +1,8 @@
 #!/bin/bash
-## Usage example: ./bootstrap_training.sh "-m whisper_base -l 2 -d ucdavis -b 50 -i itr"
+# This script is used to submit multiple jobs for bootstrap training of a model.
+# It takes a base set of arguments and appends different suffixes to create unique job identifiers.
+# Example:
+#   ./bootstrap_training.sh "-m whisper_base -l 2 -d ucdavis -b 50 -i exp_design_1"
 
 # Check if the number of command-line arguments is correct
 if [ "$#" -ne 1 ]; then
@@ -11,16 +14,16 @@ base_args="$1"
 
 # Define the sets of additional arguments for each submission
 args_sets=(
-    "-N 10"
-    "-N 20"
-    "-N 30"
-    "-N 40"
-    "-N 50"
-    "-N 60"
-    "-N 70"
-    "-N 80"
-    "-N 90"
-    "-N 100"
+    "--percent_duration 10"
+    "--percent_duration 20"
+    "--percent_duration 30"
+    "--percent_duration 40"
+    "--percent_duration 50"
+    "--percent_duration 60"
+    "--percent_duration 70"
+    "--percent_duration 80"
+    "--percent_duration 90"
+    "--percent_duration 100"
 )
 # # Replace the placeholder with the actual base identifier
 

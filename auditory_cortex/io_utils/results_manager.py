@@ -39,14 +39,14 @@ class ResultsManager:
 
             kwargs: 
                 - bootstrap: bool = True if running bootstrap, False if not. Default=False
-                - bootstrap_test: bool: True if running bootstrap for test set, False if
+                - test_bootstrap: bool: True if running bootstrap for test set, False if
                     running for training set. Default=False
 
         Returns:    
             identifier: str = identifier for the results file
         """
         bootstrap = kwargs.get('bootstrap', False)
-        bootstrap_test = kwargs.get('bootstrap_test', False)
+        test_bootstrap = kwargs.get('test_bootstrap', False)
 
         full_identifier = dataset_name+'_'
         if shuffled:
@@ -58,7 +58,7 @@ class ResultsManager:
         full_identifier += f'trf_lags{lag}_bw{bin_width}'
 
         if bootstrap:
-            if bootstrap_test:
+            if test_bootstrap:
                 full_identifier += '_bootstrap_test'
             else:
                 full_identifier += '_bootstrap'
@@ -85,9 +85,7 @@ class ResultsManager:
         return_list = []
         if verbose:
             logger.info(f"For '{model_name}', '{identifier}'")
-        # corr_obj = Correlations(model_name+'_'+identifier)
         try:
-
             filename = f'{model_name}_{identifier}_corr_results.csv'
             corr_file_path = os.path.join(saved_corr_dir, filename)
             dataframe = pd.read_csv(corr_file_path)
@@ -97,7 +95,6 @@ class ResultsManager:
             return return_list
 
         bin_widths = np.sort(dataframe['bin_width'].unique())
-        
         for bin_width in bin_widths:
             data = dataframe[dataframe['bin_width']==float(bin_width)]
             if verbose:
@@ -169,7 +166,7 @@ class ResultsManager:
 
     @staticmethod
     def merge_correlation_results(
-        model_name, identifiers_list, output_id, output_identifier=None
+        model_name, identifiers_list, output_id=0, output_identifier=None
         ):
         """
         Args:

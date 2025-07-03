@@ -77,6 +77,20 @@ class UCSFMetaData(BaseMetaData):
         self.mVoc_silence_dur = 0.0 # seconds
         self.mVocs_all_stim_ids = list(self.mVocId_to_trialId.keys())
 
+    def num_repeats_for_sess(self, sess_id, mVocs=False):
+        """Returns the number of repeats (of test data) for the given session id
+        
+        Args:
+            sess_id (int): Number of repeats for all session ids are the same,
+                so this argument is not used, but kept for consistency.
+            mVocs (bool): Number of repeats for mVocs if True, else TIMIT.
+
+        Returns:
+            int: Number of repeats for the given session id
+        """
+        stim = 'mVocs' if mVocs else 'timit'
+        return self.cfg.stim_wise_num_repeats[stim]
+
 
     def total_stimuli_duration(self, mVocs=False):
         """Returns the total duration of all the stimuli in the experiment,

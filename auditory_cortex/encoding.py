@@ -94,48 +94,63 @@ class TRF:
         self.dataset_assembler = dataset_assembler
         logger.info(f"TRF object created for '{model_name}' model.")
         
-    def evaluate(self, trf_model, test_trial=None):
+    def evaluate(self, trf_model, n_test_trials=None, percent_duration=None):
         """Computes correlation on trials of test set for the model provided.
         
         Args:
             strf_model: naplib model = trained model
-            dataset:  = 
-            test_trial: int = trial ID to be tested on. Default=None, 
-                in which case, it tests on all the trials [0--10]
-                and returns averaged correlations. 
-            test_fewer_trials: bool = if True, test on randomly 
-                choosen'test_trial' number of fewer trials
-                instead of all 11 trials.
+            n_test_trials: int = Number of random trial to be tested on. 
+            percent_duration: float = Fraction of total test duration to use
+                for evaluation, If None, use the entire test duration.
         Return:
             ndarray: (num_channels,)   
         """
-
-        test_spect_list, all_test_spikes = self.dataset_assembler.get_testing_data()
+        stim_ids, total_duration = self.dataset_assembler.dataloader.sample_stim_ids_by_duration(
+            percent_duration=percent_duration, repeated=True, mVocs=self.dataset_assembler.mVocs
+            )
+        test_spect_list, all_test_spikes = self.dataset_assembler.get_testing_data(stim_ids=stim_ids)
         predicted_response = trf_model.predict(X=test_spect_list, n_offset=self.dataset_assembler.n_offset)
         predicted_response = np.concatenate(predicted_response, axis=0)     # gives (total_time, num_channels)
         all_test_spikes = np.concatenate(all_test_spikes, axis=1)           # gives (n_repeats, total_time, num_channels)
         
         corr = utils.compute_avg_test_corr(
-            all_test_spikes, predicted_response, test_trial, mVocs=self.dataset_assembler.mVocs)
+            all_test_spikes, predicted_response, n_test_trials)
         return corr
     
-    def get_mapping_set_ids(self, N_sents=None, mVocs=False):
-        """Returns a smaller mapping set of given size."""
-        mapping_set = self.dataset_assembler.training_stim_ids
-        np.random.shuffle(mapping_set)
-        if N_sents is None or N_sents >= 100:	
-            return mapping_set
-        else:
-            required_duration = N_sents*10  # why is this 10?
-            print(f"Mapping set for stim duration={required_duration:.2f} sec")
-            stimili_duration=0
-            for n in range(5, len(mapping_set)):
-                stimili_duration += self.dataset_assembler.dataloader.get_stim_duration(
-                    mapping_set[n], mVocs=mVocs
-                    )
-                if stimili_duration >= required_duration:
-                    break
-        return mapping_set[:n+1]
+    def get_mapping_set_ids(self, percent_duration=None, mVocs=False):
+        """Returns random subset of stimulus ids, for the desired fraction of total 
+        duration of training set as specified by percent_duration.
+        
+        Args:
+            percent_duration: float = Fraction of total duration to consider.
+                If None or >= 100, returns all stimulus ids.
+            mVocs: bool = If True, mVocs trials are considered otherwise TIMIT
+        
+        Returns:
+            list: stimulus subset for the fraction of duration.
+        """
+        stim_ids, stim_duration = self.dataset_assembler.dataloader.sample_stim_ids_by_duration(
+            percent_duration, repeated=False, mVocs=mVocs
+            )
+        logger.info(f"Total duration={stim_duration:.2f} sec")
+        return stim_ids
+
+
+        # mapping_set = self.dataset_assembler.training_stim_ids
+        # np.random.shuffle(mapping_set)
+        # if N_sents is None or N_sents >= 100:	
+        #     return mapping_set
+        # else:
+        #     required_duration = N_sents*10  # why is this 10?
+        #     print(f"Mapping set for stim duration={required_duration:.2f} sec")
+        #     stimili_duration=0
+        #     for n in range(5, len(mapping_set)):
+        #         stimili_duration += self.dataset_assembler.dataloader.get_stim_duration(
+        #             mapping_set[n], mVocs=mVocs
+        #             )
+        #         if stimili_duration >= required_duration:
+        #             break
+        # return mapping_set[:n+1]
 
     def cross_validated_fit(
             self,
@@ -201,71 +216,58 @@ class TRF:
 
     def grid_search_CV(
             self,
-            lags: list = None,      
-            tmin = 0,
-            num_folds = 3, 
-            test_trial=None,
-            N_sents=None,
-            return_dict=False
+            lag: int=None,      
+            tmin: int= 0,
+            num_folds: int= 3, 
+            percent_duration=None,
         ):
         """Fits the linear model (with or without non-linearity) 
         by searching for optimal lag (max window lag) using cross-
         validation.
 
         Args:
-            dataset:  = 
-            lags: list = lags (window width) in ms
+            lag: int = lag (window width) in ms
             tmin: int = min lag start of window in ms
-            num_workers: int = number of workers used by naplib.
             num_folds: int = number of folds of cross-validation
-            use_nonlinearity: bool = using non-linearity with the linear model or not.
-                Default = False.
-            test_trial: int = trial ID to be tested on. Default=None, 
-                in which case, it tests on all the trials [0--10]
-                and returns averaged correlations. 
+            percent_duration: int = Percentage of training data (by duration) used to fit the model.
+                For example, 50 means 50% of total training duration is used.
+                Note: This applies only to the training set, not the test set.
+
         Return:
             corr: ndarray = (num_channels,) 
-            optimal_lags: ndarray = (num_channels,)
             optimal_lmbdas: ndarray = (num_channels,) 
+            trf_model: GpuTRF = trained model object.
 
         """
-        if lags is None:
-            lags = [300]
+        if lag is None:
+            lag = 200
 
-        mapping_set = self.get_mapping_set_ids(N_sents=N_sents, mVocs=self.dataset_assembler.mVocs)
+        mapping_set = self.get_mapping_set_ids(percent_duration=percent_duration, mVocs=self.dataset_assembler.mVocs)
 
-        lag_scores = []
-        opt_lmbdas = []
-        for lag in lags:
-
-            logger.info(f"\n Running for max lag={lag} ms")
-            score, opt_lmbda = self.cross_validated_fit(
-                tmax=lag,
-                tmin=tmin, 
-                num_folds=num_folds,
-                mapping_set=mapping_set,
-                )
-            lag_scores.append(score)
-            opt_lmbdas.append(opt_lmbda)
+        logger.info(f"\n Running for max lag={lag} ms")
+        score, opt_lmbda = self.cross_validated_fit(
+            tmax=lag,
+            tmin=tmin, 
+            num_folds=num_folds,
+            mapping_set=mapping_set,
+            )
             
-        opt_lag = lags[0]
-        opt_lmbda = opt_lmbdas[0]
         
         # get mapping data..
         mapping_x, mapping_y = self.dataset_assembler.get_training_data(mapping_set)
 
         sfreq = 1000/self.dataset_assembler.get_bin_width()
-        tmax = opt_lag/1000 # convert seconds to ms
+        tmax = lag/1000 # convert seconds to ms
 
-        logger.info(f"Fitting model using optimal lag={opt_lag} ms and optimal lmbda={opt_lmbda}")
+        logger.info(f"Fitting model using optimal lag={lag} ms and optimal lmbda={opt_lmbda}")
         trf_model = GpuTRF(
                     tmin, tmax, sfreq, alpha=opt_lmbda,
                     )
         trf_model.fit(X=mapping_x, y=mapping_y, n_offset=self.dataset_assembler.n_offset)
 
         logger.info(f"Computing corr for test set...")
-        corr = self.evaluate(trf_model, test_trial)
-        return corr, opt_lag, opt_lmbda, trf_model
+        corr = self.evaluate(trf_model)
+        return corr, opt_lmbda, trf_model
     
     @staticmethod
     def load_saved_model(
@@ -293,7 +295,8 @@ class TRF:
         #     dataset_name=dataset_name, lag=tmax
         #     )
         if parameters is None:
-            raise ValueError(f"Model parameters not found for session={session}")
+            # raise ValueError(f"Model parameters not found for session={session}")
+            logger.warn(f"Model parameters not found for session={session}")
             return None
         
         # weights = weights[layer_ID]
