@@ -238,58 +238,7 @@ class UCSFDataset(BaseDataset):
 
             spikes[stim_id] = all_ch_spikes_dict
         return spikes
- 
-    # 04-28-2025: adjusting for nid regime, can be removed after testing..
-    # def extract_spikes(self, bin_width=50, delay=0, repeated=False, mVocs=False):
-    #     """Returns the binned spike counts for mVocs experiment."""
-    #     # choose appropriate function to get trial IDs and spike counts
-    #     if mVocs:
-    #         get_trial_ids = self.metadata.get_mVoc_tr_id
-    #         get_spike_counts = self.retrieve_mVocs_spike_counts
-    #     else:
-    #         get_trial_ids = self.get_trials
-    #         get_spike_counts = self.retrieve_spike_counts
 
-    #     stim_group = 'repeated' if repeated else 'unique'
-    #     stim_ids = self.get_stim_ids(mVocs=mVocs)[stim_group]
-    #     spikes = {}
-    #     for stim_id in stim_ids:
-    #         tr_ids = get_trial_ids(stim_id)
-    #         if not repeated:
-    #             # only one trial for unique stimuli
-    #             tr_ids = tr_ids[:1]
-
-    #         all_tr_spikes = []
-    #         for tr_id in tr_ids:
-    #             if mVocs:
-    #                 tr_id = tr_id + self.mVocs_first_tr
-    #             tr_spikes = get_spike_counts(trial=tr_id, win=bin_width, delay=delay)
-    #             all_tr_spikes.append(tr_spikes)
-
-    #         num_channels = len(all_tr_spikes[0])
-    #         all_ch_spikes_dict = {}
-    #         for ch in range(num_channels):
-    #             channel_spikes = [tr_spikes[ch] for tr_spikes in all_tr_spikes]
-    #             channel_spikes = np.stack(channel_spikes, axis=0)
-    #             all_ch_spikes_dict[ch] = channel_spikes
-
-    #         spikes[stim_id] = all_ch_spikes_dict
-    #     return spikes
-    
-
-    # Deprecated...
-    # def retrieve_spike_counts_for_all_trials(self, sent, win=50, delay=0):
-        
-    # 	trials = self.get_trials(sent)
-    # 	spk = self.retrieve_spike_counts(trial=trials[0], win = win, delay=delay)
-    # 	spikes = {i:np.zeros((len(trials), spk[0].shape[0])) for i in range(self.num_channels)}
-    # 	for i in range(self.num_channels):
-    # 		spikes[i][0] = spk[i]
-    # 	for x, tr in enumerate(trials[1:]):
-    # 		spikes_tr = self.retrieve_spike_counts(trial=tr, win = win, delay=delay)
-    # 		for i in range(self.num_channels):
-    # 			spikes[i][x+1] = spikes_tr[i]
-    # 	return spikes
 
     def retrieve_spike_times(self, sent=212, trial = 0 , timing_type = 'relative'):
         """Returns times of spikes, relative to stimulus onset or absolute time
@@ -303,20 +252,10 @@ class UCSFDataset(BaseDataset):
         """
         s_times = {}
         if trial ==0:
-            # if no trial # is provided, use the first trial for the given sentence
-            # tr carries the trial # to index through spike data
-            #tr = self.spikes[1].trial[self.spikes[1].timitStimcode==sent][trial] 
-            # Extracting 'trial #' using the first channel...!
-            # tr = (np.where(self.trials[0].timitStimcode == sent)[0][0]) + 1      # adding 1 to match the indexes
             tr = self.get_trials(sent)[0]           # Using 1st trial for stimuli with multiple trials
         else:
-            #print('Please provide Trial # corresponding to the provided sentence using of spike.trial')
             tr = trial
-            # ADDED one to i to make it match indices
         for i in range(self.num_channels):
-            #spike_indices to index through spike fields
-            # print("here: ",i, tr)
-            # j = i+1
             j = i
             spike_indices = np.where(self.spikes[j].trial == tr)
             #spike times relative to the stimuls On time (Stimon)
@@ -347,9 +286,6 @@ class UCSFDataset(BaseDataset):
         win = win/1000
         delay = delay/1000
         bins = {}             #miliseconds
-        # round the 3rd decimal digit, before ceiling...!
-        # n = int(np.ceil(round(self.duration(sent)/win, 3)))
-        # n = self.get_num_bins(sent, win, mVocs=False)
         n = BaseDataset.calculate_num_bins(self.duration(sent), win)
         # store boundaries of sent thirds...
         one_third = int(n/3)
@@ -408,24 +344,6 @@ class UCSFDataset(BaseDataset):
         for i in range(self.num_channels):
             counts[i], _ = np.histogram(s_times[i], bins)
         return counts
-
-    # Deprecated...
-    # def extract_timit_spikes(self, bin_width=20, delay=0, sents = None):
-    # 	"""Return neural spikes for given sents
-        
-    # 	Args:
-    # 		bin_width: int = in ms
-    # 		delay: int = in ms
-    # 	"""
-    # 	print(f"NeuralData: Reading neural spikes for {self.sub}. ")
-    # 	if sents is None:
-    # 		sents = self.sents
-    # 	raw_spikes = {}
-    # 	for x,i in enumerate(sents):
-    # 		spikes = self.retrieve_spike_counts(sent=i,win=bin_width,delay=delay)
-    # 		raw_spikes[i] = np.stack([spikes[ch] for ch in range(self.num_channels)], axis=1)
-    # 	# self.raw_spikes =  raw_spikes
-    # 	return raw_spikes
   
     def get_stim_onset(self, tr):
         """Retreives stimulus onset time for the given trial ID"""
@@ -543,36 +461,7 @@ class UCSFDataset(BaseDataset):
             all_channel_spikes.append(spk_counts)
 
         return np.stack(all_channel_spikes, axis=1), total_session_duration
-    
-    # Deprecated...
-    # def get_repeated_trials(self, sents=None, bin_width=20, delay=0):
-    # 	"""Get repeated trials for given sents as 'ndarray'. """
-    # 	# print(f"Getting spikes for repeated trials of timit..")
-    # 	if sents is None:
-    # 		sents = [12,13,32,43,56,163,212,218,287,308]
-    # 	spikes_dict = {}
-    # 	min_repeats = 500   #repetition of trials (mostly it is 11)
-    # 	sum_spikes = False
-    # 	if bin_width == 1000:
-    # 		# treat this as a special case, where all samples are summed across time.
-    # 		bin_width = 20
-    # 		sum_spikes = True
-
-    # 	for s in sents:
-    # 		spikes_sentence = self.retrieve_spike_counts_for_all_trials(sent=s, win = bin_width, delay=delay)
-    # 		spikes_dict[s] = np.stack([spikes_sentence[ch] for ch in range(self.num_channels)], axis=-1)
-    # 		if spikes_dict[s].shape[0] < min_repeats:
-    # 			min_repeats = spikes_dict[s].shape[0] 
-    # 		if sum_spikes:
-    # 			spikes_dict[s] = np.sum(spikes_dict[s], axis=1)[:,None,:]
-    # 	if sum_spikes:
-    # 		all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
-    # 	else:
-    # 		# stopped trimming last partial bin otherwise do [[:min_repeats,:-1,:]]
-    # 		all_repeated_trials = np.concatenate([spikes_dict[s][:min_repeats,:,:] for s in sents], axis=1)
       
-    # 	return all_repeated_trials
-  
 ####################################
 ##### mVocs methods..
 ################################
@@ -618,55 +507,6 @@ class UCSFDataset(BaseDataset):
         all_trial_ids = np.arange(780)
         missing_trial_ids = all_trial_ids[np.isin(all_trial_ids, trial_ids,invert=True)]
         return mVocs_first_tr, missing_trial_ids
-
-    # Deprecated...
-    # def extract_mVocs_spikes(self, bin_width=50, delay=0, trials = None):
-    # 	"""Return neural spikes for given trials
-        
-    # 	Args:
-    # 		bin_width: int = in ms
-    # 		delay: int = in ms
-    # 		trials: list = trial Ids of mVocs in [0, 779]
-    # 	"""
-    # 	print(f"NeuralData: Reading mVocs spikes for {self.sub}. ")
-    # 	if trials is None:
-    # 		all_trials = self.metadata.mVocTrialIds
-    # 		trials = all_trials[np.isin(all_trials, self.missing_trial_ids, invert=True)]
-    # 	raw_spikes = {}
-    # 	for tr in trials:
-    # 		spikes = self.retrieve_mVocs_spike_counts(trial=tr, win=bin_width, delay=delay)
-    # 		raw_spikes[tr] = np.stack([spks for spks in spikes.values()], axis=1)
-    # 	# self.raw_spikes =  raw_spikes
-    # 	return raw_spikes
-    
-
-    # Deprecated...
-    # def extract_mVocs_spikes(self, bin_width=50, delay=0, repeated=False):
-    # 	"""Returns the binned spike counts for mVocs experiment."""
-
-    # 	stim_group = 'repeated' if repeated else 'unique'
-    # 	stim_ids = self.get_stim_ids(mVocs=True)[stim_group]
-    # 	spikes = {}
-    # 	for stim_id in stim_ids:
-    # 		if not repeated:
-    # 			tr_ids = self.metadata.get_mVoc_tr_id(stim_id)[:1]
-    # 		else:
-    # 			tr_ids = self.metadata.get_mVoc_tr_id(stim_id)
-
-    # 		all_tr_spikes = []
-    # 		for tr_id in tr_ids:
-    # 			tr_spikes = self.retrieve_mVocs_spike_counts(trial=tr_id, win=bin_width, delay=delay)
-    # 			all_tr_spikes.append(tr_spikes)
-
-    # 		num_channels = len(all_tr_spikes[0])
-    # 		all_ch_spikes_dict = {}
-    # 		for ch in range(num_channels):
-    # 			channel_spikes = [tr_spikes[ch] for tr_spikes in all_tr_spikes]
-    # 			channel_spikes = np.stack(channel_spikes, axis=0)
-    # 			all_ch_spikes_dict[ch] = channel_spikes
-
-    # 		spikes[stim_id] = all_ch_spikes_dict
-    # 	return spikes
     
     
     def retrieve_mVocs_spike_counts(self, trial=0, win=50, delay=0):
@@ -689,138 +529,6 @@ class UCSFDataset(BaseDataset):
         #return spikes count in each bin
         output = BaseDataset.bin_spike_times(s_times, duration, bin_width=win, delay=delay)
         return output
-    
-
-    # def get_repeated_mVoc_trials(
-    # 		self, mVocs_ids, bin_width=50, delay=0):
-    # 	"""
-    # 	Retrieves all trials of neural spikes for the given mVocs.
-
-    # 	Args:
-    # 		mVocs_ids: list = mVocs ids 
-    # 		bin_width: int = bin width in ms.
-    # 		delay: int = neural delay in ms.
-
-    # 	Returns:
-    # 		return ndarray =(num_trials, samples, n_channels)
-    # 	"""
-    # 	mVocs_spikes = {}
-
-    # 	for mVocs in mVocs_ids:
-    # 		tr_ids = self.metadata.get_mVoc_tr_id(mVocs)
-    # 		all_trial_spikes = []
-    # 		for tr in tr_ids:
-    # 			spikes = self.retrieve_mVocs_spike_counts(tr, bin_width, delay)
-    # 			spikes = np.stack([spk for spk in spikes.values()], axis=1)
-
-    # 			all_trial_spikes.append(spikes)
-    # 		mVocs_spikes[mVocs] = np.stack(all_trial_spikes, axis=0)
-    # 	repeated_trials = np.concatenate([spk for spk in mVocs_spikes.values()], axis=1).astype(np.float32)
-    # 	return repeated_trials
-    
-    # Deprecated...
-    # @staticmethod
-    # def bin_spike_times(s_times, duration, bin_width=50, delay=0):
-    # 	"""Given the spike time, returns bins containing number of
-    # 	spikes in the 'bin_width' durations following the stimulus onset.
-        
-    # 	Args:
-    # 		s_times: dict = spike times for all the channels.
-    # 		duration: float = duration of trial presentation in seconds.
-    # 		bin_width: int = miliseconds specifying the time duration of each bin, Default=50.
-    # 		delay: int = miliseconds specifying the time delay, Default=0.
-    
-    # 	Returns:
-    # 		counts: dict= Binned spike counts for all channels
-    # 	"""
-    # 	# converting to seconds
-    # 	bin_width = bin_width/1000
-    # 	delay=delay/1000
-    # 	counts = {}
-    # 	# adding bin_width//2 makes sure that last bin is created
-    # 	# if there is a duration of at least half bin_width at the end
-    # 	# i.e. partial bin at the end should be at least half of bin_width
-    # 	# to be included in the last bin
-    # 	bins = np.arange(delay, delay + duration + bin_width/2, bin_width)
-    # 	for ch, times in s_times.items():
-    # 		# for repeated stimuli, spike times will be a list
-    # 		if isinstance(times, list):
-    # 			counts_all_trials = []
-    # 			for tr_times in times:
-    # 				counts_all_trials.append(np.histogram(tr_times, bins)[0])
-    # 			counts[ch] = np.array(counts_all_trials)
-    # 		else:
-    # 			counts[ch], _ = np.histogram(times, bins)
-    # 	return counts
-
-    
-    # @staticmethod
-    # def bin_spike_times(s_times, duration, win=50, delay=0):
-    # 	"""Given the spike time, returns bins containing number of
-    # 	spikes in the 'win' durations following the stimulus onset.
-        
-    # 	Args:
-    # 		s_times: dict = spike times for all the channels.
-    # 		duration: float = duration of trial presentation in seconds.
-    # 		win: int = miliseconds specifying the time duration of each bin, Default=50.
-    # 		delay: int = miliseconds specifying the time delay, Default=0.
-    
-    # 	Returns:
-    # 		counts: dict= Binned spike counts for all channels
-    # 	"""
-    # 	# converting to seconds
-    # 	win = win/1000
-    # 	delay=delay/1000
-    # 	counts = {}
-    # 	n = int(np.ceil(round(duration/win,3)))
-    # 	# in order to get duration equal to integer multiple of win
-    # 	# using n+1 because stop entry is not included..
-    # 	dur = round((n+1)*win, 3) - 0.001	# to prevent incrementally small decimal values to create extra bin
-    # 	bins = np.arange(delay, delay + dur, win)
-    # 	for ch, times in s_times.items():
-    # 		counts[ch], _ = np.histogram(times, bins)
-    # 	return counts
-
-
-
-
-        # convert to seconds..
-        # win = win/1000
-
-        # counts = {}
-
-        # n = int(np.ceil(round(duration/win, 3)))
-        # # print(f"Duration={duration} sec, num_samples={n}")
-        # # duration = round(duration,3)  #round off to 3 decimals...
-        # # bins = np.arange(delay, delay + duration, win)
-        
-        # # delay is in ms
-        # # converting duration to ms
-        # # np.histogram returns one less bin, so need number of bins = n+1
-        # bins = np.linspace(delay, delay + (duration*1000), n+1)/1000
-        # for ch, times in s_times.items():
-        # 	counts[ch], _ = np.histogram(times, bins)
-        # return counts
-
-
-
-
-
-####################################
-##### MOVED to Regresion..
-################################
-  # def get_normalizer(self, bin_width=20, delay=0, n=1000):
-  #     """Compute dist. of normalizer and return median."""
-  #     # using sents with repeats
-  #     sents = [12,13,32,43,56,163,212,218,287,308]
-  #     all_repeated_trials = self.get_repeated_trials(sents=sents, bin_width=bin_width, delay=delay)
-  #     normalizer_all = utils.inter_trial_corr(all_repeated_trials, n=n)
-  #     normalizer_all_med = np.median(normalizer_all, axis=0)
-  #     return normalizer_all_med
-
-
-
-
     
     # Neural Data Plotting Functions....
     
@@ -861,12 +569,6 @@ class UCSFDataset(BaseDataset):
         edges = np.float64(np.arange(0, psth.shape[0]))*win/1000
 
         return edges, psth
-    # plt.bar(edges,psth, width=(0.8*win/1000))
-    # plt.xlim(0,self.duration(sent))
-    # #plt.xlabel('Time (s)', fontsize=14)
-    # plt.ylabel('Spike Counts', fontsize=14)
-    #plt.title(f"PSTH session: {self.sub}, sentence: {sent}, ch: '{self.names[ch]}', bin: {win}", fontsize=14, fontweight='bold')
-
     
     def signal_power(self, win, ch, sents = [12,13,32,43,56,163,212,218,287,308]):
         

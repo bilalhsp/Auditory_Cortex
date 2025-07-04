@@ -284,11 +284,6 @@ def get_parser():
         required=True,
         help="Specify the layer ID."
     )
-    # parser.add_argument(
-    #     '--', dest='N_sents', type=int, action='store',
-    #     choices=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    #     help="Specify the proportion of total stimuli duration to be used."
-    # )
     parser.add_argument(
         '-i','--identifier', dest='identifier', type= str, action='store',
         default='',
@@ -298,11 +293,6 @@ def get_parser():
         '-v','--mVocs', dest='mVocs', action='store_true', default=False,
         help="Specify if spikes for mVocs are to be used."
     )
-    # parser.add_argument(
-    #     '-t','--test_trial', dest='test_trial', type= int, action='store',
-    #     default=None,
-    #     help="trial to test on."
-    # )
     parser.add_argument(
         '--start', dest='start_ind', type=int, action='store', 
         default=0,
@@ -327,8 +317,6 @@ def get_parser():
         choices=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
         help="Specify the \%\ of total duration of train/test stimuli to be used for training/evaluation."
     )
-
-
     return parser
 
 

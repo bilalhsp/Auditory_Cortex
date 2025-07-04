@@ -136,33 +136,3 @@ class RecordingConfig:
         '180801',  # PB sessions here on...
         '180417', '200617', '200401',
     ]
-
-    # ### Earlier area assignments (reading off the M-file)
-    # area_wise_sessions = {
-    #     'core': np.array([
-    #             190606, 190604, 190726, 190801, 180725, 180720, 180731, 180807, #c_RH
-    #             191209, 200226, 200325, 200213, 200313,   #f_RH
-    #             200207, 191212, 191206, 200206, 191125, 200610, 191113, 191002, #c_LH
-    #             #b_RH (need to confirm these)
-    #             180405, 180719, 180808, 180627, 180814, 180810, 180724, 
-                
-    #             # moved to parabelt, based on comments in .m file on box..
-    #             # 180406, 180717, 180613, 180730,                  
-    #         ]),
-
-    #     'belt': np.array([
-    #             180622, 190703, 190607, 190605,  180619, 180502, #c_RH
-    #             191211, 200323, 200312,       #f_RH
-    #             191115, 200205, 191219,     #c_LH
-    #             # moved to parabelt, based on comments in .m file on box..
-    #             # 191210, 191121, 200617, 200212, 200219, 200401, 180728,
-    #             # 200318,
-    #         ]),            
-    #     'parabelt': np.array([
-    #             # moved to parabelt, based on comments in .m file on box..
-    #             180406, 191210, 191121, 200617, 180717, 200212, 200219, 200401,
-    #             180613, 180730, 180728, 200318,
-    #             #b_RH (need to confirm these)
-    #             180501, 180801, 180417, 180413, 180420,
-    #         ]),          
-    # }

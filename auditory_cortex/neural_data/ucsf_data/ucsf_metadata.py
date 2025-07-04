@@ -118,9 +118,6 @@ class UCSFMetaData(BaseMetaData):
     def get_training_stim_ids(self, mVocs=False):
         """Returns the set of training stimulus ids"""
         if mVocs:
-            # mVocs_all_stim_ids = np.array(self.mVocs_all_stim_ids)
-            # test_stim_ids = np.array(self.mVoc_test_stimIds)
-            # return mVocs_all_stim_ids[np.isin(mVocs_all_stim_ids, test_stim_ids, invert=True)]
             all_trials = self.mVocTrialIds
             test_trial_ids = np.concatenate([
                 self.get_mVoc_tr_id(stim_id) for stim_id in self.mVoc_test_stimIds]
@@ -191,8 +188,6 @@ class UCSFMetaData(BaseMetaData):
         sent -= 1
         fs = self.sentdet[sent].soundf
         bef, aft = 0.5, 0.5
-        #bef = self.sentdet[sent].befaft[0]
-        #aft = self.sentdet[sent].befaft[1]
         sound = self.sentdet[sent].sound
         sound = sound[int(bef*fs):-int(aft*fs)]
         
@@ -203,14 +198,7 @@ class UCSFMetaData(BaseMetaData):
         # subtracting 1 because sent_id =1 is stored at index 0 in sentdet and so on...
         sent -= 1
         bef, aft = 0.5, 0.5
-        #bef = self.sentdet[sent].befaft[0]
-        #aft = self.sentdet[sent].befaft[1]
         duration = self.sentdet[sent].duration - (bef + aft)
-        # duration = (self.sentdet[sent].sound).shape[0]/16000 - (bef + aft)
-        #### following calculation is wrong, based on very tight durations completely eliminating 
-        #### the silence at the beginning and end of the sentence.
-        #### This was done to compare to Jeff Johnson's data, where the silence was clipped off.
-        # duration = self.sentdet[sent].soundOns[1] - self.sentdet[sent].soundOns[0] #- (bef + aft)
         return duration
     
     def stim_samples(self, sent, bin_width=20):
@@ -227,40 +215,7 @@ class UCSFMetaData(BaseMetaData):
         for nid in self.get_testing_stim_ids(mVocs=mVocs):
             duration += self.get_stim_duration(nid, mVocs=mVocs)
 
-        # if mVocs:
-        #     for stim_id in self.get_testing_stim_ids(mVocs=True):
-        #         tr_id = self.get_mVoc_tr_id(stim_id)[0]
-        #         # Since in the new system, we are dealing with nids,
-        #         # which are actualy trial ids, we can use them directly.
-        #         tr_id = stim_id #
-        #         duration += self.get_mVoc_dur(tr_id)
-        # else:
-        #     for sent in self.test_sent_IDs:
-        #         duration += self.stim_duration(sent)
         return duration
-
-    # def get_total_stimuli_duration(self, stim_ids=None, mVocs=False):
-    #     """Returns the total duration of the unique stimuli in seconds.
-        
-    #     Args:
-    #         stim_ids: list = list of stimulus IDs, default=None.
-    #             if stim_ids is None, then all the stimuli are considered,
-    #             including the test set..
-    #     """
-    #     duration = 0
-    #     if mVocs:
-    #         if stim_ids is None:
-    #             stim_ids = self.mVocs_all_stim_ids
-    #         for stim_id in stim_ids:
-    #             tr_id = self.get_mVoc_tr_id(stim_id)[0]
-    #             duration += self.get_mVoc_dur(tr_id)
-    #     else:
-    #         if stim_ids is None:
-    #             stim_ids = self.sent_IDs
-
-    #         for sent in stim_ids:
-    #             duration += self.stim_duration(sent)
-    #     return duration
 
     def audio_phoneme_data(self):
         audio = {}
@@ -394,11 +349,7 @@ class UCSFMetaData(BaseMetaData):
     def get_all_available_sessions(self):
         """Retrieves the session IDs for which data is available in 'neural_data_dir'"""  
         bad_sessions = self.cfg.bad_sessions
-        # sessions = np.array(os.listdir(neural_data_dir))
-        # sessions = np.delete(sessions, np.where(sessions == "out_sentence_details_timit_all_loudness.mat"))
-        # for s in bad_sessions:
-        #     sessions = np.delete(sessions, np.where(sessions == s))
-        # Ex
+        
         all_sessions = get_subdirectories(self.data_dir)
         sessions = all_sessions[np.isin(all_sessions, bad_sessions, invert=True)]
         sessions = np.sort(sessions.astype(str))
@@ -442,16 +393,6 @@ class UCSFMetaData(BaseMetaData):
         """Return mVoc aud for the tr_id, resampled at 16kHz"""
         return self.mVocAud[tr_id]
     
-        # dur = self.get_mVoc_dur(tr_id)
-        # samples = int(self.mVocRate*dur)
-        # aud = self.mVocAud[tr_id][:samples]
-        # # resample at 16000 Hz instead of 41000 Hz
-        # # This is required because, DNN expect inputs at 16000 Hz 
-        # # e.g. wav2vec2 and wav2vec2_audioset.
-        # n = int(dur*16000)
-        # aud_res = resample(aud, n)
-        # return aud_res
-
     
     def get_mVoc_dur(self, tr_id):
         """Return mVoc aud for the tr_id, subtracts silence
