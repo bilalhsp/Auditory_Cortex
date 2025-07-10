@@ -1638,28 +1638,28 @@ class Correlations(BaseCorrelations):
 
 
 
-    @staticmethod
-    def combine_and_ready(
-            model_name, identifiers_list, output_id, normalizer_filename=None,
-            output_identifier=None
-        ):
-        """Merges results for all identifiers, copies layer types and
-        sets normalizer."""
+    # @staticmethod
+    # def combine_and_ready(
+    #         model_name, identifiers_list, output_id, normalizer_filename=None,
+    #         output_identifier=None
+    #     ):
+    #     """Merges results for all identifiers, copies layer types and
+    #     sets normalizer."""
 
-        BaseCorrelations.merge_correlation_results(
-                model_name=model_name,
-                identifiers_list=identifiers_list,
-                output_id=output_id,
-                output_identifier=output_identifier
-            )
+    #     BaseCorrelations.merge_correlation_results(
+    #             model_name=model_name,
+    #             identifiers_list=identifiers_list,
+    #             output_id=output_id,
+    #             output_identifier=output_identifier
+    #         )
         
-        if output_identifier is None:
-            output_identifier = identifiers_list[output_id]
+    #     if output_identifier is None:
+    #         output_identifier = identifiers_list[output_id]
 
-        # identifier = identifiers_list[output_id]
-        Correlations.add_layer_types(
-            model_name, output_identifier
-        )
+    #     # identifier = identifiers_list[output_id]
+    #     Correlations.add_layer_types(
+    #         model_name, output_identifier
+    #     )
 
         # setting the normalizer..
         # res = model_name + '_' + output_identifier
@@ -1745,15 +1745,6 @@ class Correlations(BaseCorrelations):
         data.to_csv(file_path, index=False)
 
 
-
-
-
-
-
-
-
-
-    
 
     def plot_topographical_peaks(
             self,

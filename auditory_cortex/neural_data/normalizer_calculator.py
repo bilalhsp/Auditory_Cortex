@@ -1,13 +1,8 @@
-import os
-import time
-import numpy as np
-import pandas as pd
-import scipy
 
-# from .deprecated.dataset import NeuralData
-# from .deprecated.neural_meta_data import NeuralMetaData
-from auditory_cortex.neural_data import create_neural_dataset, create_neural_metadata, BaseDataset
-from auditory_cortex import results_dir
+import numpy as np
+
+from .base_dataset import BaseDataset, create_neural_dataset
+from .base_metadata import create_neural_metadata
 import auditory_cortex.io_utils.io as io
 
 import logging
@@ -248,7 +243,8 @@ class NormalizerCalculator:
         if num_trials is not None:
             assert num_trials <= total_trial_repeats and num_trials >= 2, \
                 "num_trials must be between 1 and {}".format(total_trial_repeats)
-            trial_ids = np.random.choice(trial_ids, size=num_trials, replace=True)  # bootsraping step
+            # trial_ids = np.random.choice(trial_ids, size=num_trials, replace=True)  
+            trial_ids = NormalizerCalculator.sample_subset_of_trials(trial_ids, num_trials) # bootsraping step
 
         norm_dists = {ch: np.zeros((num_itr,)) for ch in channel_ids}
         null_dists = {ch: np.zeros((num_itr,)) for ch in channel_ids}
@@ -258,6 +254,8 @@ class NormalizerCalculator:
             seq_V = {ch: [] for ch in channel_ids}
             for stim_id in np.random.permutation(stim_ids):
                 tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)   # distinct pair required
+                while tr1 == tr2:   # making sure trials are distinct, even when input trial_ids have repeated trials
+                    tr1, tr2 = np.random.choice(trial_ids, size=2, replace=False)
                 for ch in channel_ids:
                     seq_U[ch].append(repeated_spikes[stim_id][ch][tr1])
                     seq_V[ch].append(repeated_spikes[stim_id][ch][tr2])
@@ -281,6 +279,20 @@ class NormalizerCalculator:
         if np.count_nonzero(x) == 0 or np.count_nonzero(y) == 0:
             return 0.0
         return np.corrcoef(x, y)[0, 1]
+    
+    @staticmethod
+    def sample_subset_of_trials(trial_ids, num_trials):
+        """ Samples a subset of trials from the given trial_ids. 
+        Makes sure that the sampled subset has at least 2 unique trials.
+        Args:
+            trial_ids: array-like = Array of trial ids to sample from.
+            num_trials: int = Number of trials to sample.
+        """
+        subset = np.random.choice(trial_ids, size=num_trials, replace=True)  # bootsraping step
+        while len(np.unique(subset)) < 2:
+            # If the sampled subset has less than 2 unique trials, resample
+            subset = np.random.choice(trial_ids, size=num_trials, replace=True)
+        return subset
     
     # --------  Method 1 Null distribution: Using random poisson sequences   ------ #
 

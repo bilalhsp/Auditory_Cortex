@@ -1,7 +1,7 @@
-from .ucdavis_data.ucdavis_dataset import UCDavisDataset
-from .ucsf_data.ucsf_dataset import UCSFDataset
-from .ucdavis_data.ucdavis_metadata import UCDavisMetaData
-from .ucsf_data.ucsf_metadata import UCSFMetaData
+from ..ucdavis_data.ucdavis_dataset import UCDavisDataset
+from ..ucsf_data.ucsf_dataset import UCSFDataset
+from ..ucdavis_data.ucdavis_metadata import UCDavisMetaData
+from ..ucsf_data.ucsf_metadata import UCSFMetaData
 
 
 from auditory_cortex import NEURAL_DATASETS

@@ -10,12 +10,13 @@ import auditory_cortex.utils as utils
 from auditory_cortex import neural_data_dir, NEURAL_DATASETS
 # from auditory_cortex.neural_data.neural_meta_data import NeuralMetaData
 from .ucsf_metadata import UCSFMetaData
-from ..base_dataset import BaseDataset
+from ..base_dataset import BaseDataset, register_dataset
 import logging
 logger = logging.getLogger(__name__)
 
 DATASET_NAME = NEURAL_DATASETS[0]
 
+@register_dataset(DATASET_NAME)
 class UCSFDataset(BaseDataset):
     """Neural_dataset class loads neural data, from the directory specified at creation & 
     provides functions to retrieve 'relative/absolute' spike times, or spike counts in the durations

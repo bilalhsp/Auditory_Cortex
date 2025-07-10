@@ -1,17 +1,19 @@
 
-from .dnn_feature_extractors import FeatureExtractorW2L, FeatureExtractorDeepSpeech2
-from .dnn_feature_extractors import FeatureExtractorS2T, FeatureExtractorWhisper
-from .dnn_feature_extractors import FeatureExtractorW2V2, FeatureExtractorW2V2Audioset
-from .dnn_feature_extractors import FeatureExtractorCoch
-from .factory import create_feature_extractor
+from .dnn_feature_extractors import Wav2LetterModified, DeepSpeech2, Speech2Text
+from .dnn_feature_extractors import Wav2Vec2, WhisperTiny, WhisperBase 
+from .dnn_feature_extractors import CochResnet50, CochCNN9, W2V2Audioset
+from .base_feature_extractor import create_feature_extractor, list_dnn_models
 
 __all__ = [
-    "FeatureExtractorW2L",
-    "FeatureExtractorDeepSpeech2",
-    "FeatureExtractorS2T",
-    "FeatureExtractorW2V2",
-    "FeatureExtractorWhisper",
-    "FeatureExtractorW2V2Audioset",
-    "FeatureExtractorCoch",
+    "Wav2LetterModified",
+    "DeepSpeech2",
+    "Speech2Text",
+    "Wav2Vec2",
+    "WhisperTiny",
+    "WhisperBase",
+    "W2V2Audioset",
+    "CochResnet50",
+    "CochCNN9",
     "create_feature_extractor",
+    "list_dnn_models",
 ]

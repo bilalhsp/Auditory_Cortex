@@ -11,7 +11,7 @@ from collections import OrderedDict
 
 import librosa
 from pycochleagram import cochleagram as cgram
-from auditory_cortex.dataloader2 import DataLoader
+from auditory_cortex.dataloader import DataLoader
 from auditory_cortex.dnn_feature_extractor import create_feature_extractor
 
 import logging
@@ -541,10 +541,6 @@ class RandProjAssembler(BaseDataAssembler):
         if sampling_rate != 16000:
             n_new = int(aud.size*16000/sampling_rate)
             aud = resample(aud, n_new)
-        # if self.mel_spectrogram:
-        #     spect = self.processor(aud, padding=True, sampling_rate=16000).input_features[0]
-        # else:
-        #     spect = nl.features.auditory_spectrogram(aud, 16000, frame_len=10)
         spect = self.dataloader.feature_extractor.process_input(aud) #(t, num_freqs)
         return spect
     

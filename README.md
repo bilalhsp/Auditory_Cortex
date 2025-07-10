@@ -36,6 +36,17 @@ auditory_cortex/
 
 
 
+## 🛠️ Installation
+The repository uses following github repos:
+```
+https://github.com/bilalhsp/Wav2Letter
+https://github.com/SeanNaren/deepspeech.pytorch.git
+https://github.com/mcdermottLab/pycochleagram.git
+
+```
+Make sure the following packages are installed, they are used for deepspeech repo but are not installed during its installation.
+python packges
+- omegaconf
 
 [Repo Link](https://github.com/bilalhsp/Auditory_Cortex)
 
@@ -45,14 +56,10 @@ go to the directory Auditory_Cortex
 
 ```pip install -e .```
 
-```
-git add .
-git commit -m "message"
-git push origin main
 
-username:
-password:
-```
+
+
+
 ## **IF memory error**
 go to the subject directory:
 ```rm -rf .*```

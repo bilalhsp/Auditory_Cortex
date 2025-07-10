@@ -40,7 +40,7 @@ import scipy.io
 import numpy as np
 
 from .recording_config import RecordingConfig
-from ..base_metadata import BaseMetaData
+from ..base_metadata import BaseMetaData, register_metadata
 from auditory_cortex import neural_data_dir, NEURAL_DATASETS
 
 import logging
@@ -51,10 +51,10 @@ logging.basicConfig(
     format='%(name)s - %(levelname)s - %(message)s'
     )
 
-
 DATASET_NAME = NEURAL_DATASETS[1]
 DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)
 
+@register_metadata(DATASET_NAME)
 class UCDavisMetaData(BaseMetaData):
     def __init__(self):
         self.data_dir = DATA_DIR

@@ -1,17 +1,44 @@
 import os
+import gc
 import yaml
+import torch
 import numpy as np
 from scipy.signal import resample
-from abc import ABC, ABCMeta, abstractmethod, abstractproperty
-import torch
-import gc
-from transformers import ClapModel, ClapProcessor
+from abc import ABC, abstractmethod
+
 from memory_profiler import profile
-from auditory_cortex import config_dir, results_dir, aux_dir, cache_dir
+from auditory_cortex import aux_dir
 
 import logging
 logger = logging.getLogger(__name__)
 
+FEATURE_EXTRACTOR_REGISTRY  = {}
+
+def register_feature_extractor(model_name: str):
+    """
+    Decorator to register a feature extractor class.
+    
+    Args:
+        model_name (str): name of the model to be used.
+    
+    Returns:
+        function: returns the decorated class.
+    """
+    def decorator(cls):
+        if model_name in FEATURE_EXTRACTOR_REGISTRY :
+            raise ValueError(f"Model {model_name} is already defined!")
+        FEATURE_EXTRACTOR_REGISTRY[model_name] = cls
+        return cls
+    return decorator
+
+def create_feature_extractor(model_name, shuffled=False, **kwargs):
+    if model_name not in FEATURE_EXTRACTOR_REGISTRY :
+        raise ValueError(f"Model {model_name} is not defined!")
+    return FEATURE_EXTRACTOR_REGISTRY[model_name](shuffled, **kwargs)
+
+def list_dnn_models():
+    """Returns the list of available feature extractors."""
+    return list(FEATURE_EXTRACTOR_REGISTRY.keys())
 
 
 class BaseFeatureExtractor(ABC):
@@ -34,10 +61,6 @@ class BaseFeatureExtractor(ABC):
             # layers = self.reset_model_parameters()
 
 
-            # if self.scale_factor is not None:
-            # 	self.scale_weights()
-            # self.randomly_reinitialize_weights(uniform=True)
-
     @abstractmethod
     def fwd_pass(self, aud):
         """DNN specific forward pass method."""
@@ -52,12 +75,9 @@ class BaseFeatureExtractor(ABC):
         named_modules = dict([*self.model.named_modules()])
         for name, layer in named_modules.items():
             if hasattr(layer, 'reset_parameters'):
-                # print(f"{layer.__name__}")
                 layer.reset_parameters()
                 layer_names.append(name)
         return layer_names
-
-            # if len(param.size()) > 1: #check if param is a weight tensor
 
     def shuffle_weights(self):
         """Shuffle weights of all the layers of the model.
@@ -91,7 +111,6 @@ class BaseFeatureExtractor(ABC):
                 param.data = param.data*self.scale_factor
 
 
-    # @profile
     def extract_features(self, stim_audios, sampling_rate, stim_durations=None, pad_time=None):
         """
         Returns raw features for all layers of the DNN..!
@@ -115,7 +134,6 @@ class BaseFeatureExtractor(ABC):
                 audio = resample(audio, n_samples)
             
             if pad_time is not None:
-                # print(f"Padding audio by {pad_time} seconds...")
                 pad = int(pad_time*self.sampling_rate)
                 padding = np.zeros((pad, ))
                 audio = np.concatenate([padding, audio])
@@ -126,14 +144,10 @@ class BaseFeatureExtractor(ABC):
                 sent_duration = stim_durations[stim_id]
                 if pad_time is not None:
                     sent_duration += pad_time
-                # sent_samples = int(np.ceil(round(sent_duration/bin_width, 3)))
                 sent_samples = int((sent_duration + bin_width/2)/bin_width)
 
-            # self.translate(audio, grad=False)
-            # _ = self.fwd_pass(audio)
             stim_features = self.get_features(audio)
             for layer_id in self.layer_ids:
-                # features[layer_id][stim_id] = self.get_features(layer_id)
                 layer_name = self.get_layer_name(layer_id)
                 features[layer_id][stim_id] = stim_features[layer_name]
                 if 'whisper' in self.model_name:
@@ -149,20 +163,16 @@ class BaseFeatureExtractor(ABC):
                     features[layer_id][stim_id] = features[layer_id][stim_id][:feature_samples]
             del stim_features
             collected = gc.collect()
-            # logger.debug(f"Garbage collector: collected {collected} objects.")
         return features
 
 
     def register_hooks(self):
         """Registers hooks for all the layers in the model."""
-        
-        # self.hooks = []
+        # Not saving the hooks as they are not needed for the analysis.
         for layer_name in self.layer_names:
             layer = dict([*self.model.named_modules()])[layer_name]
             layer.__name__ = layer_name
             hook = layer.register_forward_hook(self.create_hooks())
-        # 	self.hooks.append(hook)
-        # return self.hooks
 
 
     def create_hooks(self):
@@ -170,7 +180,6 @@ class BaseFeatureExtractor(ABC):
         def fn(layer, inp, output):
             if 'rnn' in layer.__name__:
                 features = output[0].data
-                # output = output[1][0][1].squeeze()  # reading the 2nd half of data (only backward RNNs)
             else:
                 output = output.squeeze()
                 if 'conv' in layer.__name__:
@@ -222,31 +231,10 @@ class BaseFeatureExtractor(ABC):
     def get_features(self, audio):
         """Returns features for all layers of the DNN..!"""
         _ = self.fwd_pass(audio)
-        # if 'rnn' in layer_name:
-            # return self.features[layer_name].cpu()
-        #	return self.features[layer].data[:,1024:] # only using fwd features (first half of concatenatation)
         features = {layer_name:feat.cpu() for layer_name, feat in self.features.items()}
         self.features = {}
         return features
 
-
-    # def get_features(self, layer_id):
-    # 	'''
-    # 	Use to extract features for specific layer after calling 'translate()' method 
-    # 	for given audio input.
-
-    # 	Args:
-    # 		layer_ID (int): layer identifier, assigned in config.
-
-    # 	returns:
-    # 		(dim, time) features extracted for layer at 'layer_ID'
-    # 	'''
-    # 	layer_name = self.get_layer_name(layer_id)
-    # 	if 'rnn' in layer_name:
-    # 		return self.features[layer_name].cpu()
-    # 	#	return self.features[layer].data[:,1024:] # only using fwd features (first half of concatenatation)
-    # 	else:
-    # 		return self.features[layer_name].cpu()
     
     def translate(self, aud, grad=False):
         if grad:

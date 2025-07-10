@@ -45,11 +45,12 @@ import wave
 from auditory_cortex import neural_data_dir, NEURAL_DATASETS
 # from auditory_cortex.neural_data.config import RecordingConfig
 from .recording_config import RecordingConfig
-from ..base_metadata import BaseMetaData
+from ..base_metadata import BaseMetaData, register_metadata
 
 DATASET_NAME = NEURAL_DATASETS[0]
 DATA_DIR = os.path.join(neural_data_dir, DATASET_NAME)
 
+@register_metadata(DATASET_NAME)
 class UCSFMetaData(BaseMetaData):
     def __init__(self) -> None:
     

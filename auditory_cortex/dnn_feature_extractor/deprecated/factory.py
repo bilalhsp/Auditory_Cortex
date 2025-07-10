@@ -1,7 +1,7 @@
-from .dnn_feature_extractors import FeatureExtractorW2L, FeatureExtractorDeepSpeech2
-from .dnn_feature_extractors import FeatureExtractorS2T, FeatureExtractorWhisper
-from .dnn_feature_extractors import FeatureExtractorW2V2, FeatureExtractorW2V2Audioset
-from .dnn_feature_extractors import FeatureExtractorCoch
+from ..dnn_feature_extractors import FeatureExtractorW2L, FeatureExtractorDeepSpeech2
+from ..dnn_feature_extractors import FeatureExtractorS2T, FeatureExtractorWhisper
+from ..dnn_feature_extractors import FeatureExtractorW2V2, FeatureExtractorW2V2Audioset
+from ..dnn_feature_extractors import FeatureExtractorCoch
 from auditory_cortex import DNN_MODELS
 
 # mapping strings to classes

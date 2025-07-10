@@ -38,13 +38,13 @@ import os
 import scipy.io 
 import numpy as np
 
-from ..base_dataset import BaseDataset
-from .recording_config import RecordingConfig
+from ..base_dataset import BaseDataset, register_dataset
 from .ucdavis_metadata import UCDavisMetaData
 from auditory_cortex import neural_data_dir, NEURAL_DATASETS
 
 DATASET_NAME = NEURAL_DATASETS[1]
 
+@register_dataset(DATASET_NAME)
 class UCDavisDataset(BaseDataset):
     def __init__(self, sess_id=3, data_dir=None):
         """Initialize the UCDavisDataset with session id and data directory."""
@@ -52,7 +52,7 @@ class UCDavisDataset(BaseDataset):
         self.session_id = sess_id
         self.dataset_name = DATASET_NAME
         if data_dir is None:
-            data_dir = os.path.join(neural_data_dir, DATASET_NAME)
+            data_dir = os.path.join(neural_data_dir, self.dataset_name)
         self.data_dir = data_dir
         self.metadata = UCDavisMetaData()
         self.rec_dir = os.path.join(self.data_dir, 'Data')

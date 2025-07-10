@@ -3,6 +3,35 @@ import numpy as np
 from scipy.io.matlab import mio5_params  # For mat_struct
 from abc import ABC, abstractmethod
 
+
+NEURAL_DATASETS_REGISTRY  = {}
+
+def register_dataset(name: str):
+    """
+    Decorator to register a neural dataset class.
+    
+    Args:
+        name (str): name of the dataset to be used.
+    
+    Returns:
+        function: returns the decorated class.
+    """
+    def decorator(cls):
+        if name in NEURAL_DATASETS_REGISTRY :
+            raise ValueError(f"Dataset '{name}' is already defined!")
+        NEURAL_DATASETS_REGISTRY[name] = cls
+        return cls
+    return decorator
+
+def create_neural_dataset(dataset_name, *args, **kwargs):
+    if dataset_name not in NEURAL_DATASETS_REGISTRY :
+        raise ValueError(f"Dataset '{dataset_name}' is not defined!")
+    return NEURAL_DATASETS_REGISTRY[dataset_name](*args, **kwargs)
+
+def list_neural_datasets():
+    """Returns the list of available neural datasets."""
+    return list(NEURAL_DATASETS_REGISTRY.keys())
+
 class BaseDataset(ABC):
     @abstractmethod
     def total_stimuli_duration(self, mVocs=False):

@@ -1,0 +1,24 @@
+
+# paths to the data and results directories
+neural_data_dir: /scratch/gilbreth/ahmedb/auditory_cortex/
+pretrained_models_dir: /depot/jgmakin/data/auditory_cortex/results/pretrained_weights/
+results_dir: /depot/jgmakin/data/auditory_cortex/results/
+cache_dir: /scratch/gilbreth/ahmedb/cache
+
+neural_datasets:
+- 'ucsf'
+- 'ucdavis'
+
+dnn_models:
+- 'wav2letter_modified'     # 0
+- 'wav2vec2'                # 1
+- 'speech2text'             # 2
+- 'whisper_tiny'            # 3
+- 'whisper_base'            # 4
+- 'deepspeech2'             # 5
+- 'w2v2_audioset'           # 6
+- 'cochresnet50'            # 7
+- 'cochcnn9'                # 8
+
+# experiment settings:
+pad_time: 0.35 # seconds

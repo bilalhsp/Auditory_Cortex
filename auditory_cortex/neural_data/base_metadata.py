@@ -2,6 +2,32 @@ from typing import Union
 import numpy as np
 from abc import ABC, abstractmethod
 
+
+NEURAL_METADATA_REGISTRY  = {}
+
+def register_metadata(name: str):
+    """
+    Decorator to register a neural dataset class.
+    
+    Args:
+        name (str): name of the dataset to be used.
+    
+    Returns:
+        function: returns the decorated class.
+    """
+    def decorator(cls):
+        if name in NEURAL_METADATA_REGISTRY :
+            raise ValueError(f"Dataset '{name}' is already defined!")
+        NEURAL_METADATA_REGISTRY[name] = cls
+        return cls
+    return decorator
+
+def create_neural_metadata(dataset_name, *args, **kwargs):
+    if dataset_name not in NEURAL_METADATA_REGISTRY :
+        raise ValueError(f"Dataset '{dataset_name}' is not defined!")
+    return NEURAL_METADATA_REGISTRY[dataset_name](*args, **kwargs)
+
+
 class BaseMetaData(ABC):
 
     @abstractmethod

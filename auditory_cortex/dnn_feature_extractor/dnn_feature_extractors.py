@@ -4,10 +4,6 @@ import logging
 import numpy as np
 import torch.nn as nn
 from scipy.signal import resample
-from auditory_cortex import utils
-from auditory_cortex import results_dir, CACHE_DIR
-from .base_feature_extractor import BaseFeatureExtractor
-from wav2letter.models import Wav2LetterRF, Wav2LetterSpect
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from transformers import AutoProcessor, WhisperForConditionalGeneration, AutoModelForPreTraining
 from transformers import Speech2TextForConditionalGeneration, Speech2TextProcessor
@@ -15,24 +11,26 @@ from transformers import AutoModel, Wav2Vec2FeatureExtractor
 from transformers import ClapModel, ClapProcessor
 
 # import GPU specific packages...
-from auditory_cortex import hpc_cluster
-if hpc_cluster:
-    # import cupy as cp
-    import fairseq
-    from deepspeech_pytorch.model import DeepSpeech
-    import deepspeech_pytorch.loader.data_loader as data_loader
-    from deepspeech_pytorch.configs.train_config import SpectConfig
+from deepspeech_pytorch.model import DeepSpeech
+import deepspeech_pytorch.loader.data_loader as data_loader
+from deepspeech_pytorch.configs.train_config import SpectConfig
 import importlib
+from wav2letter.models import Wav2LetterRF, Wav2LetterSpect
+
+# local imports
+from auditory_cortex import utils
+from .base_feature_extractor import BaseFeatureExtractor, register_feature_extractor
+from auditory_cortex import results_dir, cache_dir
 
 import logging
 logger = logging.getLogger(__name__)
 
-HF_CACHE_DIR = os.path.join(CACHE_DIR, 'hf_cache')
+HF_CACHE_DIR = cache_dir / 'hf_cache'
 
-class FeatureExtractorW2L(BaseFeatureExtractor):
-    def __init__(self, model_name, shuffled=False):
-
-        self.model_name = model_name
+@register_feature_extractor('wav2letter_modified')
+class Wav2LetterModified(BaseFeatureExtractor):
+    def __init__(self, shuffled=False):
+        self.model_name = 'wav2letter_modified'
         config = utils.load_dnn_config(model_name=self.model_name)
         saved_checkpoint = config['saved_checkpoint']
         checkpoint = os.path.join(results_dir, 'pretrained_weights', self.model_name, saved_checkpoint)
@@ -64,124 +62,88 @@ class FeatureExtractorW2L(BaseFeatureExtractor):
             out = self.model(aud)
         return out
     
-    # def fwd_pass_tensor(self, aud):
-    # 	"""
-    # 	Forward passes audio input through the model and captures 
-    # 	the features in the 'self.features' dict.
-
-    # 	Args:
-    # 		aud (tensor): input tensor 'wav' input of shape (1, t) 
-        
-    # 	Returns:
-    # 		input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
-    # 	"""
-    # 	with torch.no_grad():
-    # 		out = self.model(aud)
-    # 	return out
-    
-
     def batch_predictions(self, audio_batch, label_normalizer):
         """Returns prediction for the batch of audio tensors."""
         # method not tested yet
         predictions = []
         with torch.no_grad():
-            # audio, _, target_lens = batch
             for audio in audio_batch:
                 audio = audio.to(self.device)
                 predictions.append(label_normalizer(self.model.decode(audio)[0]))# 
         return predictions
-
-
-class FeatureExtractorDeepSpeech2(BaseFeatureExtractor):
-    def __init__(self, model_name, shuffled=False):
-
-        self.model_name = model_name
-        config = utils.load_dnn_config(model_name=self.model_name)
-        checkpoint = os.path.join(results_dir, 'pretrained_weights', model_name, config['saved_checkpoint'])
-        model = DeepSpeech.load_from_checkpoint(checkpoint_path=checkpoint)
-
-        # model.conv.seq_module[0] = nn.Conv2d(1, 32, kernel_size=(41, 3), stride=(2, 2), padding=(20, 1))
-        # model.conv.seq_module[3] = nn.Conv2d(32, 32, kernel_size=(21, 3), stride=(2, 1), padding=(10, 1))
-
-        super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
-        audio_config = SpectConfig()
-        self.parser = data_loader.AudioParser(audio_config, normalize=True)
-
-
-        
-        # self.device = device
-        # self.model = self.model.to(self.device)
-        # self.processor = AutoProcessor.from_pretrained("openai/whisper-tiny.en")
-        # self.model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny.en")
     
-    def process_input(self, aud):
-        """Preprocesses the input audio and returns the spectrogram.
-        Spectrogram is expected to have features of shape (t, 80).
-        
-        Args:
-            aud (ndarray): single 'wav' input of shape (t,)
-        Returns:
-            spect (ndarray): spectrogram of the input audio (t, 80)
-        
-        """
-        aud = aud.squeeze()
-        spect = self.get_spectrogram(aud).cpu().numpy().transpose(1, 0)
-        return spect
+@register_feature_extractor('wav2vec2')
+class Wav2Vec2(BaseFeatureExtractor):
+    def __init__(self, shuffled=False):
+        self.model_name = 'wav2vec2'
 
+        config = utils.load_dnn_config(model_name=self.model_name)
+        repo_name = config['repo_name']
+        model = Wav2Vec2ForCTC.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
+        super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
 
-    def get_spectrogram(self, aud):
-        """Gives spectrogram of audio input."""
-        if torch.is_tensor(aud):
-            aud = aud.cpu().numpy()
-        return self.parser.compute_spectrogram(aud)
+        self.processor = Wav2Vec2Processor.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
+
 
     def fwd_pass(self, aud):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,) 
         
-        # spect = self.parser.compute_spectrogram(aud)
-        # if not isinstance(aud, torch.Tensor): 
-
-        # test if input is 1 dimensional (audio signal)
-        if aud.ndim == 1:
-            spect = self.get_spectrogram(aud)
-        spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
-
-        # length of the spect along time
-        lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64, device=self.device)
-        spect = spect.to(self.device)
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        input = aud.astype(np.float64)
+        input_values = self.processor(input, sampling_rate=16000, return_tensors="pt", padding="longest").input_values  # Batch size 1
         self.model.eval()
         with torch.no_grad():
-            out = self.model(spect, lengths)
-        return out
+            input_values = input_values.to(self.device)
+            logits = self.model(input_values).logits
+
+        return logits
     
-    
+    def fwd_pass_tensor(self, aud_tensor):
+        """
+        Forward passes audio input through the model and captures 
+        the features in the 'self.features' dict.
+
+        Args:
+            aud (tensor): input tensor 'wav' input of shape (1, t) 
+        
+        Returns:
+            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
+        """
+        self.model.eval()
+        logits = self.model(aud_tensor).logits
+        return logits
+
+    def transcribe(self, aud):
+        """Transcribes speech audio."""
+        logits = self.fwd_pass(aud)
+        indexes = torch.argmax(logits, dim=-1)
+        return self.processor.batch_decode(indexes)
+
     def batch_predictions(self, audio_batch, label_normalizer):
         """Returns prediction for the batch of audio tensors."""
-        # method not tested yet
         predictions = []
         with torch.no_grad():
             self.model.eval()
             # audio, _, target_lens = batch
             for audio in audio_batch:
-                spect = self.get_spectrogram(audio.squeeze())
-                spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
-                spect = spect.to(self.device)
-
-                # length of the spect along time
-                lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64,
-                    device=self.device)
-                
-                out = self.model(spect, lengths)
-
-                output, output_sizes, *_ = out
-                decoded_output, _ = self.model.evaluation_decoder.decode(output, output_sizes)
-                predictions.append(label_normalizer(decoded_output[0][0]))
-
+                audio = audio.to(self.device)
+                indexes = torch.argmax(self.model(audio).logits, dim=-1)
+                predictions.append(label_normalizer(self.processor.batch_decode(indexes)[0]))# 
         return predictions
-    
-class FeatureExtractorS2T(BaseFeatureExtractor):
-    def __init__(self, model_name, shuffled=False):
-        self.model_name = model_name
 
+
+
+@register_feature_extractor('speech2text')
+class Speech2Text(BaseFeatureExtractor):
+    def __init__(self, shuffled=False):
+        self.model_name = 'speech2text'
         config = utils.load_dnn_config(model_name=self.model_name)
         repo_name = config['repo_name']
         model = Speech2TextForConditionalGeneration.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
@@ -192,7 +154,6 @@ class FeatureExtractorS2T(BaseFeatureExtractor):
 
     def fwd_pass(self, aud):
         input_features = self.processor(aud,padding=True, sampling_rate=16000, return_tensors="pt").input_features
-        # with torch.no_grad():
         self.model.eval()
         input_features = input_features.to(self.device)
         generated_ids = self.model.generate(input_features, max_new_tokens=200)
@@ -238,77 +199,6 @@ class FeatureExtractorS2T(BaseFeatureExtractor):
             ).input_features[0]
         return spect
     
-class FeatureExtractorW2V2(BaseFeatureExtractor):
-    def __init__(self, model_name, shuffled=False):
-        self.model_name = model_name
-
-        config = utils.load_dnn_config(model_name=self.model_name)
-        repo_name = config['repo_name']
-        model = Wav2Vec2ForCTC.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
-        super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
-
-        self.processor = Wav2Vec2Processor.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
-        # self.model = model 
-        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
-
-    def fwd_pass(self, aud):
-        """
-        Forward passes audio input through the model and captures 
-        the features in the 'self.features' dict.
-
-        Args:
-            aud (ndarray): single 'wav' input of shape (t,) 
-        
-        Returns:
-            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
-        """
-        input = aud.astype(np.float64)
-        input_values = self.processor(input, sampling_rate=16000, return_tensors="pt", padding="longest").input_values  # Batch size 1
-        self.model.eval()
-        with torch.no_grad():
-            input_values = input_values.to(self.device)
-            logits = self.model(input_values).logits
-
-        # input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
-        # input = input.unsqueeze(dim=0)
-        # input.requires_grad=True
-        # self.model.eval()
-        # out = self.model(input)
-        return logits
-    
-    def fwd_pass_tensor(self, aud_tensor):
-        """
-        Forward passes audio input through the model and captures 
-        the features in the 'self.features' dict.
-
-        Args:
-            aud (tensor): input tensor 'wav' input of shape (1, t) 
-        
-        Returns:
-            input (torch.Tensor): returns the torch Tensor of the input sent passed through the model.
-        """
-        self.model.eval()
-        logits = self.model(aud_tensor).logits
-        return logits
-
-    def transcribe(self, aud):
-        """Transcribes speech audio."""
-        logits = self.fwd_pass(aud)
-        indexes = torch.argmax(logits, dim=-1)
-        return self.processor.batch_decode(indexes)
-        # self.processor.decode()
-
-    def batch_predictions(self, audio_batch, label_normalizer):
-        """Returns prediction for the batch of audio tensors."""
-        predictions = []
-        with torch.no_grad():
-            self.model.eval()
-            # audio, _, target_lens = batch
-            for audio in audio_batch:
-                audio = audio.to(self.device)
-                indexes = torch.argmax(self.model(audio).logits, dim=-1)
-                predictions.append(label_normalizer(self.processor.batch_decode(indexes)[0]))# 
-        return predictions
     
 class FeatureExtractorWhisper(BaseFeatureExtractor):
     def __init__(self, model_name, shuffled=False):
@@ -316,11 +206,6 @@ class FeatureExtractorWhisper(BaseFeatureExtractor):
         config = utils.load_dnn_config(model_name=self.model_name)
         repo_name = config['repo_name']    
         model = WhisperForConditionalGeneration.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
-
-        # # changing for RFs
-        # logger.info(f"Changing convolution kernels for: {model_name}")
-        # model.model.encoder.conv1 = nn.Conv1d(80, 384, kernel_size=(11,), stride=(1,), padding=(5,))
-        # model.model.encoder.conv2 = nn.Conv1d(384, 384, kernel_size=(11,), stride=(2,), padding=(5,))
 
         super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
         self.processor = AutoProcessor.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
@@ -340,7 +225,6 @@ class FeatureExtractorWhisper(BaseFeatureExtractor):
         input_features = input_features.to(self.device)
         with torch.no_grad():
             generated_ids = self.model.generate(inputs=input_features, max_new_tokens=400)
-            # transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         return generated_ids
     
     def transcribe(self, audio):
@@ -353,28 +237,112 @@ class FeatureExtractorWhisper(BaseFeatureExtractor):
         predictions = []
         with torch.no_grad():
             self.model.eval()
-            # audio, _, target_lens = batch
             for audio in audio_batch:
                 input_features = self.processor(audio.squeeze(), sampling_rate=16000, return_tensors="pt").input_features
                 input_features = input_features.to(self.device)
                 predicted_ids = self.model.generate(input_features)
                 transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
                 predictions.append(self.processor.tokenizer._normalize(transcription))
+        return predictions
+    
+
+@register_feature_extractor('whisper_tiny')
+class WhisperTiny(FeatureExtractorWhisper):
+    def __init__(self, shuffled=False):
+        model_name = 'whisper_tiny'
+        super().__init__(model_name, shuffled=shuffled)
+
+@register_feature_extractor('whisper_base')
+class WhisperBase(FeatureExtractorWhisper):
+    def __init__(self, shuffled=False):
+        model_name = 'whisper_base'
+        super().__init__(model_name, shuffled=shuffled)
+
+@register_feature_extractor('deepspeech2')
+class DeepSpeech2(BaseFeatureExtractor):
+    def __init__(self, shuffled=False):
+        self.model_name = 'deepspeech2'
+        config = utils.load_dnn_config(model_name=self.model_name)
+        checkpoint = os.path.join(results_dir, 'pretrained_weights', self.model_name, config['saved_checkpoint'])
+        model = DeepSpeech.load_from_checkpoint(checkpoint_path=checkpoint)
+
+        super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
+        audio_config = SpectConfig()
+        self.parser = data_loader.AudioParser(audio_config, normalize=True)
+
+    
+    def process_input(self, aud):
+        """Preprocesses the input audio and returns the spectrogram.
+        Spectrogram is expected to have features of shape (t, 80).
+        
+        Args:
+            aud (ndarray): single 'wav' input of shape (t,)
+        Returns:
+            spect (ndarray): spectrogram of the input audio (t, 80)
+        
+        """
+        aud = aud.squeeze()
+        spect = self.get_spectrogram(aud).cpu().numpy().transpose(1, 0)
+        return spect
+
+
+    def get_spectrogram(self, aud):
+        """Gives spectrogram of audio input."""
+        if torch.is_tensor(aud):
+            aud = aud.cpu().numpy()
+        return self.parser.compute_spectrogram(aud)
+
+    def fwd_pass(self, aud):
+
+        # test if input is 1 dimensional (audio signal)
+        if aud.ndim == 1:
+            spect = self.get_spectrogram(aud)
+        spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
+
+        # length of the spect along time
+        lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64, device=self.device)
+        spect = spect.to(self.device)
+        self.model.eval()
+        with torch.no_grad():
+            out = self.model(spect, lengths)
+        return out
+    
+    
+    def batch_predictions(self, audio_batch, label_normalizer):
+        """Returns prediction for the batch of audio tensors."""
+        # method not tested yet
+        predictions = []
+        with torch.no_grad():
+            self.model.eval()
+            for audio in audio_batch:
+                spect = self.get_spectrogram(audio.squeeze())
+                spect = spect.unsqueeze(dim=0).unsqueeze(dim=0)
+                spect = spect.to(self.device)
+
+                # length of the spect along time
+                lengths = torch.tensor([spect.shape[-1]], dtype=torch.int64,
+                    device=self.device)
+                
+                out = self.model(spect, lengths)
+
+                output, output_sizes, *_ = out
+                decoded_output, _ = self.model.evaluation_decoder.decode(output, output_sizes)
+                predictions.append(label_normalizer(decoded_output[0][0]))
 
         return predictions
 
 
-class FeatureExtractorW2V2Audioset(BaseFeatureExtractor):
-    def __init__(self, model_name, shuffled=False):
-        self.model_name = model_name
+
+@register_feature_extractor('w2v2_audioset')
+class W2V2Audioset(BaseFeatureExtractor):
+    def __init__(self, shuffled=False):
+        self.model_name = 'w2v2_audioset'
         config = utils.load_dnn_config(model_name=self.model_name)
         repo_name = config['repo_name']
         model = Wav2Vec2ForCTC.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
-        # model = AutoModelForPreTraining.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
         super().__init__(model, config, shuffled=shuffled, sampling_rate=config['sampling_rate'])
         self.processor = AutoProcessor.from_pretrained(repo_name, cache_dir=HF_CACHE_DIR)
-        # self.model = model 
-        ########################## NEED TO MAKE THIS CONSISTENT>>>##################
+
     def fwd_pass(self, aud):
         """
         Forward passes audio input through the model and captures 
@@ -392,12 +360,6 @@ class FeatureExtractorW2V2Audioset(BaseFeatureExtractor):
         with torch.no_grad():
             input_values = input_values.to(self.device)
             out = self.model(input_values)
-
-        # input = torch.tensor(aud, dtype=torch.float32)#, requires_grad=True)
-        # input = input.unsqueeze(dim=0)
-        # input.requires_grad=True
-        # self.model.eval()
-        # out = self.model(input)
         return out
     
     def fwd_pass_tensor(self, aud_tensor):
@@ -420,14 +382,13 @@ class FeatureExtractorW2V2Audioset(BaseFeatureExtractor):
         logits = self.fwd_pass(aud)
         indexes = torch.argmax(logits, dim=-1)
         return self.processor.batch_decode(indexes)
-        # self.processor.decode()
 
     def batch_predictions(self, audio_batch, label_normalizer):
         """Returns prediction for the batch of audio tensors."""
         predictions = []
         with torch.no_grad():
             self.model.eval()
-            # audio, _, target_lens = batch
+            
             for audio in audio_batch:
                 audio = audio.to(self.device)
                 indexes = torch.argmax(self.model(audio).logits, dim=-1)
@@ -594,17 +555,24 @@ class FeatureExtractorCoch(BaseFeatureExtractor):
             ### I don't need it....
 
             for layer_id in self.layer_ids:
-                # features[layer_id][stim_id] = self.get_features(layer_id)
                 layer_name = self.get_layer_name(layer_id)
                 features[layer_id][stim_id] = np.concatenate([stim_feats[layer_name] for stim_feats in stim_features_list], axis=0)
 
             del stim_features_list
         return features
 
+@register_feature_extractor('cochresnet50')
+class CochResnet50(FeatureExtractorCoch):
+    def __init__(self, shuffled=False):
+        model_name = 'cochresnet50'
+        super().__init__(model_name, shuffled=shuffled)
 
-
-
-
+@register_feature_extractor('cochcnn9')
+class CochCNN9(FeatureExtractorCoch):
+    def __init__(self, shuffled=False):
+        model_name = 'cochcnn9'
+        super().__init__(model_name, shuffled)
+        
 
 
 

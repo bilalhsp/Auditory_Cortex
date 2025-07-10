@@ -22,7 +22,7 @@ import time
 import argparse
 
 from auditory_cortex import valid_model_names
-from auditory_cortex.dataloader2 import DataLoader
+from auditory_cortex.dataloader import DataLoader
 from auditory_cortex.neural_data import create_neural_dataset
 from auditory_cortex.dnn_feature_extractor import create_feature_extractor
 

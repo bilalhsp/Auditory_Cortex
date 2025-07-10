@@ -62,23 +62,16 @@ Usage:
     making it flexible for various computational settings.
 """
 
-
-# import math
-import numpy as np
-# from scipy.signal import resample
-from sklearn.metrics import r2_score
 import gc
+import numpy as np
+import cupy as cp
 import naplib as nl
-# from auditory_cortex import config
-# from auditory_cortex.neural_data import dataset
-# from auditory_cortex.dataloader import DataLoader
+from sklearn.metrics import r2_score
+
+# local imports
 from auditory_cortex import utils
 import auditory_cortex.io_utils.io as io
-# from sklearn.linear_model import RidgeCV, ElasticNet, Ridge, PoissonRegressor
-import cupy as cp
-# from multiprocessing import Pool
-# from tqdm.auto import tqdm
-# import copy
+
 import logging
 logger = logging.getLogger(__name__)
 

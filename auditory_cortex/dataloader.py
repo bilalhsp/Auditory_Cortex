@@ -12,9 +12,13 @@ import numpy as np
 from scipy import linalg, signal
 from memory_profiler import profile
 
-from auditory_cortex.io_utils.io import read_cached_spikes, write_cached_spikes
-from auditory_cortex.io_utils.io import read_cached_features, write_cached_features
-from auditory_cortex.io_utils.io import read_context_dependent_normalizer
+from auditory_cortex.io_utils import io
+from auditory_cortex import config
+
+
+# from auditory_cortex.io_utils.io import read_cached_spikes, write_cached_spikes
+# from auditory_cortex.io_utils.io import read_cached_features, write_cached_features
+# from auditory_cortex.io_utils.io import read_context_dependent_normalizer
 
 import logging
 logger = logging.getLogger(__name__)
@@ -27,7 +31,7 @@ class DataLoader:
         self.feature_extractor = feature_extractor
 
         if pad_time is None:
-            self.pad_time = 0.35 # seconds
+            self.pad_time = config['pad_time'] #0.35 # seconds
         self.neural_spikes = {} 	
         self.num_channels = None	
         self.DNN_feature_dict = {}
@@ -37,7 +41,6 @@ class DataLoader:
         self.DNN_feature_dict.clear()
         self.DNN_shuffled_feature_dict.clear()
         self.neural_spikes.clear()
-
 
 
     def get_layer_ids(self):
@@ -167,7 +170,7 @@ class DataLoader:
         model_name = self.feature_extractor.model_name
         shuffled = self.feature_extractor.shuffled
         if not force_reload:
-            raw_DNN_features = read_cached_features(
+            raw_DNN_features = io.read_cached_features(
                 model_name, dataset_name=self.dataset_obj.dataset_name,
                 contextualized=contextualized,
                 shuffled=shuffled, mVocs=mVocs,
@@ -200,7 +203,7 @@ class DataLoader:
             collected = gc.collect()
             logger.info(f"Garbage collector: collected {collected} objects.")
             # cache features for future use...
-            write_cached_features(
+            io.write_cached_features(
                 model_name, raw_DNN_features, dataset_name=self.dataset_obj.dataset_name,
                 contextualized=contextualized, shuffled=shuffled, mVocs=mVocs
                 )

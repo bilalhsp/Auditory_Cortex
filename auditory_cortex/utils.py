@@ -1,28 +1,17 @@
 import os
 import yaml
 import pickle
-import gc
-
 import torch
 import torchaudio
-
 import torch.nn as nn
-
 import numpy as np
+import cupy as cp
 import pandas as pd
-
-import matplotlib as mpl
-from scipy import linalg
 import matplotlib.pylab as plt
 
 # local
 # from auditory_cortex import session_to_coordinates#, #CMAP_2D
-from auditory_cortex import results_dir, aux_dir, saved_corr_dir
-
-# import GPU specific packages...
-from auditory_cortex import hpc_cluster
-if hpc_cluster:
-    import cupy as cp
+from auditory_cortex import aux_dir, saved_corr_dir
 
 import sys
 import logging
@@ -143,19 +132,12 @@ class SyntheticInputUtils:
         if peak_id > 0:
             sig1_al = sig1[peak_id:]
             sig2_al = sig2[:-1*peak_id]
-            # out_sig = (sig1[peak_id:] + sig2[:-1*peak_id])/2
-            # corr = np.corrcoef(sig1[peak_id:], sig2[:-1*peak_id])[0,1]
         elif peak_id < 0:
             sig1_al = sig1[:peak_id]
             sig2_al = sig2[-1*peak_id:]
-            
-            # out_sig = (sig1[:peak_id] + sig2[-1*peak_id:])/2
-            
         else:
             sig1_al = sig1
             sig2_al = sig2
-            
-            # out_sig = (sig1 + sig2)/2
         
         out_sig = (sig1_al + sig2_al)/2
 
@@ -226,103 +208,103 @@ class SyntheticInputUtils:
 
 
 
-class CorrelationUtils:
-    """Contains utility functions for correlations analysis.
-    """
-    def merge_correlation_results(model_name, file_identifiers, idx):
-        """
-        Args:
+# class CorrelationUtils:
+#     """Contains utility functions for correlations analysis.
+#     """
+#     def merge_correlation_results(model_name, file_identifiers, idx):
+#         """
+#         Args:
 
-            model_name: Name of the pre-trained network
-            file_identifiers: List of filename identifiers 
-            idx:    id of the file identifier to use for saving the merged results
-        """
-        # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
+#             model_name: Name of the pre-trained network
+#             file_identifiers: List of filename identifiers 
+#             idx:    id of the file identifier to use for saving the merged results
+#         """
+#         # results_dir = '/depot/jgmakin/data/auditory_cortex/correlation_results/cross_validated_correlations'
 
-        corr_dfs = []
-        for identifier in file_identifiers:
-            filename = f"{model_name}_{identifier}_corr_results.csv"
-            file_path = os.path.join(saved_corr_dir, filename)
+#         corr_dfs = []
+#         for identifier in file_identifiers:
+#             filename = f"{model_name}_{identifier}_corr_results.csv"
+#             file_path = os.path.join(saved_corr_dir, filename)
 
-            corr_dfs.append(pd.read_csv(file_path))
+#             corr_dfs.append(pd.read_csv(file_path))
 
-            # remove the file
-            os.remove(file_path)
+#             # remove the file
+#             os.remove(file_path)
 
-        # save the merged results at the very first filename...
-        output_identifer = file_identifiers[idx]    
-        filename = f"{model_name}_{output_identifer}_corr_results.csv"
-        file_path = os.path.join(saved_corr_dir, filename)
+#         # save the merged results at the very first filename...
+#         output_identifer = file_identifiers[idx]    
+#         filename = f"{model_name}_{output_identifer}_corr_results.csv"
+#         file_path = os.path.join(saved_corr_dir, filename)
 
-        data = pd.concat(corr_dfs)
-        data.to_csv(file_path, index=False)
-        logger.info(f"Output saved at: \n {file_path}")
+#         data = pd.concat(corr_dfs)
+#         data.to_csv(file_path, index=False)
+#         logger.info(f"Output saved at: \n {file_path}")
 
-    @staticmethod
-    def add_layer_types(model_name, results_identifer):
+    # @staticmethod
+    # def add_layer_types(model_name, results_identifer):
 
-        # reading layer_types from aux config...
-        layer_types = {}
-        config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
-        with open(config_file, 'r') as f:
-            config = yaml.load(f, yaml.FullLoader)
+    #     # reading layer_types from aux config...
+    #     layer_types = {}
+    #     config_file = os.path.join(aux_dir, f"{model_name}_config.yml")
+    #     with open(config_file, 'r') as f:
+    #         config = yaml.load(f, yaml.FullLoader)
 
-        # config['layers']
-        for layer_config in config['layers']:
-            layer_types[layer_config['layer_id']] = layer_config['layer_type']
+    #     # config['layers']
+    #     for layer_config in config['layers']:
+    #         layer_types[layer_config['layer_id']] = layer_config['layer_type']
 
-        # reading results directory...
-        if results_identifer != '':
-            model = f'{model_name}_{results_identifer}'
-        else:
-            model = model_name 
-        filename = f"{model}_corr_results.csv"
-        file_path = os.path.join(saved_corr_dir, filename)
-        data = pd.read_csv(file_path)
-        logger.info(f"reading from {file_path}")
+    #     # reading results directory...
+    #     if results_identifer != '':
+    #         model = f'{model_name}_{results_identifer}'
+    #     else:
+    #         model = model_name 
+    #     filename = f"{model}_corr_results.csv"
+    #     file_path = os.path.join(saved_corr_dir, filename)
+    #     data = pd.read_csv(file_path)
+    #     logger.info(f"reading from {file_path}")
 
-        # remove 'Unnamed' columns
-        data = data.loc[:, ~data.columns.str.contains('Unnamed')]
+    #     # remove 'Unnamed' columns
+    #     data = data.loc[:, ~data.columns.str.contains('Unnamed')]
 
-        # add 'layer_type' as a column
-        for layer, type in layer_types.items():
-            ids = data[data['layer']==layer].index
-            data.loc[ids, 'layer_type'] = type
+    #     # add 'layer_type' as a column
+    #     for layer, type in layer_types.items():
+    #         ids = data[data['layer']==layer].index
+    #         data.loc[ids, 'layer_type'] = type
 
-        logger.info("Writing back...!")
-        data.to_csv(file_path, index=False)
+    #     logger.info("Writing back...!")
+    #     data.to_csv(file_path, index=False)
 
-    @staticmethod
-    def copy_normalizer(model_name, results_identifer=''):
-        # reading results directory...
-        if results_identifer != '':
-            corr_file = f'{model_name}_{results_identifer}'
-        else:
-            corr_file = model_name
+    # @staticmethod
+    # def copy_normalizer(model_name, results_identifer=''):
+    #     # reading results directory...
+    #     if results_identifer != '':
+    #         corr_file = f'{model_name}_{results_identifer}'
+    #     else:
+    #         corr_file = model_name
 
-        filename = f'{corr_file}_corr_results.csv'
-        corr_file_path = os.path.join(saved_corr_dir, filename)
-        data1 = pd.read_csv(corr_file_path)
-        logger.info(f"Reading file from: \n {corr_file_path}")
-        # normalizer
-        normalizer_file = 'wav2letter_modified_normalizer2_corr_results.csv'
-        norm_file_path = os.path.join(saved_corr_dir, normalizer_file)
-        data2 = pd.read_csv(norm_file_path)
-        logger.info(f"Reading normalizers from: \n {norm_file_path}")
+    #     filename = f'{corr_file}_corr_results.csv'
+    #     corr_file_path = os.path.join(saved_corr_dir, filename)
+    #     data1 = pd.read_csv(corr_file_path)
+    #     logger.info(f"Reading file from: \n {corr_file_path}")
+    #     # normalizer
+    #     normalizer_file = 'wav2letter_modified_normalizer2_corr_results.csv'
+    #     norm_file_path = os.path.join(saved_corr_dir, normalizer_file)
+    #     data2 = pd.read_csv(norm_file_path)
+    #     logger.info(f"Reading normalizers from: \n {norm_file_path}")
 
-        sessions = data1['session'].unique()
-        for session in sessions:
-            select_data = data1[data1['session']==session]
-            channels = select_data['channel'].unique()
-            for ch in channels:
-                ids = select_data[select_data['channel'] == ch].index
+    #     sessions = data1['session'].unique()
+    #     for session in sessions:
+    #         select_data = data1[data1['session']==session]
+    #         channels = select_data['channel'].unique()
+    #         for ch in channels:
+    #             ids = select_data[select_data['channel'] == ch].index
 
-                norm = data2[(data2['session']==session) &(data2['channel']==ch)]['normalizer'].head(1).item() 
+    #             norm = data2[(data2['session']==session) &(data2['channel']==ch)]['normalizer'].head(1).item() 
 
-                data1.loc[ids, 'normalizer'] = norm
+    #             data1.loc[ids, 'normalizer'] = norm
         
-        data1.to_csv(corr_file_path, index=False)
-        logger.info(f"Normalizer updated and written back to file: \n {corr_file_path}")
+    #     data1.to_csv(corr_file_path, index=False)
+    #     logger.info(f"Normalizer updated and written back to file: \n {corr_file_path}")
 
 
 
@@ -489,73 +471,74 @@ def poiss_regression(x_train, y_train):
             break
       
     return model, loss_history, P_scores
-def write_df_to_disk(df, file_path):
-    """
-    Takes in any pandas dataframe 'df' and writes as csv file 'file_path',
-    appends data to existing file, if it already exists.
 
-    Args:
-        df (dataframe): dataframe containing data to write
-        file_path (str): name of the file to write to.
-    """
-    if os.path.isfile(file_path):
-        data = pd.read_csv(file_path)
-        action = 'appended'
-    else:
-        data = pd.DataFrame(columns= df.columns)
-        action = 'written'
-    data = pd.concat([data,df], axis=0, ignore_index=True)
-    data.to_csv(file_path, index=False)
-    logger.info(f"Dataframe {action} to {file_path}.")
+# def write_df_to_disk(df, file_path):
+#     """
+#     Takes in any pandas dataframe 'df' and writes as csv file 'file_path',
+#     appends data to existing file, if it already exists.
 
-def write_STRF(corr_dict, file_path, normalizer=None):
+#     Args:
+#         df (dataframe): dataframe containing data to write
+#         file_path (str): name of the file to write to.
+#     """
+#     if os.path.isfile(file_path):
+#         data = pd.read_csv(file_path)
+#         action = 'appended'
+#     else:
+#         data = pd.DataFrame(columns= df.columns)
+#         action = 'written'
+#     data = pd.concat([data,df], axis=0, ignore_index=True)
+#     data.to_csv(file_path, index=False)
+#     logger.info(f"Dataframe {action} to {file_path}.")
 
-    columns_list = [
-        'session','channel','bin_width', 'delay',
-        'num_freqs', 'tmin', 'tmax', 'lmbda',
-        'test_cc_raw', 'normalizer',
-        'mVocs_test_cc_raw', 'mVocs_normalizer',
-        ]
-    if os.path.isfile(file_path):
-        logger.info(f"Reading existing result from: {file_path}")
-        data = pd.read_csv(file_path)
-        # making sure there is no extra columns in the existing dataframe.
-        for column in data.columns:
-            if column not in columns_list:
-                data.drop(columns=column, inplace=True)
-    else:
-        data = pd.DataFrame(columns=columns_list)
-    session = corr_dict['session']
-    win = corr_dict['win']
-    delay = corr_dict['delay']
-    ch = np.arange(corr_dict['strf_corr'].shape[0])
-    num_freqs = corr_dict['num_freqs']
-    tmin = corr_dict['tmin']
-    tmax = corr_dict['tmax']
-    lmbda = corr_dict['lmbda']
-    if normalizer is None:
-        normalizer = np.zeros_like(ch)
+# def write_STRF(corr_dict, file_path, normalizer=None):
 
-    df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
-                                    ch, 
-                                    np.ones_like(ch)*win, 
-                                    np.ones_like(ch)*delay,
-                                    np.ones_like(ch)*num_freqs,
-                                    np.ones_like(ch)*tmin,
-                                    np.ones_like(ch)*tmax,
-                                    np.ones_like(ch)*lmbda,
-                                    corr_dict['strf_corr'],
-                                    normalizer,
-                                    corr_dict['mVocs_strf_corr'],
-                                    normalizer,
-                                    ]).transpose(),
-                        columns=data.columns
-                        )
-    data = pd.concat([data,df], axis=0, ignore_index=True)
-    data.to_csv(file_path, index=False)
-    logger.info(f"Data saved for session: '{session}',\
-    bin-width: {win}ms, delay: {delay}ms at file: '{file_path}'")
-    return data
+#     columns_list = [
+#         'session','channel','bin_width', 'delay',
+#         'num_freqs', 'tmin', 'tmax', 'lmbda',
+#         'test_cc_raw', 'normalizer',
+#         'mVocs_test_cc_raw', 'mVocs_normalizer',
+#         ]
+#     if os.path.isfile(file_path):
+#         logger.info(f"Reading existing result from: {file_path}")
+#         data = pd.read_csv(file_path)
+#         # making sure there is no extra columns in the existing dataframe.
+#         for column in data.columns:
+#             if column not in columns_list:
+#                 data.drop(columns=column, inplace=True)
+#     else:
+#         data = pd.DataFrame(columns=columns_list)
+#     session = corr_dict['session']
+#     win = corr_dict['win']
+#     delay = corr_dict['delay']
+#     ch = np.arange(corr_dict['strf_corr'].shape[0])
+#     num_freqs = corr_dict['num_freqs']
+#     tmin = corr_dict['tmin']
+#     tmax = corr_dict['tmax']
+#     lmbda = corr_dict['lmbda']
+#     if normalizer is None:
+#         normalizer = np.zeros_like(ch)
+
+#     df = pd.DataFrame(np.array([np.ones_like(ch)*int(session),
+#                                     ch, 
+#                                     np.ones_like(ch)*win, 
+#                                     np.ones_like(ch)*delay,
+#                                     np.ones_like(ch)*num_freqs,
+#                                     np.ones_like(ch)*tmin,
+#                                     np.ones_like(ch)*tmax,
+#                                     np.ones_like(ch)*lmbda,
+#                                     corr_dict['strf_corr'],
+#                                     normalizer,
+#                                     corr_dict['mVocs_strf_corr'],
+#                                     normalizer,
+#                                     ]).transpose(),
+#                         columns=data.columns
+#                         )
+#     data = pd.concat([data,df], axis=0, ignore_index=True)
+#     data.to_csv(file_path, index=False)
+#     logger.info(f"Data saved for session: '{session}',\
+#     bin-width: {win}ms, delay: {delay}ms at file: '{file_path}'")
+#     return data
 
 def write_to_disk(corr_dict, file_path):
     """Takes in the 'corr' dict and stores the results
@@ -884,21 +867,12 @@ def predict(X, B):
 #     return pred 
 
 def fit_and_score(X, y):
-    # x_train, y_train, x_test, y_test = train_test_split(X,y, split=0.7)
-    # B = reg(x_train,y_train)
-    # y_hat = predict(x_test,B)
-    # cc = cc_norm(y_hat, y_test)
 
     B = reg(X,y)
     y_hat = predict(X,B)
     cc = cc_norm(y_hat, y)
     return cc
 
-# def fit_and_score(X, y):
-#     B = regression_param(X,y)
-#     y_hat = predict(X,B)
-#     cc = cc_norm(y_hat, y)
-#     return cc
 
 def train_test_split(x,y, split=0.7):
     split = int(x.shape[0]*split)
@@ -906,12 +880,6 @@ def train_test_split(x,y, split=0.7):
 
 
 def mse_loss(y, y_hat):
-    #check if incoming array is np or cp,
-    #and decide which module to use...!
-    # if type(y).__module__ == np.__name__:
-    #     module = np
-    # else:
-    #     module = cp
     module = np
     if y.ndim < y_hat.ndim:
         y = module.expand_dims(y, axis=-1)
@@ -946,35 +914,35 @@ def mse_loss(y, y_hat):
 #############################
 ##############
 
-def normalize(x):
-    # Normalize for spectrogram
-    mean = x.mean(axis=0)
-    square_sums = (x ** 2).sum(axis=0)
-    x = np.subtract(x, mean)
-    var = square_sums / x.shape[0] - mean ** 2
-    std = np.sqrt(np.maximum(var, 1e-10))
-    x = np.divide(x, std)
+# def normalize(x):
+#     # Normalize for spectrogram
+#     mean = x.mean(axis=0)
+#     square_sums = (x ** 2).sum(axis=0)
+#     x = np.subtract(x, mean)
+#     var = square_sums / x.shape[0] - mean ** 2
+#     std = np.sqrt(np.maximum(var, 1e-10))
+#     x = np.divide(x, std)
 
-    return x
+#     return x
 
-def spectrogram(aud):
-    waveform = torch.tensor(aud, dtype=torch.float32).unsqueeze(dim=0)
-    waveform = waveform * (2 ** 15)
-    kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
-    kaldi = normalize(kaldi)
+# def spectrogram(aud):
+#     waveform = torch.tensor(aud, dtype=torch.float32).unsqueeze(dim=0)
+#     waveform = waveform * (2 ** 15)
+#     kaldi = torchaudio.compliance.kaldi.fbank(waveform, num_mel_bins=80, window_type='hanning')
+#     kaldi = normalize(kaldi)
 
-    return kaldi.transpose(0,1)
+#     return kaldi.transpose(0,1)
 
-def write_optimal_delays(filename, result):
-    if os.path.exists(filename):
-        with open(filename, 'rb') as f:
-            prev_result = pickle.load(f)
-        result['corr'] = np.concatenate([prev_result['corr'], result['corr']], axis=0)
-        result['loss'] = np.concatenate([prev_result['loss'], result['loss']], axis=0)
-        result['delays'] = np.concatenate([prev_result['delays'], result['delays']], axis=0)
-        # temporary change...should be removed after run..!
-        # result['delays'] = np.concatenate([np.arange(0,201,10), result['delays']], axis=0)
+# def write_optimal_delays(filename, result):
+#     if os.path.exists(filename):
+#         with open(filename, 'rb') as f:
+#             prev_result = pickle.load(f)
+#         result['corr'] = np.concatenate([prev_result['corr'], result['corr']], axis=0)
+#         result['loss'] = np.concatenate([prev_result['loss'], result['loss']], axis=0)
+#         result['delays'] = np.concatenate([prev_result['delays'], result['delays']], axis=0)
+#         # temporary change...should be removed after run..!
+#         # result['delays'] = np.concatenate([np.arange(0,201,10), result['delays']], axis=0)
         
 
-    with open(filename, 'wb') as file:
-        pickle.dump(result, file)
+#     with open(filename, 'wb') as file:
+#         pickle.dump(result, file)
