@@ -11,7 +11,7 @@ setuptools.setup(
     description="Auditory Cortex Modeling with ECoG data in PyTorch",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/bilalhsp/",
+    url="https://github.com/bilalhsp/Auditory_Cortex",
     packages=setuptools.find_packages(),
     package_data={
         'auditory_cortex': ['config.yml']
