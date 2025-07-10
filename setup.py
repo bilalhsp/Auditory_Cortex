@@ -14,9 +14,7 @@ setuptools.setup(
     url="https://github.com/bilalhsp/",
     packages=setuptools.find_packages(),
     package_data={
-        'auditory_ctx': [
-            'conf/params.yaml'
-        ]
+        'auditory_cortex': ['config.yml']
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
